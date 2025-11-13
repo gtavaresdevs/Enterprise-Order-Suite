@@ -11,103 +11,73 @@ This project showcases real-world backend development skills, including layered 
 🚀 Features
 🔐 Authentication
 
-User registration
-
-Login with JWT
-
-Refresh token
-
-Role-based authorization
-
-Protected API routes
+- User registration
+- Login with JWT
+- Refresh token
+- Role-based authorization
+- Protected API routes
 
 🏢 Company Management
 
-Create, update, retrieve, deactivate companies
-
-Validation and business rules
-
-Pagination and search
+- Create, update, retrieve, deactivate companies
+- Validation and business rules
+- Pagination and search
 
 📦 Product Management
 
-Create and manage products
-
-Update prices
-
-Archive/soft delete
-
-Filtering
+- Create and manage products
+- Update prices
+- Archive/soft delete
+- Filtering
 
 🧾 Order Management
 
-Create new orders
-
-Associate buyer/seller companies
-
-Add multiple items
-
-Automatic total calculation
-
-Change order status (workflow)
-
-Full order retrieval with details
+- Create new orders
+- Associate buyer/seller companies
+- Add multiple items
+- Automatic total calculation
+- Change order status (workflow)
+- Full order retrieval with details
 
 📜 Order Status Workflow
 
 Supported statuses:
 
-CREATED
-
-APPROVED
-
-REJECTED
-
-PROCESSING
-
-SHIPPED
-
-COMPLETED
+- CREATED
+- APPROVED
+- REJECTED
+- PROCESSING
+- SHIPPED
+- COMPLETED
 
 Includes:
 
-Validation of allowed transitions
-
-History entries created automatically
+- Validation of allowed transitions
+- History entries created automatically
 
 🕒 Order History
 
-Every status change logs:
-
-Previous status
-
-New status
-
-User responsible
-
-Timestamp
+- Every status change logs:
+- Previous status
+- New status
+- User responsible
+- Timestamp
 
 🧩 Advanced Filtering
 
-Filter orders by:
-
-Company
-
-Status
-
-Date range
-
-Value range
+- Filter orders by:
+- Company
+- Status
+- Date range
+- Value range
 
 Pagination + sorting
 
 🧭 Documentation
 
-Swagger/OpenAPI UI
-
-Clear folder structure
-
-Postman collection (optional)
+- Swagger/OpenAPI UI
+- Clear folder structure
+- Postman collection (optional)
 
 🧱 Architecture Overview
 
@@ -126,50 +96,30 @@ PostgreSQL Database
 
 Additional engineering practices:
 
-DTO mapping with MapStruct
-
-Global exception handling
-
-Validation with Jakarta Bean Validation
-
-Structured logging (SLF4J)
-
-JWT authentication with refresh tokens
+- DTO mapping with MapStruct
+- Global exception handling
+- Validation with Jakarta Bean Validation
+- Structured logging (SLF4J)
+- JWT authentication with refresh tokens
 
 🛠 Tech Stack
-Backend
-
-Java 17
-
-Spring Boot 3
-
-Spring Web
-
-Spring Data JPA
-
-Spring Security + JWT
-
-MapStruct
-
-Lombok
-
-Validation API
-
-Database
-
-PostgreSQL
-
-Flyway (optional for migrations)
-
-DevOps
-
-Docker
-
-Docker Compose
-
-Swagger/OpenAPI
-
-JUnit 5
+- Backend
+- Java 17
+- Spring Boot 3
+- Spring Web
+- Spring Data JPA
+- Spring Security + JWT
+- MapStruct
+- Lombok
+- Validation API
+- Database
+- PostgreSQL
+- Flyway (optional for migrations)
+- DevOps
+- Docker
+- Docker Compose
+- Swagger/OpenAPI
+- JUnit 5
 
 🗃️ Database Entities
 User
@@ -224,7 +174,6 @@ Make sure you have Docker installed, then run:
 
 docker compose up -d
 
-
 This will start:
 
 PostgreSQL
@@ -239,9 +188,7 @@ password: postgres
 
 ▶️ How to Run Locally (Without Docker)
 1. Start PostgreSQL manually
-
 Create a database:
-
 b2b_order_db
 
 2. Set environment variables (or edit application.yml):
@@ -253,7 +200,6 @@ spring:
 
 3. Run the app:
 ./mvnw spring-boot:run
-
 
 (or use your IDE)
 
@@ -270,15 +216,11 @@ src/main/java/com/yourname/b2border
     mappers/
 
 🧪 Tests
-
 Includes:
 
-Unit tests for services
-
-Integration tests for controllers
-
-Authentication flow tests
+- Unit tests for services
+- Integration tests for controllers
+- Authentication flow tests
 
 To run:
-
 ./mvnw test
