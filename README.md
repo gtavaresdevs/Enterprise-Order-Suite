@@ -122,51 +122,65 @@ Additional engineering practices:
 - JUnit 5
 
 🗃️ Database Entities
+
 User
+
 id, name, email, password, role
 
 Company
+
 id, name, documentNumber, active
 
 Product
+
 id, name, price, description, active
 
 Order
+
 id, buyerCompany, sellerCompany,
 createdAt, updatedAt, status, totalValue
 
 OrderItem
+
 id, orderId, productId, quantity, priceAtMoment
 
 OrderHistory
+
 id, orderId, previousStatus, newStatus, changedBy, changedAt
 
+
+
 📡 API Endpoints Overview
+
 Auth
-POST /auth/register
-POST /auth/login
-POST /auth/refresh
+
+- POST /auth/register
+- POST /auth/login
+- POST /auth/refresh
 
 Companies
-POST /companies
-GET /companies
-GET /companies/{id}
-PUT /companies/{id}
-DELETE /companies/{id}
+
+- POST /companies
+- GET /companies
+- GET /companies/{id}
+- PUT /companies/{id}
+- DELETE /companies/{id}
 
 Products
-POST /products
-GET /products
-GET /products/{id}
-PUT /products/{id}
-DELETE /products/{id}
+
+- POST /products
+- GET /products
+- GET /products/{id}
+- PUT /products/{id}
+- DELETE /products/{id}
 
 Orders
-POST /orders
-GET /orders
-GET /orders/{id}
-PUT /orders/{id}/status
-GET /orders/{id}/history
+
+- POST /orders
+- GET /orders
+- GET /orders/{id}
+- PUT /orders/{id}/status
+- GET /orders/{id}/history
 
 🐳 How to Run with Docker
 
