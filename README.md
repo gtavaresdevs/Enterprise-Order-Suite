@@ -176,9 +176,8 @@ docker compose up -d
 
 This will start:
 
-PostgreSQL
-
-The backend application
+- PostgreSQL
+- The backend application
 
 Database available at:
 
