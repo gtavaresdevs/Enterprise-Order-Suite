@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ADD YOUR OWN HERE
+    username: ADD YOUR OWN HERE
+    password: ADD YOUR OWN HERE
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+jwt:
+  secret: ADD YOUR OWN HERE
+  expiration: 86400000
