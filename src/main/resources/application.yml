@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/ADD YOUR OWN HERE
-    username: ADD YOUR OWN HERE
-    password: ADD YOUR OWN HERE
+    url: jdbc:postgresql://localhost:5432/${DB_NAME}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
 
   jpa:
     hibernate:
@@ -13,5 +13,5 @@ spring:
         format_sql: true
 
 jwt:
-  secret: ADD YOUR OWN HERE
+  secret: ${JWT_SECRET}
   expiration: 86400000
