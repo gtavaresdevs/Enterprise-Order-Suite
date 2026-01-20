@@ -26,7 +26,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)  // disable CSRF for JWT authentication
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/login", "/auth/register").permitAll() // public endpoints
+                        .requestMatchers("/auth/login", "/auth/register","/auth/forgot-password","/auth/reset-password").permitAll() // public endpoints
                         .anyRequest().authenticated() // everything else is protected
                 )
 
