@@ -4,8 +4,10 @@ import com.enterprise.ordersuite.entities.auth.PasswordResetToken;
 import com.enterprise.ordersuite.entities.user.User;
 import com.enterprise.ordersuite.repositories.PasswordResetTokenRepository;
 import com.enterprise.ordersuite.repositories.UserRepository;
+import com.enterprise.ordersuite.services.auth.PasswordResetLinkBuilder;
 import com.enterprise.ordersuite.services.auth.PasswordResetService;
 import com.enterprise.ordersuite.services.auth.exceptions.InvalidPasswordResetTokenException;
+import com.enterprise.ordersuite.services.notification.EmailService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -19,6 +21,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class PasswordResetServiceTest {
@@ -28,6 +32,10 @@ class PasswordResetServiceTest {
     private PasswordEncoder passwordEncoder;
     private Clock clock;
 
+    // NEW deps introduced in step 1.5
+    private EmailService emailService;
+    private PasswordResetLinkBuilder linkBuilder;
+
     private PasswordResetService service;
 
     @BeforeEach
@@ -35,9 +43,22 @@ class PasswordResetServiceTest {
         userRepository = mock(UserRepository.class);
         tokenRepository = mock(PasswordResetTokenRepository.class);
         passwordEncoder = mock(PasswordEncoder.class);
+        emailService = mock(EmailService.class);
+        linkBuilder = mock(PasswordResetLinkBuilder.class);
+
         clock = Clock.fixed(Instant.parse("2026-01-19T12:00:00Z"), ZoneOffset.UTC);
 
-        service = new PasswordResetService(userRepository, tokenRepository, passwordEncoder, clock);
+        // Service will call linkBuilder.build(rawToken) and then emailService.sendPasswordResetEmail(...)
+        when(linkBuilder.build(anyString())).thenReturn("http://localhost/reset-password?token=mock");
+
+        service = new PasswordResetService(
+                userRepository,
+                tokenRepository,
+                passwordEncoder,
+                clock,
+                emailService,
+                linkBuilder
+        );
     }
 
     @Test
@@ -49,10 +70,14 @@ class PasswordResetServiceTest {
 
         assertThat(token).isEmpty();
         verify(tokenRepository, never()).save(any());
+
+        // Also ensure no email is attempted
+        verifyNoInteractions(emailService);
+        verifyNoInteractions(linkBuilder);
     }
 
     @Test
-    void requestPasswordReset_whenUserFound_returnsRawToken_andSavesHashedToken_withExpiry() {
+    void requestPasswordReset_whenUserFound_returnsRawToken_andSavesHashedToken_withExpiry_andSendsEmail() {
         User user = new User();
         user.setEmail("gabriel@example.com");
 
@@ -73,12 +98,17 @@ class PasswordResetServiceTest {
         // raw token should NOT be stored
         assertThat(saved.getTokenHash()).isNotBlank();
         assertThat(saved.getTokenHash()).isNotEqualTo(rawToken);
+        assertThat(saved.getTokenHash()).hasSize(64); // SHA-256 hex
 
         // expiry should be now + 15 minutes (EXPIRY_MINUTES)
         LocalDateTime expectedNow = LocalDateTime.now(clock);
         assertThat(saved.getExpiresAt()).isEqualTo(expectedNow.plusMinutes(15));
 
         assertThat(saved.getUser()).isSameAs(user);
+
+        // Email should be triggered using the built link
+        verify(linkBuilder).build(eq(rawToken));
+        verify(emailService).sendPasswordResetEmail(eq("gabriel@example.com"), anyString());
     }
 
     @Test
@@ -88,6 +118,8 @@ class PasswordResetServiceTest {
 
         verifyNoInteractions(tokenRepository);
         verifyNoInteractions(userRepository);
+        verifyNoInteractions(emailService);
+        verifyNoInteractions(linkBuilder);
     }
 
     @Test
@@ -96,6 +128,9 @@ class PasswordResetServiceTest {
 
         assertThatThrownBy(() -> service.resetPassword("token", "NewPass123!"))
                 .isInstanceOf(InvalidPasswordResetTokenException.class);
+
+        verify(userRepository, never()).save(any());
+        verify(tokenRepository, never()).save(any(PasswordResetToken.class));
     }
 
     @Test
@@ -148,5 +183,9 @@ class PasswordResetServiceTest {
         verify(userRepository).save(user);
         verify(prt).setUsedAt(LocalDateTime.now(clock));
         verify(tokenRepository).save(prt);
+
+        // Reset flow does not send email during reset, only during request
+        verifyNoInteractions(emailService);
+        verifyNoInteractions(linkBuilder);
     }
 }

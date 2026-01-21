@@ -5,6 +5,7 @@ import com.enterprise.ordersuite.entities.user.User;
 import com.enterprise.ordersuite.repositories.PasswordResetTokenRepository;
 import com.enterprise.ordersuite.repositories.UserRepository;
 import com.enterprise.ordersuite.services.auth.exceptions.InvalidPasswordResetTokenException;
+import com.enterprise.ordersuite.services.notification.EmailService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,16 +30,25 @@ public class PasswordResetService {
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
 
+    // NEW (keeps original behavior, adds email + link composition)
+    private final EmailService emailService;
+    private final PasswordResetLinkBuilder linkBuilder;
+
     public PasswordResetService(
             UserRepository userRepository,
             PasswordResetTokenRepository passwordResetTokenRepository,
             PasswordEncoder passwordEncoder,
-            Clock clock
+            Clock clock,
+            EmailService emailService,
+            PasswordResetLinkBuilder linkBuilder
     ) {
         this.userRepository = userRepository;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.clock = clock;
+
+        this.emailService = emailService;
+        this.linkBuilder = linkBuilder;
     }
 
     /**
@@ -60,6 +70,10 @@ public class PasswordResetService {
 
         PasswordResetToken entity = new PasswordResetToken(userOpt.get(), tokenHash, expiresAt);
         passwordResetTokenRepository.save(entity);
+
+        // NEW: compose URL and "send" email (dev logs, prod sends)
+        String resetUrl = linkBuilder.build(rawToken);
+        emailService.sendPasswordResetEmail(userOpt.get().getEmail(), resetUrl);
 
         return Optional.of(rawToken);
     }
