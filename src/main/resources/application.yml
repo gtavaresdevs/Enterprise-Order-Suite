@@ -15,3 +15,7 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
   expiration: 86400000
+
+app:
+  urls:
+    password-reset: ${APP_PASSWORD_RESET_URL}

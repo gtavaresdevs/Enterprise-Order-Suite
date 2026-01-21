@@ -1,6 +1,8 @@
 package com.enterprise.ordersuite.config;
 
 import com.enterprise.ordersuite.security.CustomUserDetailsService;
+import com.enterprise.ordersuite.services.notification.DevEmailService;
+import com.enterprise.ordersuite.services.notification.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,5 +35,10 @@ public class ApplicationConfig {
 
         authProvider.setPasswordEncoder(passwordEncoder);
         return authProvider;
+    }
+
+    @Bean
+    public EmailService emailService() {
+        return new DevEmailService();
     }
 }
