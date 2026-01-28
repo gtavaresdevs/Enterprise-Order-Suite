@@ -1,13 +1,13 @@
 package com.enterprise.ordersuite.repository;
 
-import com.enterprise.ordersuite.entities.auth.PasswordResetToken;
-import com.enterprise.ordersuite.entities.user.User;
-import com.enterprise.ordersuite.repositories.PasswordResetTokenRepository;
-import com.enterprise.ordersuite.repositories.UserRepository;
-import com.enterprise.ordersuite.services.auth.PasswordResetLinkBuilder;
-import com.enterprise.ordersuite.services.auth.PasswordResetService;
-import com.enterprise.ordersuite.services.auth.exceptions.InvalidPasswordResetTokenException;
-import com.enterprise.ordersuite.services.notification.EmailService;
+import com.enterprise.ordersuite.auth.domain.PasswordResetToken;
+import com.enterprise.ordersuite.identity.domain.User;
+import com.enterprise.ordersuite.auth.persistence.PasswordResetTokenRepository;
+import com.enterprise.ordersuite.identity.persistence.UserRepository;
+import com.enterprise.ordersuite.auth.service.PasswordResetLinkBuilder;
+import com.enterprise.ordersuite.auth.service.PasswordResetService;
+import com.enterprise.ordersuite.auth.service.exceptions.InvalidPasswordResetTokenException;
+import com.enterprise.ordersuite.notifications.service.EmailService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
