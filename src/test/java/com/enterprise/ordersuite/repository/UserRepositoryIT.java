@@ -1,9 +1,9 @@
 package com.enterprise.ordersuite.repository;
 
-import com.enterprise.ordersuite.entities.role.Role;
-import com.enterprise.ordersuite.entities.user.User;
-import com.enterprise.ordersuite.repositories.RoleRepository;
-import com.enterprise.ordersuite.repositories.UserRepository;
+import com.enterprise.ordersuite.identity.domain.Role;
+import com.enterprise.ordersuite.identity.domain.User;
+import com.enterprise.ordersuite.identity.persistence.RoleRepository;
+import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
