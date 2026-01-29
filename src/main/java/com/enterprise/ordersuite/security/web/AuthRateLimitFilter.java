@@ -20,6 +20,8 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private final RateLimiter forgotPasswordLimiter;
     private final RateLimiter loginLimiter;
     private final RateLimiter resetPasswordLimiter;
+    private final RateLimiter refreshLimiter;
+    private final RateLimiter logoutLimiter;
 
     private final ObjectMapper objectMapper;
     private final Clock clock;
@@ -28,12 +30,16 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             RateLimiter forgotPasswordLimiter,
             RateLimiter loginLimiter,
             RateLimiter resetPasswordLimiter,
+            RateLimiter refreshLimiter,
+            RateLimiter logoutLimiter,
             ObjectMapper objectMapper,
             Clock clock
     ) {
         this.forgotPasswordLimiter = forgotPasswordLimiter;
         this.loginLimiter = loginLimiter;
         this.resetPasswordLimiter = resetPasswordLimiter;
+        this.refreshLimiter = refreshLimiter;
+        this.logoutLimiter = logoutLimiter;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -47,6 +53,8 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
                 path.equals("/auth/forgot-password")
                         || path.equals("/auth/login")
                         || path.equals("/auth/reset-password")
+                        || path.equals("/auth/refresh")
+                        || path.equals("/auth/logout")
         );
     }
 
@@ -90,9 +98,15 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         } else if (path.equals("/auth/login")) {
             limiter = loginLimiter;
             keyPrefix = "LOGIN";
-        } else {
+        } else if (path.equals("/auth/reset-password")) {
             limiter = resetPasswordLimiter;
             keyPrefix = "RESET_PASSWORD";
+        } else if (path.equals("/auth/refresh")) {
+            limiter = refreshLimiter;
+            keyPrefix = "REFRESH";
+        } else {
+            limiter = logoutLimiter;
+            keyPrefix = "LOGOUT";
         }
 
         String key = keyPrefix + ":ip:" + ip;

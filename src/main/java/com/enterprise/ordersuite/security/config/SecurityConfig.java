@@ -30,17 +30,27 @@ public class SecurityConfig {
 
     // ---- Rate limiters ----
 
-    @Bean
+    @Bean("forgotPasswordRateLimiter")
     public RateLimiter forgotPasswordRateLimiter() {
         return new InMemoryBucketedSlidingWindowRateLimiter(5, 10, clock);
     }
 
-    @Bean
+    @Bean("loginRateLimiter")
     public RateLimiter loginRateLimiter() {
         return new InMemoryBucketedSlidingWindowRateLimiter(5, 5, clock);
     }
 
-    @Bean
+    @Bean("refreshLimiter")
+    public RateLimiter refreshLimiter () {
+        return new InMemoryBucketedSlidingWindowRateLimiter(10, 1, clock);
+    }
+
+    @Bean("logoutLimiter")
+    public RateLimiter logoutLimiter () {
+        return new InMemoryBucketedSlidingWindowRateLimiter(30, 1, clock);
+    }
+
+    @Bean("resetPasswordRateLimiter")
     public RateLimiter resetPasswordRateLimiter() {
         return new InMemoryBucketedSlidingWindowRateLimiter(5, 10, clock);
     }
@@ -49,12 +59,16 @@ public class SecurityConfig {
     public AuthRateLimitFilter authRateLimitFilter(
             RateLimiter forgotPasswordRateLimiter,
             RateLimiter loginRateLimiter,
-            RateLimiter resetPasswordRateLimiter
+            RateLimiter resetPasswordRateLimiter,
+            RateLimiter refreshLimiter,
+            RateLimiter logoutLimiter
     ) {
         return new AuthRateLimitFilter(
                 forgotPasswordRateLimiter,
                 loginRateLimiter,
                 resetPasswordRateLimiter,
+                refreshLimiter,
+                logoutLimiter,
                 objectMapper,
                 clock
         );
@@ -74,7 +88,9 @@ public class SecurityConfig {
                                 "/auth/login",
                                 "/auth/register",
                                 "/auth/forgot-password",
-                                "/auth/reset-password"
+                                "/auth/reset-password",
+                                "/auth/refresh",
+                                "/auth/logout"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
