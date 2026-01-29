@@ -19,3 +19,7 @@ jwt:
 app:
   urls:
     password-reset: ${APP_PASSWORD_RESET_URL}
+
+logging:
+  level:
+    org.springframework.security: DEBUG
