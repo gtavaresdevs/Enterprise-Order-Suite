@@ -4,6 +4,7 @@ import com.enterprise.ordersuite.security.jwt.JwtAuthenticationFilter;
 import com.enterprise.ordersuite.security.ratelimit.InMemoryBucketedSlidingWindowRateLimiter;
 import com.enterprise.ordersuite.security.ratelimit.RateLimiter;
 import com.enterprise.ordersuite.security.web.AuthRateLimitFilter;
+import com.enterprise.ordersuite.security.web.RequestIdFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -41,12 +42,12 @@ public class SecurityConfig {
     }
 
     @Bean("refreshLimiter")
-    public RateLimiter refreshLimiter () {
+    public RateLimiter refreshLimiter() {
         return new InMemoryBucketedSlidingWindowRateLimiter(10, 1, clock);
     }
 
     @Bean("logoutLimiter")
-    public RateLimiter logoutLimiter () {
+    public RateLimiter logoutLimiter() {
         return new InMemoryBucketedSlidingWindowRateLimiter(30, 1, clock);
     }
 
@@ -77,7 +78,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            AuthRateLimitFilter authRateLimitFilter
+            AuthRateLimitFilter authRateLimitFilter,
+            RequestIdFilter requestIdFilter
     ) throws Exception {
 
         http
@@ -85,12 +87,15 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
+                                "/error",
                                 "/auth/login",
                                 "/auth/register",
                                 "/auth/forgot-password",
                                 "/auth/reset-password",
                                 "/auth/refresh",
-                                "/auth/logout"
+                                "/auth/logout",
+                                "/actuator/health",
+                                "/actuator/metrics/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
@@ -101,10 +106,13 @@ public class SecurityConfig {
 
                 .authenticationProvider(authenticationProvider)
 
-                // Rate limit FIRST
+                // RequestId FIRST
+                .addFilterBefore(requestIdFilter, UsernamePasswordAuthenticationFilter.class)
+
+                // Rate limit
                 .addFilterBefore(authRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
 
-                // JWT auth AFTER
+                // JWT auth
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
