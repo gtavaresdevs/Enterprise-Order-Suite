@@ -1,6 +1,6 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '3.5.7'
+	id 'org.springframework.boot' version '3.5.10'
 	id 'io.spring.dependency-management' version '1.1.7'
     id 'org.flywaydb.flyway' version '11.7.2'
 }
@@ -42,6 +42,9 @@ dependencies {
 	implementation 'org.flywaydb:flyway-database-postgresql'
     implementation 'me.paulschwarz:spring-dotenv:3.0.0'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.15'
+    implementation "org.apache.commons:commons-compress:1.26.0"
+    implementation "org.apache.commons:commons-lang3:3.18.0"
     compileOnly 'org.projectlombok:lombok'
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 	runtimeOnly 'org.postgresql:postgresql'
@@ -56,7 +59,7 @@ dependencies {
 
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'
-    testImplementation 'org.assertj:assertj-core'
+    testImplementation "org.assertj:assertj-core:3.27.7"
 
 
 }

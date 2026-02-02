@@ -88,6 +88,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/error",
+                                "auth/**",
                                 "/auth/login",
                                 "/auth/register",
                                 "/auth/forgot-password",
@@ -95,7 +96,10 @@ public class SecurityConfig {
                                 "/auth/refresh",
                                 "/auth/logout",
                                 "/actuator/health",
-                                "/actuator/metrics/**"
+                                "/actuator/metrics/**",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui.html"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

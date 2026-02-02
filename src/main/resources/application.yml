@@ -35,3 +35,9 @@ management:
     health:
       show-details: when_authorized
 
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
