@@ -1,26 +1,35 @@
 package com.enterprise.ordersuite.security.config;
 
+import com.enterprise.ordersuite.api.errors.ApiErrorResponse;
 import com.enterprise.ordersuite.security.jwt.JwtAuthenticationFilter;
 import com.enterprise.ordersuite.security.ratelimit.InMemoryBucketedSlidingWindowRateLimiter;
 import com.enterprise.ordersuite.security.ratelimit.RateLimiter;
 import com.enterprise.ordersuite.security.web.AuthRateLimitFilter;
 import com.enterprise.ordersuite.security.web.RequestIdFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import org.springframework.http.MediaType;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import java.time.Clock;
+import java.time.Instant;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -84,17 +93,12 @@ public class SecurityConfig {
 
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedEntryPoint()))
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/error",
-                                "auth/**",
-                                "/auth/login",
-                                "/auth/register",
-                                "/auth/forgot-password",
-                                "/auth/reset-password",
-                                "/auth/refresh",
-                                "/auth/logout",
+                                "/auth/**",
                                 "/actuator/health",
                                 "/actuator/metrics/**",
                                 "/swagger-ui/**",
@@ -120,5 +124,21 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public AuthenticationEntryPoint unauthorizedEntryPoint() {
+        return (request, response, authException) -> {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+
+            ApiErrorResponse body = new ApiErrorResponse(
+                    "UNAUTHORIZED",
+                    "Authentication required",
+                    Instant.now(clock)
+            );
+
+            objectMapper.writeValue(response.getOutputStream(), body);
+        };
     }
 }

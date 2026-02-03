@@ -62,18 +62,24 @@ public class PasswordResetService {
             return Optional.empty();
         }
 
+        User user = userOpt.get();
+
+        // NEW: do not issue reset tokens for inactive users (no enumeration, silent no-op)
+        if (!Boolean.TRUE.equals(user.getActive())) {
+            return Optional.empty();
+        }
+
         String rawToken = generateRawToken();
         String tokenHash = sha256Hex(rawToken);
 
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime expiresAt = now.plusMinutes(EXPIRY_MINUTES);
 
-        PasswordResetToken entity = new PasswordResetToken(userOpt.get(), tokenHash, expiresAt);
+        PasswordResetToken entity = new PasswordResetToken(user, tokenHash, expiresAt);
         passwordResetTokenRepository.save(entity);
 
-        // NEW: compose URL and "send" email (dev logs, prod sends)
         String resetUrl = linkBuilder.build(rawToken);
-        emailService.sendPasswordResetEmail(userOpt.get().getEmail(), resetUrl);
+        emailService.sendPasswordResetEmail(user.getEmail(), resetUrl);
 
         return Optional.of(rawToken);
     }
@@ -103,6 +109,12 @@ public class PasswordResetService {
         }
 
         User user = prt.getUser(); // LAZY, but inside transaction it is fine
+
+        // NEW: do not allow password reset for inactive users (treat as invalid token)
+        if (!Boolean.TRUE.equals(user.getActive())) {
+            throw InvalidPasswordResetTokenException.generic();
+        }
+
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
 
