@@ -80,6 +80,7 @@ class PasswordResetServiceTest {
     void requestPasswordReset_whenUserFound_returnsRawToken_andSavesHashedToken_withExpiry_andSendsEmail() {
         User user = new User();
         user.setEmail("gabriel@example.com");
+        user.setActive(true);
 
         when(userRepository.findByEmailIgnoreCase("gabriel@example.com"))
                 .thenReturn(Optional.of(user));
@@ -185,6 +186,48 @@ class PasswordResetServiceTest {
         verify(tokenRepository).save(prt);
 
         // Reset flow does not send email during reset, only during request
+        verifyNoInteractions(emailService);
+        verifyNoInteractions(linkBuilder);
+    }
+    @Test
+    void requestPasswordReset_whenUserInactive_returnsEmpty_andDoesNotSaveToken_orSendEmail() {
+        User user = new User();
+        user.setEmail("gabriel@example.com");
+        user.setActive(false);
+
+        when(userRepository.findByEmailIgnoreCase("gabriel@example.com"))
+                .thenReturn(Optional.of(user));
+
+        Optional<String> token = service.requestPasswordReset("gabriel@example.com");
+
+        assertThat(token).isEmpty();
+
+        verify(tokenRepository, never()).save(any());
+        verifyNoInteractions(emailService);
+        verifyNoInteractions(linkBuilder);
+    }
+
+    @Test
+    void resetPassword_whenUserInactive_throwsGenericInvalidToken_andDoesNotPersist() {
+        User user = new User();
+        user.setEmail("gabriel@example.com");
+        user.setActive(false);
+        user.setPassword("old");
+
+        PasswordResetToken prt = mock(PasswordResetToken.class);
+        when(prt.isUsed()).thenReturn(false);
+        when(prt.getExpiresAt()).thenReturn(LocalDateTime.now(clock).plusMinutes(10));
+        when(prt.getUser()).thenReturn(user);
+
+        when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.of(prt));
+
+        assertThatThrownBy(() -> service.resetPassword("raw-token", "NewPass123!"))
+                .isInstanceOf(InvalidPasswordResetTokenException.class);
+
+        verify(userRepository, never()).save(any());
+        verify(tokenRepository, never()).save(any(PasswordResetToken.class));
+        verify(prt, never()).setUsedAt(any());
+
         verifyNoInteractions(emailService);
         verifyNoInteractions(linkBuilder);
     }

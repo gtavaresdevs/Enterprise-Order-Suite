@@ -57,6 +57,11 @@ public class AuthenticationService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(InvalidCredentialsException::new);
 
+        // Do not allow inactive users to login, and do not reveal that the account is disabled
+        if (!Boolean.TRUE.equals(user.getActive())) {
+            throw new InvalidCredentialsException();
+        }
+
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new InvalidCredentialsException();
         }
@@ -73,10 +78,17 @@ public class AuthenticationService {
             throw new InvalidRefreshTokenException();
         }
 
+        User user = existing.getUser();
+
+        // If user is inactive, block refresh and revoke the token as a safety measure
+        if (!Boolean.TRUE.equals(user.getActive())) {
+            refreshTokenService.revoke(existing);
+            throw new InvalidRefreshTokenException();
+        }
+
         // rotation: old token becomes unusable
         refreshTokenService.markUsed(existing);
 
-        User user = existing.getUser();
         String newAccessToken = jwtService.generateToken(user);
         var newRefresh = refreshTokenService.issueFor(user);
 

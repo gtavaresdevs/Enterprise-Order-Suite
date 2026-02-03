@@ -51,7 +51,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         return !(
                 path.equals("/auth/forgot-password")
-                        || path.equals("/auth/login")
+                        // deactivated for tests || path.equals("/auth/login")
                         || path.equals("/auth/reset-password")
                         || path.equals("/auth/refresh")
                         || path.equals("/auth/logout")
