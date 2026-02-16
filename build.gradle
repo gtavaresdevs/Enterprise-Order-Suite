@@ -1,71 +1,99 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        // Keep these so Flyway Gradle tasks can resolve the DB plugin + driver
+        classpath "org.flywaydb:flyway-database-postgresql:11.7.2"
+        classpath "org.postgresql:postgresql:42.7.9"
+    }
+}
+
+def loadDotEnv(File envFile) {
+    def map = [:]
+    if (!envFile.exists()) return map
+
+    envFile.eachLine { line ->
+        def s = line?.trim()
+        if (!s || s.startsWith("#")) return
+        def idx = s.indexOf("=")
+        if (idx <= 0) return
+
+        def key = s.substring(0, idx).trim()
+        def val = s.substring(idx + 1).trim()
+
+        // strip optional quotes
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.substring(1, val.length() - 1)
+        }
+        map[key] = val
+    }
+    return map
+}
+
 plugins {
-	id 'java'
-	id 'org.springframework.boot' version '3.5.10'
-	id 'io.spring.dependency-management' version '1.1.7'
+    id 'java'
+    id 'org.springframework.boot' version '3.5.10'
+    id 'io.spring.dependency-management' version '1.1.7'
     id 'org.flywaydb.flyway' version '11.7.2'
 }
 
+ext.dotenv = loadDotEnv(file(".env"))
+
 flyway {
-    url = System.getenv("DB_URL")
-    user = System.getenv("DB_USER")
-    password = System.getenv("DB_PASSWORD")
+    def envMap = (Map<String, String>) project.ext.dotenv
+
+    def envOrNull = { String k ->
+        def v = envMap != null ? envMap.get(k) : null
+        return (v != null && !v.trim().isEmpty()) ? v.trim() : null
+    }
+
+    // precedence: -Dflyway.* -> .env -> OS env
+    url = System.getProperty("flyway.url") ?: envOrNull("DB_URL") ?: System.getenv("DB_URL")
+    user = System.getProperty("flyway.user") ?: envOrNull("DB_USER") ?: System.getenv("DB_USER")
+    password = System.getProperty("flyway.password") ?: envOrNull("DB_PASSWORD") ?: System.getenv("DB_PASSWORD")
+
     locations = ["classpath:db/migration"]
 }
 
-group = 'com.enterprise.ordersuite'
-version = '0.0.1-SNAPSHOT'
-description = 'B2B Order Management System backend'
-
-java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(17)
-	}
-}
-
-configurations {
-	compileOnly {
-		extendsFrom annotationProcessor
-	}
-}
-
 repositories {
-	mavenCentral()
+    mavenCentral()
 }
 
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-	// implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
-	implementation 'org.springframework.boot:spring-boot-starter-security'
-	implementation 'org.springframework.boot:spring-boot-starter-validation'
-	implementation 'org.springframework.boot:spring-boot-starter-web'
-	implementation 'org.flywaydb:flyway-core'
-	implementation 'org.flywaydb:flyway-database-postgresql'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
+
     implementation 'me.paulschwarz:spring-dotenv:3.0.0'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.15'
     implementation "org.apache.commons:commons-compress:1.26.0"
     implementation "org.apache.commons:commons-lang3:3.18.0"
+
     compileOnly 'org.projectlombok:lombok'
-	developmentOnly 'org.springframework.boot:spring-boot-devtools'
-	runtimeOnly 'org.postgresql:postgresql'
-	annotationProcessor 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    annotationProcessor 'org.projectlombok:lombok'
+
     implementation 'org.mapstruct:mapstruct:1.5.5.Final'
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
+
     implementation 'io.jsonwebtoken:jjwt-api:0.12.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.5'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
-
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'
     testImplementation "org.assertj:assertj-core:3.27.7"
-
-
 }
 
 test {
     useJUnitPlatform()
 }
-
-
