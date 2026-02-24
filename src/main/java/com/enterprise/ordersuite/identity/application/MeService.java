@@ -18,8 +18,7 @@ public class MeService {
 
     @Transactional(readOnly = true)
     public MeResponse getMe() {
-        currentUserService.requireActive();
-        User user = currentUserService.getUser();
+        User user = currentUserService.requireActiveUser();
 
         return new MeResponse(
                 user.getId(),
@@ -32,14 +31,10 @@ public class MeService {
 
     @Transactional
     public UpdateMeResponse updateMe(UpdateMeRequest request) {
-        currentUserService.requireActive();
-        User user = currentUserService.getUser();
+        User user = currentUserService.requireActiveUser();
 
         user.setFirstName(request.firstName());
         user.setLastName(request.lastName());
-
-        // No explicit save required if User is managed in a transactional persistence context.
-        // If your CurrentUserService returns a detached entity, we will adjust to save via repository.
 
         return new UpdateMeResponse(
                 user.getId(),

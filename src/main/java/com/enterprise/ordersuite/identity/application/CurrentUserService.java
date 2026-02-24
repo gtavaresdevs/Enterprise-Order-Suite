@@ -18,28 +18,33 @@ public class CurrentUserService {
     }
 
     public String getEmail() {
-        Authentication authentication = authenticationOrThrow();
-        return authentication.getName();
+        return authenticationOrThrow().getName();
     }
 
     @Transactional(readOnly = true)
-    public User getUser() {
+    public User requireUser() {
         String email = getEmail();
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("Authenticated user not found"));
     }
 
     @Transactional(readOnly = true)
-    public Long getUserId() {
-        return getUser().getId();
+    public User requireActiveUser() {
+        User user = requireUser();
+        if (!Boolean.TRUE.equals(user.getActive())) {
+            throw new IllegalStateException("User is inactive");
+        }
+        return user;
     }
 
     @Transactional(readOnly = true)
-    public void requireActive() {
-        User user = getUser();
-        if (!user.getActive()) {
-            throw new IllegalStateException("User is inactive");
-        }
+    public Long getUserId() {
+        return requireUser().getId();
+    }
+
+    @Transactional(readOnly = true)
+    public Long getActiveUserId() {
+        return requireActiveUser().getId();
     }
 
     private Authentication authenticationOrThrow() {
