@@ -105,6 +105,12 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html"
                         ).permitAll()
+
+                        // Admin-only endpoints must be blocked at the security layer
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/users/**").hasRole("ADMIN")
+                        .requestMatchers("/roles").hasRole("ADMIN")
+
                         .anyRequest().authenticated()
                 )
 
