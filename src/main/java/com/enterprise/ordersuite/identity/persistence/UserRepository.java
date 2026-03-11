@@ -24,4 +24,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
             """)
     Optional<User> findByEmailIgnoreCaseFetchingRole(@Param("email") String email);
 
+    boolean existsByEmailIgnoreCase(String normalizedEmail);
 }
