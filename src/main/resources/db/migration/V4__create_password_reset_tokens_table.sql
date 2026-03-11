@@ -1,3 +1,5 @@
+
+
 -- V3__create_password_reset_tokens_table.sql
 -- Stores password reset tokens securely (hash only), one-time use, short-lived.
 

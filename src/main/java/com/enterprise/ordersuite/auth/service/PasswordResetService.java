@@ -1,13 +1,14 @@
 package com.enterprise.ordersuite.auth.service;
 
 import com.enterprise.ordersuite.auth.domain.PasswordResetToken;
-import com.enterprise.ordersuite.identity.domain.User;
 import com.enterprise.ordersuite.auth.persistence.PasswordResetTokenRepository;
-import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidPasswordResetTokenException;
+import com.enterprise.ordersuite.identity.domain.User;
+import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import com.enterprise.ordersuite.notifications.service.EmailService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -30,7 +31,6 @@ public class PasswordResetService {
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
 
-    // NEW (keeps original behavior, adds email + link composition)
     private final EmailService emailService;
     private final PasswordResetLinkBuilder linkBuilder;
 
@@ -46,7 +46,6 @@ public class PasswordResetService {
         this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.clock = clock;
-
         this.emailService = emailService;
         this.linkBuilder = linkBuilder;
     }
@@ -64,7 +63,7 @@ public class PasswordResetService {
 
         User user = userOpt.get();
 
-        // NEW: do not issue reset tokens for inactive users (no enumeration, silent no-op)
+        // Do not issue reset tokens for inactive users (no enumeration, silent no-op)
         if (!Boolean.TRUE.equals(user.getActive())) {
             return Optional.empty();
         }
@@ -82,6 +81,12 @@ public class PasswordResetService {
         emailService.sendPasswordResetEmail(user.getEmail(), resetUrl);
 
         return Optional.of(rawToken);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void sendPasswordSetupForNewUser(String email) {
+        // Reuse existing secure behavior, still silent no-op if user not found or inactive.
+        requestPasswordReset(email);
     }
 
     @Transactional
@@ -110,7 +115,7 @@ public class PasswordResetService {
 
         User user = prt.getUser(); // LAZY, but inside transaction it is fine
 
-        // NEW: do not allow password reset for inactive users (treat as invalid token)
+        // Do not allow password reset for inactive users (treat as invalid token)
         if (!Boolean.TRUE.equals(user.getActive())) {
             throw InvalidPasswordResetTokenException.generic();
         }

@@ -1,14 +1,14 @@
 package com.enterprise.ordersuite.identity.api.dto;
 
-import com.enterprise.ordersuite.identity.domain.IdentityAuditEventType;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import java.time.LocalDateTime;
 
 public record IdentityAuditEventResponse(
         Long id,
-        IdentityAuditEventType type,
+        String type,
         Long actorUserId,
         Long targetUserId,
-        String metadata,
+        JsonNode metadata,
         LocalDateTime createdAt
 ) {}
