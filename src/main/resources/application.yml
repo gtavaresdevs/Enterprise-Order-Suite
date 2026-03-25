@@ -31,10 +31,16 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,metrics
+        include: health,info,metrics
   endpoint:
     health:
       show-details: when_authorized
+
+info:
+  app:
+    name: enterprise-order-suite
+    description: Production-grade backend project
+    version: 1.0.0
 
 springdoc:
   api-docs:

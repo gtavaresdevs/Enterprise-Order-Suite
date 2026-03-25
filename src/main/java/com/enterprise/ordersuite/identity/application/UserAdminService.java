@@ -61,7 +61,14 @@ public class UserAdminService {
                     IdentityAuditEventType.USER_DEACTIVATED,
                     actor.getId(),
                     target.getId(),
-                    null
+                    """
+                    {
+                      "active": {
+                        "from": true,
+                        "to": false
+                      }
+                    }
+                    """
             );
         }
 
@@ -82,7 +89,14 @@ public class UserAdminService {
                     IdentityAuditEventType.USER_REACTIVATED,
                     actor.getId(),
                     target.getId(),
-                    null
+                    """
+                    {
+                      "active": {
+                        "from": false,
+                        "to": true
+                      }
+                    }
+                    """
             );
         }
 
@@ -119,7 +133,7 @@ public class UserAdminService {
                     IdentityAuditEventType.USER_ROLE_CHANGED,
                     actor.getId(),
                     target.getId(),
-                    "{\"from\":\"" + previousRole + "\",\"to\":\"" + nextRole + "\"}"
+                    "{\"role\":{\"from\":\"" + escapeJson(previousRole) + "\",\"to\":\"" + escapeJson(nextRole) + "\"}}"
             );
         }
 
@@ -158,7 +172,7 @@ public class UserAdminService {
                 IdentityAuditEventType.USER_CREATED,
                 actor.getId(),
                 saved.getId(),
-                "{\"email\":\"" + saved.getEmail() + "\",\"role\":\"" + saved.getRole().getName() + "\"}"
+                "{\"email\":\"" + escapeJson(saved.getEmail()) + "\",\"role\":\"" + escapeJson(saved.getRole().getName()) + "\",\"active\":true}"
         );
 
         boolean send = request.sendPasswordSetupEmail() == null || request.sendPasswordSetupEmail();
@@ -218,7 +232,7 @@ public class UserAdminService {
                 IdentityAuditEventType.PASSWORD_SETUP_SENT,
                 actor.getId(),
                 target.getId(),
-                "{\"email\":\"" + target.getEmail() + "\"}"
+                "{\"email\":\"" + escapeJson(target.getEmail()) + "\",\"active\":true}"
         );
     }
 
