@@ -75,7 +75,7 @@ public class SecurityConfig {
     ) {
         return new AuthRateLimitFilter(
                 forgotPasswordRateLimiter,
-                loginRateLimiter,
+                loginRateLimiter, // test
                 resetPasswordRateLimiter,
                 refreshLimiter,
                 logoutLimiter,
