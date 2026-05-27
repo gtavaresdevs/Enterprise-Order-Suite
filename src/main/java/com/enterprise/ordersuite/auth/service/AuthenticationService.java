@@ -13,6 +13,7 @@ import com.enterprise.ordersuite.identity.domain.User;
 import com.enterprise.ordersuite.identity.persistence.RoleRepository;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import com.enterprise.ordersuite.security.jwt.JwtService;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,6 +27,7 @@ public class AuthenticationService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final MeterRegistry meterRegistry;
 
     public AuthResponse register(RegisterRequest request) {
 
@@ -46,6 +48,8 @@ public class AuthenticationService {
 
         userRepository.save(user);
 
+        meterRegistry.counter("app.user.created", "source", "registration").increment();
+
         String accessToken = jwtService.generateToken(user);
         var issuedRefresh = refreshTokenService.issueFor(user);
 
@@ -55,16 +59,15 @@ public class AuthenticationService {
     public AuthResponse authenticate(AuthRequest request) {
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(InvalidCredentialsException::new);
+                .orElse(null);
 
-        // Do not allow inactive users to login, and do not reveal that the account is disabled
-        if (!Boolean.TRUE.equals(user.getActive())) {
+        if (user == null || !Boolean.TRUE.equals(user.getActive()) || 
+            !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            meterRegistry.counter("app.login.attempt", "status", "failure").increment();
             throw new InvalidCredentialsException();
         }
 
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new InvalidCredentialsException();
-        }
+        meterRegistry.counter("app.login.attempt", "status", "success").increment();
 
         String accessToken = jwtService.generateToken(user);
         var issuedRefresh = refreshTokenService.issueFor(user);

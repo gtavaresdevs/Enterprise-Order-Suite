@@ -3,6 +3,7 @@ package com.enterprise.ordersuite.identity.api;
 import com.enterprise.ordersuite.auth.dtos.AuthRequest;
 import com.enterprise.ordersuite.identity.domain.Role;
 import com.enterprise.ordersuite.identity.domain.User;
+import com.enterprise.ordersuite.identity.persistence.IdentityAuditEventRepository;
 import com.enterprise.ordersuite.identity.persistence.RoleRepository;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,10 +13,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -23,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class IdentityAuditControllerIT {
 
     @Autowired MockMvc mockMvc;
@@ -30,6 +34,7 @@ class IdentityAuditControllerIT {
 
     @Autowired UserRepository userRepository;
     @Autowired RoleRepository roleRepository;
+    @Autowired IdentityAuditEventRepository auditRepository;
     @Autowired PasswordEncoder passwordEncoder;
 
     @Test
@@ -42,41 +47,42 @@ class IdentityAuditControllerIT {
     @Test
     void listAudit_nonAdmin_returns403() throws Exception {
         Role userRole = roleRepository.findByName("USER").orElseThrow();
-        String userToken = createUserAndLogin(userRole);
+        String token = createUserAndLogin(userRole);
 
         mockMvc.perform(get("/admin/identity-audit?page=0&size=10")
-                        .header("Authorization", "Bearer " + userToken))
+                        .header("Authorization", "Bearer " + token))
                 .andDo(print())
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void listAudit_admin_returns200_andContainsEventsAfterDeactivate() throws Exception {
+        long beforeAuditCount = auditRepository.count();
+
         Role adminRole = roleRepository.findByName("ADMIN").orElseThrow();
         String adminToken = createAdminAndLogin(adminRole);
 
         Role userRole = roleRepository.findByName("USER").orElseThrow();
         User target = createTargetUser(userRole);
 
-        // generate an audit event (deactivate)
         mockMvc.perform(post("/admin/users/" + target.getId() + "/deactivate")
                         .header("Authorization", "Bearer " + adminToken))
                 .andDo(print())
                 .andExpect(status().isOk());
 
-        // query audit endpoint
-        mockMvc.perform(get("/admin/identity-audit?page=0&size=20")
+        long afterDeactivateAuditCount = auditRepository.count();
+        assertThat(afterDeactivateAuditCount).isEqualTo(beforeAuditCount + 1);
+
+        mockMvc.perform(get("/admin/identity-audit?page=0&size=10")
                         .header("Authorization", "Bearer " + adminToken))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items").isArray())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(10))
                 .andExpect(jsonPath("$.totalItems").exists())
-                .andExpect(jsonPath("$.items[0].id").exists())
-                .andExpect(jsonPath("$.items[0].type").exists())
-                .andExpect(jsonPath("$.items[0].actorUserId").exists())
-                .andExpect(jsonPath("$.items[0].targetUserId").exists())
-                .andExpect(jsonPath("$.items[0].createdAt").exists())
-                .andExpect(jsonPath("$.items[0].targetUserId").value(target.getId()));
+                .andExpect(jsonPath("$.totalPages").exists())
+                .andExpect(jsonPath("$.items[0].type").value("USER_DEACTIVATED"));
     }
 
     private User createTargetUser(Role role) {

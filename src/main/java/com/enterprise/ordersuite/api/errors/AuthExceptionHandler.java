@@ -3,16 +3,22 @@ package com.enterprise.ordersuite.api.errors;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidCredentialsException;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidPasswordResetTokenException;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidRefreshTokenException;
+import com.enterprise.ordersuite.orders.domain.exception.InvalidStatusTransitionException;
+import com.enterprise.ordersuite.orders.domain.exception.ProductNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @ControllerAdvice
 public class AuthExceptionHandler {
@@ -21,6 +27,26 @@ public class AuthExceptionHandler {
 
     public AuthExceptionHandler(Clock clock) {
         this.clock = clock;
+    }
+
+    // -------- Order / Product Errors --------
+
+    @ExceptionHandler(ProductNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleProductNotFound(ProductNotFoundException ex) {
+        return build(
+                HttpStatus.BAD_REQUEST,
+                "PRODUCT_NOT_FOUND",
+                ex.getMessage()
+        );
+    }
+
+    @ExceptionHandler(InvalidStatusTransitionException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidStatusTransition(InvalidStatusTransitionException ex) {
+        return build(
+                HttpStatus.BAD_REQUEST,
+                "INVALID_STATUS_TRANSITION",
+                ex.getMessage()
+        );
     }
 
     // -------- Login / authentication --------
@@ -69,11 +95,17 @@ public class AuthExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
-        return build(
-                HttpStatus.BAD_REQUEST,
+        List<String> errors = ex.getBindingResult().getFieldErrors().stream()
+                .map(FieldError::getDefaultMessage)
+                .collect(Collectors.toList());
+        
+        ApiErrorResponse body = new ApiErrorResponse(
                 "INVALID_INPUT",
-                "Invalid input"
+                "Validation failed",
+                Instant.now(clock),
+                errors
         );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -94,11 +126,23 @@ public class AuthExceptionHandler {
         );
     }
 
+    // -------- Security Access Denied --------
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException ex) {
+        return build(
+                HttpStatus.FORBIDDEN,
+                "ACCESS_DENIED",
+                "You do not have permission to access this resource"
+        );
+    }
+
     // -------- Fallback (auth-safe) --------
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ApiErrorResponse> handleRuntime(RuntimeException ex) {
-        // We do NOT leak internal details
+        // If it's one of our domain exceptions that we want to handle specifically, 
+        // we should have added an explicit handler above.
         return build(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "AUTH_ERROR",
@@ -116,7 +160,8 @@ public class AuthExceptionHandler {
         ApiErrorResponse body = new ApiErrorResponse(
                 code,
                 message,
-                Instant.now(clock)
+                Instant.now(clock),
+                null
         );
         return ResponseEntity.status(status).body(body);
     }

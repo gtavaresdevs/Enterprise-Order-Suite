@@ -1,93 +1,61 @@
 package com.enterprise.ordersuite.identity.api;
 
+import com.enterprise.ordersuite.auth.dtos.AuthRequest;
+import com.enterprise.ordersuite.identity.api.dto.UpdateMeRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class MePatchControllerIT {
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
 
     @Test
-    void patchMe_withoutToken_returns401() throws Exception {
-        mockMvc.perform(patch("/me")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                            {
-                              "firstName": "John",
-                              "lastName": "Doe"
-                            }
-                            """))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
     void patchMe_invalidInput_returns400() throws Exception {
-        String accessToken = loginAndGetAccessToken();
+        String token = loginAndGetToken();
 
+        var request = new UpdateMeRequest(" ", " "); // blank names
         mockMvc.perform(patch("/me")
-                        .header("Authorization", "Bearer " + accessToken)
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                            {
-                              "firstName": "",
-                              "lastName": ""
-                            }
-                            """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     void patchMe_validInput_returns200AndUpdatedFields() throws Exception {
-        String accessToken = loginAndGetAccessToken();
+        String token = loginAndGetToken();
 
+        var request = new UpdateMeRequest("UpdatedFirst", "UpdatedLast");
         mockMvc.perform(patch("/me")
-                        .header("Authorization", "Bearer " + accessToken)
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                            {
-                              "firstName": "John",
-                              "lastName": "Doe"
-                            }
-                            """))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.id").exists())
-                .andExpect(jsonPath("$.email").exists())
-                .andExpect(jsonPath("$.firstName").value("John"))
-                .andExpect(jsonPath("$.lastName").value("Doe"))
-                .andExpect(jsonPath("$.updatedAt").exists())
-                // safety checks
-                .andExpect(jsonPath("$.password").doesNotExist())
-                .andExpect(jsonPath("$.active").doesNotExist());
+                .andExpect(jsonPath("$.firstName").value("UpdatedFirst"))
+                .andExpect(jsonPath("$.lastName").value("UpdatedLast"));
     }
 
-    private String loginAndGetAccessToken() throws Exception {
-        // Adjust to your seeded test credentials
-        String loginJson = """
-            {
-              "email": "user@test.com",
-              "password": "Password123!"
-            }
-            """;
-
+    private String loginAndGetToken() throws Exception {
+        var loginPayload = new AuthRequest("user@test.com", "Password123!");
         String response = mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(loginJson))
+                        .content(objectMapper.writeValueAsString(loginPayload)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").exists())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();

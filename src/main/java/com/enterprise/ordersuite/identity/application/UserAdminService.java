@@ -7,6 +7,7 @@ import com.enterprise.ordersuite.identity.domain.Role;
 import com.enterprise.ordersuite.identity.domain.User;
 import com.enterprise.ordersuite.identity.persistence.RoleRepository;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class UserAdminService {
     private final IdentityAuditService identityAuditService;
     private final PasswordResetService passwordResetService;
     private final PasswordEncoder passwordEncoder;
+    private final MeterRegistry meterRegistry;
 
     public UserAdminService(
             UserRepository userRepository,
@@ -37,7 +39,8 @@ public class UserAdminService {
             CurrentUserService currentUserService,
             IdentityAuditService identityAuditService,
             PasswordResetService passwordResetService,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            MeterRegistry meterRegistry
     ) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -45,6 +48,7 @@ public class UserAdminService {
         this.identityAuditService = identityAuditService;
         this.passwordResetService = passwordResetService;
         this.passwordEncoder = passwordEncoder;
+        this.meterRegistry = meterRegistry;
     }
 
     @Transactional
@@ -167,6 +171,8 @@ public class UserAdminService {
         user.setPassword(passwordEncoder.encode(generateRandomPassword()));
 
         User saved = userRepository.save(user);
+
+        meterRegistry.counter("app.user.created", "source", "admin").increment();
 
         identityAuditService.recordEvent(
                 IdentityAuditEventType.USER_CREATED,
