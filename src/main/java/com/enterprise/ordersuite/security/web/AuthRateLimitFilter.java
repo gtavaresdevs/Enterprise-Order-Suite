@@ -48,10 +48,10 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         if (!"POST".equalsIgnoreCase(request.getMethod())) return true;
 
-        String path = request.getRequestURI();
+        String path = request.getServletPath();
         return !(
                 path.equals("/auth/forgot-password")
-                        // deactivated for tests || path.equals("/auth/login")
+                        || path.equals("/auth/login")
                         || path.equals("/auth/reset-password")
                         || path.equals("/auth/refresh")
                         || path.equals("/auth/logout")
@@ -65,7 +65,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        String path = request.getRequestURI();
+        String path = request.getServletPath();
         String ip = extractClientIp(request);
 
         RateLimitDecision decision = getRateLimitDecision(path, ip);
@@ -114,7 +114,14 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     }
 
     private String extractClientIp(HttpServletRequest request) {
-        String remote = request.getRemoteAddr();
-        return (remote == null || remote.isBlank()) ? "unknown" : remote;
+        // Enterprise standard: Check for X-Forwarded-For in case of Proxies/Load Balancers
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+            // Take the first IP in the list
+            return xForwardedFor.split(",")[0].trim();
+        }
+        
+        String remoteAddr = request.getRemoteAddr();
+        return (remoteAddr == null || remoteAddr.isBlank()) ? "unknown" : remoteAddr;
     }
 }

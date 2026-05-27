@@ -1,3 +1,8 @@
+server:
+  port: ${SERVER_PORT}
+  servlet:
+    context-path: ${SERVER_CONTEXT_PATH}
+
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/${DB_NAME}
@@ -21,6 +26,18 @@ app:
   urls:
     password-reset: ${APP_PASSWORD_RESET_URL}
 
+security:
+  rate-limit:
+    forgot-password:
+      capacity: 5
+      refill-seconds: 10
+    login:
+      capacity: 5
+      refill-seconds: 5
+    refresh:
+      capacity: 10
+      refill-seconds: 1
+
 logging:
   level:
     org.springframework.security: DEBUG
@@ -35,11 +52,22 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+  health:
+    db:
+      enabled: true
+  info:
+    env:
+      enabled: true # Required for custom info properties
 
 info:
   app:
     name: enterprise-order-suite
-    description: Production-grade backend project
+    description: Production-grade backend system
     version: 1.0.0
 
 springdoc:
@@ -47,4 +75,3 @@ springdoc:
     enabled: true
   swagger-ui:
     enabled: true
-

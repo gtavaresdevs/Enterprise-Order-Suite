@@ -1,29 +1,31 @@
 package com.enterprise.ordersuite.security.jwt;
 
-import com.enterprise.ordersuite.security.userdetails.CustomUserDetails;
-import com.enterprise.ordersuite.security.userdetails.CustomUserDetailsService;
+import com.enterprise.ordersuite.security.userdetails.JwtUserPrincipal;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
-import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final CustomUserDetailsService customUserDetailsService;
 
     @Override
     protected void doFilterInternal(
@@ -42,36 +44,52 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         final String jwt = authHeader.substring(7);
 
-        String userEmail;
         try {
-            userEmail = jwtService.extractEmail(jwt);
-        } catch (Exception ex) {
-            // Token malformed or cannot be parsed, do not authenticate
-            filterChain.doFilter(request, response);
-            return;
-        }
+            if (jwtService.isTokenValid(jwt)) {
+                String userEmail = jwtService.extractEmail(jwt);
+                Long userId = jwtService.extractClaim(jwt, claims -> ((Number) claims.get("userId")).longValue());
+                List<String> roles = jwtService.extractRoles(jwt);
 
-        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            try {
-                CustomUserDetails userDetails =
-                        (CustomUserDetails) customUserDetailsService.loadUserByUsername(userEmail);
-                System.out.println("CustomUserDetailsService called for:");
-                if (jwtService.isTokenValid(jwt, userDetails.user())) {
+                if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                    List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+
+                    // Map roles to Spring Security authorities with "ROLE_" prefix
+                    if (roles != null) {
+                        authorities.addAll(roles.stream()
+                                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                                .collect(Collectors.toList()));
+                    }
+
+                    // Map roles to scopes for PreAuthorize compatibility
+                    // This assumes that if a user has a certain role, they also have corresponding scopes.
+                    // In a real application, scopes might be managed separately.
+                    if (roles != null && roles.contains("ADMIN")) {
+                        authorities.add(new SimpleGrantedAuthority("SCOPE_order:write"));
+                        authorities.add(new SimpleGrantedAuthority("SCOPE_order:read"));
+                        authorities.add(new SimpleGrantedAuthority("SCOPE_order:delete"));
+                    } else if (roles != null && roles.contains("USER")) {
+                        authorities.add(new SimpleGrantedAuthority("SCOPE_order:read"));
+                        // A regular user might have write access to their own orders, but not all orders.
+                        // This is handled by @PostAuthorize or programmatic checks.
+                        authorities.add(new SimpleGrantedAuthority("SCOPE_order:write"));
+                    }
+
+
+                    JwtUserPrincipal principal = new JwtUserPrincipal(userId, userEmail);
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(
-                                    userDetails,
+                                    principal,
                                     null,
-                                    userDetails.getAuthorities()
+                                    authorities
                             );
 
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
+                    log.debug("User {} (ID: {}) authenticated with authorities: {}", userEmail, userId, authorities);
                 }
-
-            } catch (UsernameNotFoundException | DisabledException ex) {
-                // User does not exist or is disabled, do not authenticate
-                // Continue the chain, protected endpoints will return 401
             }
+        } catch (Exception ex) {
+            log.warn("Failed to authenticate user from JWT: {}", ex.getMessage());
         }
 
         filterChain.doFilter(request, response);
