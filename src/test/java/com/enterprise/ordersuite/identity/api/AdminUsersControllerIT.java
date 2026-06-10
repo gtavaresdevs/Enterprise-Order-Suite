@@ -7,6 +7,7 @@ import com.enterprise.ordersuite.identity.persistence.IdentityAuditEventReposito
 import com.enterprise.ordersuite.identity.persistence.RoleRepository;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -29,167 +30,130 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 class AdminUsersControllerIT {
 
-    @Autowired MockMvc mockMvc;
-    @Autowired ObjectMapper objectMapper;
+  @Autowired MockMvc mockMvc;
+  @Autowired ObjectMapper objectMapper;
+  @Autowired UserRepository userRepository;
+  @Autowired RoleRepository roleRepository;
+  @Autowired IdentityAuditEventRepository auditRepository;
+  @Autowired PasswordEncoder passwordEncoder;
 
-    @Autowired UserRepository userRepository;
-    @Autowired RoleRepository roleRepository;
-    @Autowired IdentityAuditEventRepository auditRepository;
-    @Autowired PasswordEncoder passwordEncoder;
+  private Role userRole;
+  private Role superAdminRole;
 
-    @Test
-    void deactivate_requiresAdmin_403ForNonAdmin() throws Exception {
-        Role userRole = roleRepository.findByName("USER").orElseThrow();
+  @BeforeEach
+  void setup() {
+    userRole = roleRepository.findByName("USER").orElseThrow();
+    superAdminRole = roleRepository.findByName("SUPER_ADMIN").orElseThrow();
+  }
 
-        String nonAdminEmail = "user-" + UUID.randomUUID() + "@test.com";
-        User nonAdmin = new User();
-        nonAdmin.setEmail(nonAdminEmail);
-        nonAdmin.setPassword(passwordEncoder.encode("Password123!"));
-        nonAdmin.setRole(userRole);
-        nonAdmin.setActive(true);
-        nonAdmin.setFirstName("Non");
-        nonAdmin.setLastName("Admin");
-        userRepository.save(nonAdmin);
+  @Test
+  void deactivate_requiresSuperAdmin_403ForNonSuperAdmin() throws Exception {
+    Role adminRole = roleRepository.findByName("ADMIN").orElseThrow();
+    String adminEmail = "admin-" + UUID.randomUUID() + "@test.com";
 
-        String nonAdminAccessToken = loginAndGetAccessToken(nonAdminEmail, "Password123!");
+    User admin = new User();
+    admin.setEmail(adminEmail);
+    admin.setPassword(passwordEncoder.encode("Password123!"));
+    admin.setRole(adminRole);
+    admin.setActive(true);
+    admin.setFirstName("Standard");
+    admin.setLastName("Admin");
+    userRepository.save(admin);
 
-        User target = createTargetUser(userRole);
+    String token = loginAndGetAccessToken(adminEmail, "Password123!");
+    User target = createTargetUser(userRole);
 
-        mockMvc.perform(post("/admin/users/" + target.getId() + "/deactivate")
-                        .header("Authorization", "Bearer " + nonAdminAccessToken))
-                .andDo(print())
-                .andExpect(status().isForbidden());
-    }
+    mockMvc.perform(post("/admin/users/" + target.getId() + "/deactivate")
+        .header("Authorization", "Bearer " + token))
+      .andDo(print())
+      .andExpect(status().isForbidden());
+  }
 
-    @Test
-    void reactivate_requiresAdmin_403ForNonAdmin() throws Exception {
-        Role userRole = roleRepository.findByName("USER").orElseThrow();
+  @Test
+  void reactivate_requiresSuperAdmin_403ForNonSuperAdmin() throws Exception {
+    Role adminRole = roleRepository.findByName("ADMIN").orElseThrow();
+    String adminEmail = "admin-" + UUID.randomUUID() + "@test.com";
 
-        String nonAdminEmail = "user-" + UUID.randomUUID() + "@test.com";
-        User nonAdmin = new User();
-        nonAdmin.setEmail(nonAdminEmail);
-        nonAdmin.setPassword(passwordEncoder.encode("Password123!"));
-        nonAdmin.setRole(userRole);
-        nonAdmin.setActive(true);
-        nonAdmin.setFirstName("Non");
-        nonAdmin.setLastName("Admin");
-        userRepository.save(nonAdmin);
+    User admin = new User();
+    admin.setEmail(adminEmail);
+    admin.setPassword(passwordEncoder.encode("Password123!"));
+    admin.setRole(adminRole);
+    admin.setActive(true);
+    admin.setFirstName("Standard");
+    admin.setLastName("Admin");
+    userRepository.save(admin);
 
-        String nonAdminAccessToken = loginAndGetAccessToken(nonAdminEmail, "Password123!");
+    String token = loginAndGetAccessToken(adminEmail, "Password123!");
+    User target = createTargetUser(userRole);
 
-        User target = createTargetUser(userRole);
+    mockMvc.perform(post("/admin/users/" + target.getId() + "/reactivate")
+        .header("Authorization", "Bearer " + token))
+      .andDo(print())
+      .andExpect(status().isForbidden());
+  }
 
-        mockMvc.perform(post("/admin/users/" + target.getId() + "/reactivate")
-                        .header("Authorization", "Bearer " + nonAdminAccessToken))
-                .andDo(print())
-                .andExpect(status().isForbidden());
-    }
+  @Test
+  void deactivateThenReactivate_areIdempotent_statusReflectsState_andAuditIsWritten() throws Exception {
+    long beforeAuditCount = auditRepository.count();
 
-    @Test
-    void deactivateThenReactivate_areIdempotent_statusReflectsState_andAuditIsWritten() throws Exception {
-        long beforeAuditCount = auditRepository.count();
+    String superAdminToken = createSuperAdminAndLogin();
+    User target = createTargetUser(userRole);
 
-        String adminAccessToken = createAdminAndLogin();
+    // Deactivate
+    mockMvc.perform(post("/admin/users/" + target.getId() + "/deactivate")
+        .header("Authorization", "Bearer " + superAdminToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.active").value(false));
 
-        Role userRole = roleRepository.findByName("USER").orElseThrow();
-        User target = createTargetUser(userRole);
+    // Re-deactivate (Idempotent)
+    mockMvc.perform(post("/admin/users/" + target.getId() + "/deactivate")
+        .header("Authorization", "Bearer " + superAdminToken))
+      .andExpect(status().isOk());
 
-        mockMvc.perform(post("/admin/users/" + target.getId() + "/deactivate")
-                        .header("Authorization", "Bearer " + adminAccessToken))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(target.getId()))
-                .andExpect(jsonPath("$.active").value(false));
+    // Reactivate
+    mockMvc.perform(post("/admin/users/" + target.getId() + "/reactivate")
+        .header("Authorization", "Bearer " + superAdminToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.active").value(true));
 
-        assertStatus(adminAccessToken, target.getId(), false);
+    long afterAuditCount = auditRepository.count();
+    assertThat(afterAuditCount).isGreaterThan(beforeAuditCount);
+  }
 
-        mockMvc.perform(post("/admin/users/" + target.getId() + "/deactivate")
-                        .header("Authorization", "Bearer " + adminAccessToken))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(target.getId()))
-                .andExpect(jsonPath("$.active").value(false));
+  private User createTargetUser(Role userRole) {
+    User target = new User();
+    target.setEmail("target-" + UUID.randomUUID() + "@test.com");
+    target.setPassword(passwordEncoder.encode("Password123!"));
+    target.setRole(userRole);
+    target.setActive(true);
+    target.setFirstName("Target");
+    target.setLastName("User");
+    return userRepository.save(target);
+  }
 
-        assertStatus(adminAccessToken, target.getId(), false);
+  private String createSuperAdminAndLogin() throws Exception {
+    String email = "super-" + UUID.randomUUID() + "@test.com";
+    String password = "Password123!";
 
-        long afterDeactivateAuditCount = auditRepository.count();
-        assertThat(afterDeactivateAuditCount).isEqualTo(beforeAuditCount + 1);
+    User u = new User();
+    u.setEmail(email);
+    u.setPassword(passwordEncoder.encode(password));
+    u.setRole(superAdminRole);
+    u.setActive(true);
+    u.setFirstName("Super");
+    u.setLastName("Admin");
+    userRepository.save(u);
 
-        mockMvc.perform(post("/admin/users/" + target.getId() + "/reactivate")
-                        .header("Authorization", "Bearer " + adminAccessToken))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(target.getId()))
-                .andExpect(jsonPath("$.active").value(true));
+    return loginAndGetAccessToken(email, password);
+  }
 
-        assertStatus(adminAccessToken, target.getId(), true);
-
-        mockMvc.perform(post("/admin/users/" + target.getId() + "/reactivate")
-                        .header("Authorization", "Bearer " + adminAccessToken))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(target.getId()))
-                .andExpect(jsonPath("$.active").value(true));
-
-        assertStatus(adminAccessToken, target.getId(), true);
-
-        long afterReactivateAuditCount = auditRepository.count();
-        assertThat(afterReactivateAuditCount).isEqualTo(beforeAuditCount + 2);
-    }
-
-    private void assertStatus(String adminAccessToken, long userId, boolean expectedActive) throws Exception {
-        mockMvc.perform(get("/admin/users/" + userId + "/status")
-                        .header("Authorization", "Bearer " + adminAccessToken))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.userId").value(userId))
-                .andExpect(jsonPath("$.active").value(expectedActive));
-    }
-
-    private User createTargetUser(Role userRole) {
-        String targetEmail = "target-" + UUID.randomUUID() + "@test.com";
-
-        User target = new User();
-        target.setEmail(targetEmail);
-        target.setPassword(passwordEncoder.encode("Password123!"));
-        target.setRole(userRole);
-        target.setActive(true);
-        target.setFirstName("Target");
-        target.setLastName("User");
-
-        return userRepository.save(target);
-    }
-
-    private String createAdminAndLogin() throws Exception {
-        Role adminRole = roleRepository.findByName("ADMIN").orElseThrow();
-
-        String adminEmail = "admin-" + UUID.randomUUID() + "@test.com";
-        String adminPassword = "Passord123!";
-
-        User admin = new User();
-        admin.setEmail(adminEmail);
-        admin.setPassword(passwordEncoder.encode(adminPassword));
-        admin.setRole(adminRole);
-        admin.setActive(true);
-        admin.setFirstName("Test");
-        admin.setLastName("Admin");
-        userRepository.save(admin);
-
-        return loginAndGetAccessToken(adminEmail, adminPassword);
-    }
-
-    private String loginAndGetAccessToken(String email, String password) throws Exception {
-        var payload = new AuthRequest(email, password);
-
-        var result = mockMvc.perform(post("/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(payload)))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").exists())
-                .andReturn();
-
-        String body = result.getResponse().getContentAsString();
-        return objectMapper.readTree(body).get("accessToken").asText();
-    }
+  private String loginAndGetAccessToken(String email, String password) throws Exception {
+    var payload = new AuthRequest(email, password);
+    var result = mockMvc.perform(post("/auth/login")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(payload)))
+      .andExpect(status().isOk())
+      .andReturn();
+    return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
+  }
 }

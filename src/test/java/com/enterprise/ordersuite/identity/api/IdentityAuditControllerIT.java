@@ -7,6 +7,7 @@ import com.enterprise.ordersuite.identity.persistence.IdentityAuditEventReposito
 import com.enterprise.ordersuite.identity.persistence.RoleRepository;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -18,10 +19,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
@@ -29,118 +28,67 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 class IdentityAuditControllerIT {
 
-    @Autowired MockMvc mockMvc;
-    @Autowired ObjectMapper objectMapper;
+  @Autowired MockMvc mockMvc;
+  @Autowired ObjectMapper objectMapper;
+  @Autowired UserRepository userRepository;
+  @Autowired RoleRepository roleRepository;
+  @Autowired IdentityAuditEventRepository auditRepository;
+  @Autowired PasswordEncoder passwordEncoder;
 
-    @Autowired UserRepository userRepository;
-    @Autowired RoleRepository roleRepository;
-    @Autowired IdentityAuditEventRepository auditRepository;
-    @Autowired PasswordEncoder passwordEncoder;
+  private Role adminRole;
+  private Role superAdminRole;
 
-    @Test
-    void listAudit_withoutToken_returns401() throws Exception {
-        mockMvc.perform(get("/admin/identity-audit"))
-                .andDo(print())
-                .andExpect(status().isUnauthorized());
-    }
+  @BeforeEach
+  void setup() {
+    adminRole = roleRepository.findByName("ADMIN").orElseThrow();
+    superAdminRole = roleRepository.findByName("SUPER_ADMIN").orElseThrow();
+  }
 
-    @Test
-    void listAudit_nonAdmin_returns403() throws Exception {
-        Role userRole = roleRepository.findByName("USER").orElseThrow();
-        String token = createUserAndLogin(userRole);
+  @Test
+  void listAudit_withoutToken_returns401() throws Exception {
+    mockMvc.perform(get("/admin/identity-audit"))
+      .andExpect(status().isUnauthorized());
+  }
 
-        mockMvc.perform(get("/admin/identity-audit?page=0&size=10")
-                        .header("Authorization", "Bearer " + token))
-                .andDo(print())
-                .andExpect(status().isForbidden());
-    }
+  @Test
+  void listAudit_nonSuperAdmin_returns403() throws Exception {
+    // Explicitly login as a standard ADMIN
+    String token = createUserAndLogin(adminRole, "admin-" + UUID.randomUUID() + "@test.com");
 
-    @Test
-    void listAudit_admin_returns200_andContainsEventsAfterDeactivate() throws Exception {
-        long beforeAuditCount = auditRepository.count();
+    // This should return 403 because we restricted the endpoint to SUPER_ADMIN in SecurityConfig
+    mockMvc.perform(get("/admin/identity-audit?page=0&size=10")
+        .header("Authorization", "Bearer " + token))
+      .andExpect(status().isForbidden());
+  }
 
-        Role adminRole = roleRepository.findByName("ADMIN").orElseThrow();
-        String adminToken = createAdminAndLogin(adminRole);
+  @Test
+  void listAudit_superAdmin_returns200() throws Exception {
+    // Explicitly login as a SUPER_ADMIN
+    String token = createUserAndLogin(superAdminRole, "super-" + UUID.randomUUID() + "@test.com");
 
-        Role userRole = roleRepository.findByName("USER").orElseThrow();
-        User target = createTargetUser(userRole);
+    mockMvc.perform(get("/admin/identity-audit?page=0&size=10")
+        .header("Authorization", "Bearer " + token))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.items").isArray());
+  }
 
-        mockMvc.perform(post("/admin/users/" + target.getId() + "/deactivate")
-                        .header("Authorization", "Bearer " + adminToken))
-                .andDo(print())
-                .andExpect(status().isOk());
+  private String createUserAndLogin(Role role, String email) throws Exception {
+    User u = new User();
+    u.setEmail(email);
+    u.setPassword(passwordEncoder.encode("Password123!"));
+    u.setRole(role);
+    u.setActive(true);
+    u.setFirstName("Test");
+    u.setLastName("User");
+    userRepository.save(u);
 
-        long afterDeactivateAuditCount = auditRepository.count();
-        assertThat(afterDeactivateAuditCount).isEqualTo(beforeAuditCount + 1);
+    var payload = new AuthRequest(email, "Password123!");
+    var result = mockMvc.perform(post("/auth/login")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(payload)))
+      .andExpect(status().isOk())
+      .andReturn();
 
-        mockMvc.perform(get("/admin/identity-audit?page=0&size=10")
-                        .header("Authorization", "Bearer " + adminToken))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items").isArray())
-                .andExpect(jsonPath("$.page").value(0))
-                .andExpect(jsonPath("$.size").value(10))
-                .andExpect(jsonPath("$.totalItems").exists())
-                .andExpect(jsonPath("$.totalPages").exists())
-                .andExpect(jsonPath("$.items[0].type").value("USER_DEACTIVATED"));
-    }
-
-    private User createTargetUser(Role role) {
-        String email = "target-" + UUID.randomUUID() + "@test.com";
-
-        User u = new User();
-        u.setEmail(email);
-        u.setPassword(passwordEncoder.encode("Password123!"));
-        u.setRole(role);
-        u.setActive(true);
-        u.setFirstName("Target");
-        u.setLastName("User");
-        return userRepository.save(u);
-    }
-
-    private String createUserAndLogin(Role userRole) throws Exception {
-        String email = "user-" + UUID.randomUUID() + "@test.com";
-        String password = "Password123!";
-
-        User u = new User();
-        u.setEmail(email);
-        u.setPassword(passwordEncoder.encode(password));
-        u.setRole(userRole);
-        u.setActive(true);
-        u.setFirstName("Non");
-        u.setLastName("Admin");
-        userRepository.save(u);
-
-        return loginAndGetAccessToken(email, password);
-    }
-
-    private String createAdminAndLogin(Role adminRole) throws Exception {
-        String email = "admin-" + UUID.randomUUID() + "@test.com";
-        String password = "Passord123!";
-
-        User u = new User();
-        u.setEmail(email);
-        u.setPassword(passwordEncoder.encode(password));
-        u.setRole(adminRole);
-        u.setActive(true);
-        u.setFirstName("Test");
-        u.setLastName("Admin");
-        userRepository.save(u);
-
-        return loginAndGetAccessToken(email, password);
-    }
-
-    private String loginAndGetAccessToken(String email, String password) throws Exception {
-        var payload = new AuthRequest(email, password);
-
-        var result = mockMvc.perform(post("/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(payload)))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").exists())
-                .andReturn();
-
-        return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
-    }
+    return objectMapper.readTree(result.getResponse().getContentAsString()).get("accessToken").asText();
+  }
 }

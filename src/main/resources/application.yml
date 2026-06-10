@@ -1,15 +1,15 @@
 server:
-  port: ${SERVER_PORT}
+  port: ${SERVER_PORT:8080}
   servlet:
-    context-path: ${SERVER_CONTEXT_PATH}
+    context-path: ${SERVER_CONTEXT_PATH:}
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/${DB_NAME}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
   profiles:
-   active: local
+    active: ${SPRING_PROFILES_ACTIVE:local}
   jpa:
     hibernate:
       ddl-auto: update
@@ -20,23 +20,32 @@ spring:
 
 jwt:
   secret: ${JWT_SECRET}
-  expiration: 86400000
+  expiration: ${JWT_EXPIRATION_MS:86400000}
 
 app:
   urls:
     password-reset: ${APP_PASSWORD_RESET_URL}
 
+# ENTERPRISE RATE LIMIT METADATA
+# This structure sets sensible defaults while exposing explicit hooks for DevOps overrides
 security:
   rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
     forgot-password:
-      capacity: 5
-      refill-seconds: 10
+      capacity: ${RATE_LIMIT_FORGOT_PASSWORD_CAPACITY:5}
+      refill-seconds: ${RATE_LIMIT_FORGOT_PASSWORD_REFILL:10}
     login:
-      capacity: 5
-      refill-seconds: 5
+      capacity: ${RATE_LIMIT_LOGIN_CAPACITY:5}
+      refill-seconds: ${RATE_LIMIT_LOGIN_REFILL:5}
     refresh:
-      capacity: 10
-      refill-seconds: 1
+      capacity: ${RATE_LIMIT_REFRESH_CAPACITY:10}
+      refill-seconds: ${RATE_LIMIT_REFRESH_REFILL:1}
+    logout:
+      capacity: ${RATE_LIMIT_LOGOUT_CAPACITY:30}
+      refill-seconds: ${RATE_LIMIT_LOGOUT_REFILL:1}
+    reset-password:
+      capacity: ${RATE_LIMIT_RESET_PASSWORD_CAPACITY:5}
+      refill-seconds: ${RATE_LIMIT_RESET_PASSWORD_REFILL:10}
 
 logging:
   level:
@@ -62,7 +71,7 @@ management:
       enabled: true
   info:
     env:
-      enabled: true # Required for custom info properties
+      enabled: true
 
 info:
   app:
@@ -72,6 +81,7 @@ info:
 
 springdoc:
   api-docs:
-    enabled: true
+    path: /v3/api-docs
   swagger-ui:
+    path: /swagger-ui.html
     enabled: true

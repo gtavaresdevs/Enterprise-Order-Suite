@@ -22,90 +22,89 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @RequiredArgsConstructor
 public class AuthenticationService {
 
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
-    private final RefreshTokenService refreshTokenService;
-    private final MeterRegistry meterRegistry;
+  private final UserRepository userRepository;
+  private final RoleRepository roleRepository;
+  private final PasswordEncoder passwordEncoder;
+  private final JwtService jwtService;
+  private final RefreshTokenService refreshTokenService;
+  private final MeterRegistry meterRegistry;
 
-    public AuthResponse register(RegisterRequest request) {
+  public AuthResponse register(RegisterRequest request) {
 
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already in use.");
-        }
-
-        Role role = roleRepository.findByName(request.getRole())
-                .orElseThrow(() -> new RuntimeException("Role not found."));
-
-        User user = new User();
-        user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setActive(true);
-        user.setRole(role);
-
-        userRepository.save(user);
-
-        meterRegistry.counter("app.user.created", "source", "registration").increment();
-
-        String accessToken = jwtService.generateToken(user);
-        var issuedRefresh = refreshTokenService.issueFor(user);
-
-        return new AuthResponse(accessToken, issuedRefresh.rawToken());
+    if (userRepository.existsByEmail(request.getEmail())) {
+      throw new RuntimeException("Email already in use.");
     }
 
-    public AuthResponse authenticate(AuthRequest request) {
+    // SECURITY FIX: Hardcode the assignment to "USER".
+    // Ignore any role the client might try to inject.
+    Role role = roleRepository.findByName("USER")
+      .orElseThrow(() -> new RuntimeException("Default role USER not found. Database seeded incorrectly."));
 
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElse(null);
+    User user = new User();
+    user.setFirstName(request.getFirstName());
+    user.setLastName(request.getLastName());
+    user.setEmail(request.getEmail());
+    user.setPassword(passwordEncoder.encode(request.getPassword()));
+    user.setActive(true);
+    user.setRole(role);
 
-        if (user == null || !Boolean.TRUE.equals(user.getActive()) || 
-            !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            meterRegistry.counter("app.login.attempt", "status", "failure").increment();
-            throw new InvalidCredentialsException();
-        }
+    userRepository.save(user);
 
-        meterRegistry.counter("app.login.attempt", "status", "success").increment();
+    meterRegistry.counter("app.user.created", "source", "registration").increment();
 
-        String accessToken = jwtService.generateToken(user);
-        var issuedRefresh = refreshTokenService.issueFor(user);
+    String accessToken = jwtService.generateToken(user);
+    var issuedRefresh = refreshTokenService.issueFor(user);
 
-        return new AuthResponse(accessToken, issuedRefresh.rawToken());
+    return new AuthResponse(accessToken, issuedRefresh.rawToken());
+  }
+
+  public AuthResponse authenticate(AuthRequest request) {
+    User user = userRepository.findByEmail(request.getEmail())
+      .orElse(null);
+
+    if (user == null || !Boolean.TRUE.equals(user.getActive()) ||
+      !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+      meterRegistry.counter("app.login.attempt", "status", "failure").increment();
+      throw new InvalidCredentialsException();
     }
 
-    public AuthResponse refresh(RefreshRequest request) {
-        RefreshToken existing = refreshTokenService.getActiveTokenOrNull(request.refreshToken());
-        if (existing == null) {
-            throw new InvalidRefreshTokenException();
-        }
+    meterRegistry.counter("app.login.attempt", "status", "success").increment();
 
-        User user = existing.getUser();
+    String accessToken = jwtService.generateToken(user);
+    var issuedRefresh = refreshTokenService.issueFor(user);
 
-        // If user is inactive, block refresh and revoke the token as a safety measure
-        if (!Boolean.TRUE.equals(user.getActive())) {
-            refreshTokenService.revoke(existing);
-            throw new InvalidRefreshTokenException();
-        }
+    return new AuthResponse(accessToken, issuedRefresh.rawToken());
+  }
 
-        // rotation: old token becomes unusable
-        refreshTokenService.markUsed(existing);
-
-        String newAccessToken = jwtService.generateToken(user);
-        var newRefresh = refreshTokenService.issueFor(user);
-
-        return new AuthResponse(newAccessToken, newRefresh.rawToken());
+  public AuthResponse refresh(RefreshRequest request) {
+    RefreshToken existing = refreshTokenService.getActiveTokenOrNull(request.refreshToken());
+    if (existing == null) {
+      throw new InvalidRefreshTokenException();
     }
 
-    public void logout(LogoutRequest request) {
-        String hash = refreshTokenService.hash(request.refreshToken());
-        RefreshToken token = refreshTokenService.findByHashOrNull(hash);
+    User user = existing.getUser();
 
-        if (token == null) {
-            return; // always succeed, no token enumeration
-        }
-
-        refreshTokenService.revoke(token);
+    if (!Boolean.TRUE.equals(user.getActive())) {
+      refreshTokenService.revoke(existing);
+      throw new InvalidRefreshTokenException();
     }
+
+    refreshTokenService.markUsed(existing);
+
+    String newAccessToken = jwtService.generateToken(user);
+    var newRefresh = refreshTokenService.issueFor(user);
+
+    return new AuthResponse(newAccessToken, newRefresh.rawToken());
+  }
+
+  public void logout(LogoutRequest request) {
+    String hash = refreshTokenService.hash(request.refreshToken());
+    RefreshToken token = refreshTokenService.findByHashOrNull(hash);
+
+    if (token == null) {
+      return;
+    }
+
+    refreshTokenService.revoke(token);
+  }
 }
