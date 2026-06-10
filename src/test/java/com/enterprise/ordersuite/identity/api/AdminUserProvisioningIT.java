@@ -35,249 +35,268 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(TestEmailServiceConfig.class)
 class AdminUserProvisioningIT {
 
-    @Autowired MockMvc mockMvc;
-    @Autowired ObjectMapper objectMapper;
+  @Autowired MockMvc mockMvc;
+  @Autowired ObjectMapper objectMapper;
 
-    @Autowired UserRepository userRepository;
-    @Autowired RoleRepository roleRepository;
-    @Autowired PasswordEncoder passwordEncoder;
-    @Autowired IdentityAuditEventRepository auditRepo;
+  @Autowired UserRepository userRepository;
+  @Autowired RoleRepository roleRepository;
+  @Autowired PasswordEncoder passwordEncoder;
+  @Autowired IdentityAuditEventRepository auditRepo;
 
-    @Autowired CapturingEmailService emailService;
+  @Autowired CapturingEmailService emailService;
 
-    private String adminEmail;
-    private String adminPassword;
-    private String userEmail;
-    private String userPassword;
+  // We now maintain three separate test personas
+  private String superAdminEmail;
+  private String superAdminPassword;
+  private String adminEmail;
+  private String adminPassword;
+  private String userEmail;
+  private String userPassword;
 
-    @BeforeEach
-    void setup() {
-        emailService.clear();
-        auditRepo.deleteAll();
+  @BeforeEach
+  void setup() {
+    emailService.clear();
+    auditRepo.deleteAll();
 
-        Role adminRole = roleRepository.findByName("ADMIN")
-                .orElseGet(() -> {
-                    Role r = new Role();
-                    r.setName("ADMIN");
-                    return roleRepository.save(r);
-                });
+    // Seed SUPER_ADMIN
+    Role superAdminRole = roleRepository.findByName("SUPER_ADMIN")
+      .orElseGet(() -> {
+        Role r = new Role();
+        r.setName("SUPER_ADMIN");
+        return roleRepository.save(r);
+      });
 
-        Role userRole = roleRepository.findByName("USER")
-                .orElseGet(() -> {
-                    Role r = new Role();
-                    r.setName("USER");
-                    return roleRepository.save(r);
-                });
+    Role adminRole = roleRepository.findByName("ADMIN")
+      .orElseGet(() -> {
+        Role r = new Role();
+        r.setName("ADMIN");
+        return roleRepository.save(r);
+      });
 
-        adminEmail = "admin." + UUID.randomUUID() + "@test.local";
-        adminPassword = "AdminPass123!";
-        userEmail = "user." + UUID.randomUUID() + "@test.local";
-        userPassword = "UserPass123!";
+    Role userRole = roleRepository.findByName("USER")
+      .orElseGet(() -> {
+        Role r = new Role();
+        r.setName("USER");
+        return roleRepository.save(r);
+      });
 
-        newPersistedUser(adminEmail, adminPassword, adminRole, true, "Admin", "User");
-        newPersistedUser(userEmail, userPassword, userRole, true, "Normal", "User");
-    }
+    superAdminEmail = "super." + UUID.randomUUID() + "@test.local";
+    superAdminPassword = "SuperPass123!";
+    adminEmail = "admin." + UUID.randomUUID() + "@test.local";
+    adminPassword = "AdminPass123!";
+    userEmail = "user." + UUID.randomUUID() + "@test.local";
+    userPassword = "UserPass123!";
 
-    @Test
-    void createUser_noToken_401() throws Exception {
-        AdminCreateUserRequest req = new AdminCreateUserRequest(
-                "new.user@test.local",
-                "New",
-                "User",
-                null,
-                true
-        );
+    newPersistedUser(superAdminEmail, superAdminPassword, superAdminRole, true, "Super", "Admin");
+    newPersistedUser(adminEmail, adminPassword, adminRole, true, "Admin", "User");
+    newPersistedUser(userEmail, userPassword, userRole, true, "Normal", "User");
+  }
 
-        mockMvc.perform(post("/admin/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isUnauthorized());
-    }
+  @Test
+  void createUser_noToken_401() throws Exception {
+    AdminCreateUserRequest req = new AdminCreateUserRequest(
+      "new.user@test.local",
+      "New",
+      "User",
+      null,
+      true
+    );
 
-    @Test
-    void createUser_nonAdmin_403() throws Exception {
-        String token = loginAndGetAccessToken(userEmail, userPassword);
+    mockMvc.perform(post("/admin/users")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(req)))
+      .andExpect(status().isUnauthorized());
+  }
 
-        AdminCreateUserRequest req = new AdminCreateUserRequest(
-                "new.user@test.local",
-                "New",
-                "User",
-                null,
-                true
-        );
+  @Test
+  void createUser_standardAdmin_403() throws Exception {
+    // Here we prove that a standard ADMIN is correctly blocked from user management
+    String token = loginAndGetAccessToken(adminEmail, adminPassword);
 
-        mockMvc.perform(post("/admin/users")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isForbidden());
-    }
+    AdminCreateUserRequest req = new AdminCreateUserRequest(
+      "new.user@test.local",
+      "New",
+      "User",
+      null,
+      true
+    );
 
-    @Test
-    void createUser_admin_201_persistsUser_writesAudit_andSendsEmail_byDefault() throws Exception {
-        String token = loginAndGetAccessToken(adminEmail, adminPassword);
+    mockMvc.perform(post("/admin/users")
+        .header("Authorization", "Bearer " + token)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(req)))
+      .andExpect(status().isForbidden()); // Security Working!
+  }
 
-        String newEmail = "created." + UUID.randomUUID() + "@test.local";
+  @Test
+  void createUser_superAdmin_201_persistsUser_writesAudit_andSendsEmail_byDefault() throws Exception {
+    // Upgrade request to use the SUPER_ADMIN token
+    String token = loginAndGetAccessToken(superAdminEmail, superAdminPassword);
 
-        AdminCreateUserRequest req = new AdminCreateUserRequest(
-                newEmail,
-                "Created",
-                "User",
-                null,
-                null
-        );
+    String newEmail = "created." + UUID.randomUUID() + "@test.local";
 
-        mockMvc.perform(post("/admin/users")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andDo(print())
-                .andExpect(status().isCreated())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.id").isNumber())
-                .andExpect(jsonPath("$.email").value(newEmail))
-                .andExpect(jsonPath("$.role").value("USER"))
-                .andExpect(jsonPath("$.active").value(true));
+    AdminCreateUserRequest req = new AdminCreateUserRequest(
+      newEmail,
+      "Created",
+      "User",
+      null,
+      null
+    );
 
-        User saved = userRepository.findByEmailIgnoreCase(newEmail).orElseThrow();
-        assertThat(saved.getActive()).isTrue();
-        assertThat(saved.getFirstName()).isEqualTo("Created");
-        assertThat(saved.getLastName()).isEqualTo("User");
+    mockMvc.perform(post("/admin/users")
+        .header("Authorization", "Bearer " + token)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(req)))
+      .andDo(print())
+      .andExpect(status().isCreated())
+      .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+      .andExpect(jsonPath("$.id").isNumber())
+      .andExpect(jsonPath("$.email").value(newEmail))
+      .andExpect(jsonPath("$.role").value("USER"))
+      .andExpect(jsonPath("$.active").value(true));
 
-        IdentityAuditEvent evt = auditRepo.findAll().stream()
-                .filter(e -> e.getType() == IdentityAuditEventType.USER_CREATED)
-                .max(Comparator.comparing(IdentityAuditEvent::getCreatedAt))
-                .orElseThrow();
+    User saved = userRepository.findByEmailIgnoreCase(newEmail).orElseThrow();
+    assertThat(saved.getActive()).isTrue();
+    assertThat(saved.getFirstName()).isEqualTo("Created");
+    assertThat(saved.getLastName()).isEqualTo("User");
 
-        assertThat(evt.getActorUserId()).isNotNull();
-        assertThat(evt.getTargetUserId()).isEqualTo(saved.getId());
-        assertThat(evt.getMetadata()).contains(newEmail);
+    IdentityAuditEvent evt = auditRepo.findAll().stream()
+      .filter(e -> e.getType() == IdentityAuditEventType.USER_CREATED)
+      .max(Comparator.comparing(IdentityAuditEvent::getCreatedAt))
+      .orElseThrow();
 
-        assertThat(emailService.sent()).hasSize(1);
-        assertThat(emailService.sent().get(0).toEmail()).isEqualTo(newEmail);
-        assertThat(emailService.sent().get(0).resetUrl()).contains("token=");
-    }
+    assertThat(evt.getActorUserId()).isNotNull();
+    assertThat(evt.getTargetUserId()).isEqualTo(saved.getId());
+    assertThat(evt.getMetadata()).contains(newEmail);
 
-    @Test
-    void createUser_admin_emailFailure_doesNotFailProvisioning_still201_andWritesAudit() throws Exception {
-        String token = loginAndGetAccessToken(adminEmail, adminPassword);
+    assertThat(emailService.sent()).hasSize(1);
+    assertThat(emailService.sent().get(0).toEmail()).isEqualTo(newEmail);
+    assertThat(emailService.sent().get(0).resetUrl()).contains("token=");
+  }
 
-        emailService.failNext(true);
+  @Test
+  void createUser_superAdmin_emailFailure_doesNotFailProvisioning_still201_andWritesAudit() throws Exception {
+    // Upgrade request to use the SUPER_ADMIN token
+    String token = loginAndGetAccessToken(superAdminEmail, superAdminPassword);
 
-        String newEmail = "created.failmail." + UUID.randomUUID() + "@test.local";
+    emailService.failNext(true);
 
-        AdminCreateUserRequest req = new AdminCreateUserRequest(
-                newEmail,
-                "Created",
-                "User",
-                null,
-                true
-        );
+    String newEmail = "created.failmail." + UUID.randomUUID() + "@test.local";
 
-        mockMvc.perform(post("/admin/users")
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(req)))
-                .andDo(print())
-                .andExpect(status().isCreated());
+    AdminCreateUserRequest req = new AdminCreateUserRequest(
+      newEmail,
+      "Created",
+      "User",
+      null,
+      true
+    );
 
-        User saved = userRepository.findByEmailIgnoreCase(newEmail).orElseThrow();
-        assertThat(saved.getActive()).isTrue();
-        assertThat(saved.getFirstName()).isEqualTo("Created");
-        assertThat(saved.getLastName()).isEqualTo("User");
+    mockMvc.perform(post("/admin/users")
+        .header("Authorization", "Bearer " + token)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(req)))
+      .andDo(print())
+      .andExpect(status().isCreated());
 
-        assertThat(auditRepo.findAll().stream().anyMatch(e -> e.getType() == IdentityAuditEventType.USER_CREATED))
-                .isTrue();
+    User saved = userRepository.findByEmailIgnoreCase(newEmail).orElseThrow();
+    assertThat(saved.getActive()).isTrue();
+    assertThat(saved.getFirstName()).isEqualTo("Created");
+    assertThat(saved.getLastName()).isEqualTo("User");
 
-        assertThat(emailService.sent()).isEmpty();
-    }
+    assertThat(auditRepo.findAll().stream().anyMatch(e -> e.getType() == IdentityAuditEventType.USER_CREATED))
+      .isTrue();
 
-    @Test
-    void resendPasswordSetup_admin_200_sendsEmail_andWritesAudit() throws Exception {
-        String token = loginAndGetAccessToken(adminEmail, adminPassword);
+    assertThat(emailService.sent()).isEmpty();
+  }
 
-        Role userRole = roleRepository.findByName("USER").orElseThrow();
-        String targetEmail = "target." + UUID.randomUUID() + "@test.local";
+  @Test
+  void resendPasswordSetup_superAdmin_200_sendsEmail_andWritesAudit() throws Exception {
+    // Upgrade request to use the SUPER_ADMIN token
+    String token = loginAndGetAccessToken(superAdminEmail, superAdminPassword);
 
-        User savedTarget = newPersistedUser(
-                targetEmail,
-                "TempPass123!",
-                userRole,
-                true,
-                "Target",
-                "User"
-        );
+    Role userRole = roleRepository.findByName("USER").orElseThrow();
+    String targetEmail = "target." + UUID.randomUUID() + "@test.local";
 
-        mockMvc.perform(post("/admin/users/{id}/password-setup", savedTarget.getId())
-                        .header("Authorization", "Bearer " + token))
-                .andDo(print())
-                .andExpect(status().isOk());
+    User savedTarget = newPersistedUser(
+      targetEmail,
+      "TempPass123!",
+      userRole,
+      true,
+      "Target",
+      "User"
+    );
 
-        assertThat(emailService.sent()).hasSize(1);
-        assertThat(emailService.sent().get(0).toEmail()).isEqualTo(targetEmail);
+    mockMvc.perform(post("/admin/users/{id}/password-setup", savedTarget.getId())
+        .header("Authorization", "Bearer " + token))
+      .andDo(print())
+      .andExpect(status().isOk());
 
-        IdentityAuditEvent evt = auditRepo.findAll().stream()
-                .filter(e -> e.getType() == IdentityAuditEventType.PASSWORD_SETUP_SENT)
-                .max(Comparator.comparing(IdentityAuditEvent::getCreatedAt))
-                .orElseThrow();
+    assertThat(emailService.sent()).hasSize(1);
+    assertThat(emailService.sent().get(0).toEmail()).isEqualTo(targetEmail);
 
-        assertThat(evt.getTargetUserId()).isEqualTo(savedTarget.getId());
-        assertThat(evt.getMetadata()).contains(targetEmail);
-    }
+    IdentityAuditEvent evt = auditRepo.findAll().stream()
+      .filter(e -> e.getType() == IdentityAuditEventType.PASSWORD_SETUP_SENT)
+      .max(Comparator.comparing(IdentityAuditEvent::getCreatedAt))
+      .orElseThrow();
 
-    @Test
-    void resendPasswordSetup_inactiveTarget_returns400_andDoesNotSendEmail() throws Exception {
-        String token = loginAndGetAccessToken(adminEmail, adminPassword);
+    assertThat(evt.getTargetUserId()).isEqualTo(savedTarget.getId());
+    assertThat(evt.getMetadata()).contains(targetEmail);
+  }
 
-        Role userRole = roleRepository.findByName("USER").orElseThrow();
-        String targetEmail = "inactive." + UUID.randomUUID() + "@test.local";
+  @Test
+  void resendPasswordSetup_inactiveTarget_returns400_andDoesNotSendEmail() throws Exception {
+    // Upgrade request to use the SUPER_ADMIN token
+    String token = loginAndGetAccessToken(superAdminEmail, superAdminPassword);
 
-        User savedTarget = newPersistedUser(
-                targetEmail,
-                "TempPass123!",
-                userRole,
-                false,
-                "Inactive",
-                "User"
-        );
+    Role userRole = roleRepository.findByName("USER").orElseThrow();
+    String targetEmail = "inactive." + UUID.randomUUID() + "@test.local";
 
-        mockMvc.perform(post("/admin/users/{id}/password-setup", savedTarget.getId())
-                        .header("Authorization", "Bearer " + token))
-                .andDo(print())
-                .andExpect(status().isBadRequest());
+    User savedTarget = newPersistedUser(
+      targetEmail,
+      "TempPass123!",
+      userRole,
+      false,
+      "Inactive",
+      "User"
+    );
 
-        assertThat(emailService.sent()).isEmpty();
-        assertThat(auditRepo.findAll().stream().noneMatch(e -> e.getType() == IdentityAuditEventType.PASSWORD_SETUP_SENT))
-                .isTrue();
-    }
+    mockMvc.perform(post("/admin/users/{id}/password-setup", savedTarget.getId())
+        .header("Authorization", "Bearer " + token))
+      .andDo(print())
+      .andExpect(status().isBadRequest());
 
-    private User newPersistedUser(
-            String email,
-            String rawPassword,
-            Role role,
-            boolean active,
-            String firstName,
-            String lastName
-    ) {
-        User u = new User();
-        u.setEmail(email);
-        u.setPassword(passwordEncoder.encode(rawPassword));
-        u.setRole(role);
-        u.setActive(active);
-        u.setFirstName(firstName);
-        u.setLastName(lastName);
-        return userRepository.save(u);
-    }
+    assertThat(emailService.sent()).isEmpty();
+    assertThat(auditRepo.findAll().stream().noneMatch(e -> e.getType() == IdentityAuditEventType.PASSWORD_SETUP_SENT))
+      .isTrue();
+  }
 
-    private String loginAndGetAccessToken(String email, String password) throws Exception {
-        String responseJson = mockMvc.perform(post("/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new AuthRequest(email, password))))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+  private User newPersistedUser(
+    String email,
+    String rawPassword,
+    Role role,
+    boolean active,
+    String firstName,
+    String lastName
+  ) {
+    User u = new User();
+    u.setEmail(email);
+    u.setPassword(passwordEncoder.encode(rawPassword));
+    u.setRole(role);
+    u.setActive(active);
+    u.setFirstName(firstName);
+    u.setLastName(lastName);
+    return userRepository.save(u);
+  }
 
-        return objectMapper.readTree(responseJson).get("accessToken").asText();
-    }
+  private String loginAndGetAccessToken(String email, String password) throws Exception {
+    String responseJson = mockMvc.perform(post("/auth/login")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(new AuthRequest(email, password))))
+      .andExpect(status().isOk())
+      .andReturn()
+      .getResponse()
+      .getContentAsString();
+
+    return objectMapper.readTree(responseJson).get("accessToken").asText();
+  }
 }

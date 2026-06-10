@@ -9,19 +9,18 @@ import lombok.Setter;
 @Setter
 public class RegisterRequest {
 
-    @NotBlank
-    private String firstName;
+  @NotBlank
+  private String firstName;
 
-    @NotBlank
-    private String lastName;
+  @NotBlank
+  private String lastName;
 
-    @Email
-    @NotBlank
-    private String email;
+  @Email
+  @NotBlank
+  private String email;
 
-    @NotBlank
-    private String password;
+  @NotBlank
+  private String password;
 
-    @NotBlank
-    private String role; // will be "ADMIN" or "USER"
+  // REMOVED: private String role;
 }
