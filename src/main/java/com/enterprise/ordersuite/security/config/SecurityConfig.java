@@ -166,7 +166,7 @@ public class SecurityConfig {
       .csrf(AbstractHttpConfigurer::disable)
       .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedEntryPoint()))
       .authorizeHttpRequests(auth -> auth
-        .requestMatchers("/error", "/auth/**", "/actuator/health/**", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html", "/webjars/**").permitAll()
+        .requestMatchers("/error", "/auth/**", "/actuator/health/**", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html", "/webjars/**", "/logo.png").permitAll()
         .requestMatchers("/actuator/info", "/actuator/metrics/**").hasRole("SUPER_ADMIN")
         .requestMatchers("/admin/users/**", "/admin/identity-audit/**").hasRole("SUPER_ADMIN")
         .requestMatchers("/admin/**", "/roles").hasRole("ADMIN")

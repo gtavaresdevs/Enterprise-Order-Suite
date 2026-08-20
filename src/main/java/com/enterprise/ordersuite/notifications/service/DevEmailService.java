@@ -1,4 +1,4 @@
-package com.enterprise.ordersuite.notifications.service;
+/* package com.enterprise.ordersuite.notifications.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -14,3 +14,4 @@ public class DevEmailService implements EmailService {
         log.info("[DEV EMAIL] Password reset requested for '{}'. Reset URL: {}", toEmail, resetUrl);
     }
 }
+*/
