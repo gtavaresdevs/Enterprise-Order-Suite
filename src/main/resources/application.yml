@@ -17,6 +17,19 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  # CORRECTED NAMESPACE FOR AUTOCONFIGURING JAVAMAILSENDER
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
 
 jwt:
   secret: ${JWT_SECRET}
@@ -25,9 +38,15 @@ jwt:
 app:
   urls:
     password-reset: ${APP_PASSWORD_RESET_URL}
+  # CUSTOM MAPS CORRESPONDING TO THE @ConfigurationProperties(prefix = "app.email") CLASS
+  email:
+    from: ${MAIL_USERNAME}
+    template-name: "password-reset-email"
+    # Absolute public base URL used for resolving static assets cleanly in email HTML (e.g., logo images)
+    backend-base-url: ${APP_BACKEND_BASE_URL:http://localhost:8080/api}
+    logo-url: "https://enterprise-order-suite-public-images.s3.sa-east-1.amazonaws.com/logo.png"
 
 # ENTERPRISE RATE LIMIT METADATA
-# This structure sets sensible defaults while exposing explicit hooks for DevOps overrides
 security:
   rate-limit:
     enabled: ${RATE_LIMIT_ENABLED:true}
