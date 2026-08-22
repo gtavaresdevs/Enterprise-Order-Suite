@@ -12,11 +12,13 @@ import com.enterprise.ordersuite.identity.domain.Role;
 import com.enterprise.ordersuite.identity.domain.User;
 import com.enterprise.ordersuite.identity.persistence.RoleRepository;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
+import com.enterprise.ordersuite.profile.application.service.ProfileService;
 import com.enterprise.ordersuite.security.jwt.JwtService;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -28,7 +30,9 @@ public class AuthenticationService {
   private final JwtService jwtService;
   private final RefreshTokenService refreshTokenService;
   private final MeterRegistry meterRegistry;
+  private final ProfileService profileService;
 
+  @Transactional
   public AuthResponse register(RegisterRequest request) {
 
     if (userRepository.existsByEmail(request.getEmail())) {
@@ -50,7 +54,11 @@ public class AuthenticationService {
 
     userRepository.save(user);
 
-    meterRegistry.counter("app.user.created", "source", "registration").increment();
+    profileService.createProfile(user.getId());
+
+    meterRegistry
+      .counter("app.user.created", "source", "registration")
+      .increment();
 
     String accessToken = jwtService.generateToken(user);
     var issuedRefresh = refreshTokenService.issueFor(user);

@@ -3,102 +3,188 @@ package com.enterprise.ordersuite.auth.controllers;
 import com.enterprise.ordersuite.auth.dtos.AuthRequest;
 import com.enterprise.ordersuite.auth.dtos.LogoutRequest;
 import com.enterprise.ordersuite.auth.dtos.RefreshRequest;
+import com.enterprise.ordersuite.auth.dtos.RegisterRequest;
+import com.enterprise.ordersuite.support.IntegrationTest;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@IntegrationTest
 @AutoConfigureMockMvc
 class RefreshTokenFlowIT {
 
-    @Autowired MockMvc mockMvc;
-    @Autowired ObjectMapper objectMapper;
+  private static final String RAW_PASSWORD = "Password123!";
+  private static final String TEST_IP = "10.10.10.10";
 
-    @Test
-    void login_then_refresh_rotates_and_old_token_fails_and_logout_revokes() throws Exception {
-        // 1) login (NOTE: you must set valid credentials here)
-        var login = new AuthRequest("gtavaresdev+enterpriseordersuitetestrefreshtokentest@gmail.com","Test123!"); // TODO: set email/password for a real seeded user
+  @Autowired
+  private MockMvc mockMvc;
 
-        var loginRes = mockMvc.perform(post("/auth/login")
-                        .with(req -> { req.setRemoteAddr("10.10.10.10"); return req; })
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(login)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
-                .andReturn();
+  @Autowired
+  private ObjectMapper objectMapper;
 
-        String loginBody = loginRes.getResponse().getContentAsString();
-        String refreshToken = objectMapper.readTree(loginBody).get("refreshToken").asText();
+  private String testEmail;
 
-        // 2) refresh once, should succeed and give new refresh token
-        var refreshReq = new RefreshRequest(refreshToken);
+  @BeforeEach
+  void setUp() throws Exception {
+    testEmail = "testuser_" + UUID.randomUUID() + "@example.com";
 
-        var refreshRes = mockMvc.perform(post("/auth/refresh")
-                        .with(req -> { req.setRemoteAddr("10.10.10.10"); return req; })
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(refreshReq)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
-                .andReturn();
+    // Register test user with all mandatory fields via API
+    RegisterRequest registerRequest = new RegisterRequest();
+    registerRequest.setFirstName("Test");
+    registerRequest.setLastName("User");
+    registerRequest.setEmail(testEmail);
+    registerRequest.setPassword(RAW_PASSWORD);
 
-        String refreshBody = refreshRes.getResponse().getContentAsString();
-        String newRefreshToken = objectMapper.readTree(refreshBody).get("refreshToken").asText();
+    mockMvc.perform(
+        post("/auth/register")
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(objectMapper.writeValueAsString(registerRequest))
+      )
+      .andExpect(status().isOk());
+  }
 
-        assertThat(newRefreshToken).isNotEqualTo(refreshToken);
+  @Test
+  void login_then_refresh_rotates_and_old_token_fails_and_logout_revokes() throws Exception {
+    // 1. Initial Login
+    AuthRequest loginRequest = new AuthRequest(testEmail, RAW_PASSWORD);
 
-        // 3) reuse old refresh token, must fail with INVALID_REFRESH_TOKEN
-        mockMvc.perform(post("/auth/refresh")
-                        .with(req -> { req.setRemoteAddr("10.10.10.10"); return req; })
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new RefreshRequest(refreshToken))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+    MvcResult loginResult = mockMvc.perform(
+        post("/auth/login")
+          .with(request -> {
+            request.setRemoteAddr(TEST_IP);
+            return request;
+          })
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(objectMapper.writeValueAsString(loginRequest))
+      )
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.accessToken").isNotEmpty())
+      .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+      .andReturn();
 
-        // 4) refresh with the new token should still work (and returns another rotated token)
-        var refreshRes2 = mockMvc.perform(post("/auth/refresh")
-                        .with(req -> { req.setRemoteAddr("10.10.10.10"); return req; })
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new RefreshRequest(newRefreshToken))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").isNotEmpty())
-                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
-                .andReturn();
+    String refreshToken = extractToken(loginResult, "refreshToken");
 
-        String refreshBody2 = refreshRes2.getResponse().getContentAsString();
-        String newestRefreshToken = objectMapper.readTree(refreshBody2).get("refreshToken").asText();
+    // 2. First Refresh -> Obtains new refresh token
+    MvcResult firstRefreshResult = mockMvc.perform(
+        post("/auth/refresh")
+          .with(request -> {
+            request.setRemoteAddr(TEST_IP);
+            return request;
+          })
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(
+            objectMapper.writeValueAsString(new RefreshRequest(refreshToken))
+          )
+      )
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.accessToken").isNotEmpty())
+      .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+      .andReturn();
 
-        assertThat(newestRefreshToken).isNotEqualTo(newRefreshToken);
+    String newRefreshToken = extractToken(firstRefreshResult, "refreshToken");
 
-        // 5) logout using the latest refresh token, must always return 200
-        mockMvc.perform(post("/auth/logout")
-                        .with(req -> { req.setRemoteAddr("10.10.10.10"); return req; })
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new LogoutRequest(newestRefreshToken))))
-                .andExpect(status().isOk());
+    assertThat(newRefreshToken)
+      .isNotBlank()
+      .isNotEqualTo(refreshToken);
 
-        // 6) refresh after logout must fail with INVALID_REFRESH_TOKEN (revoked)
-        mockMvc.perform(post("/auth/refresh")
-                        .with(req -> { req.setRemoteAddr("10.10.10.10"); return req; })
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new RefreshRequest(newestRefreshToken))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+    // 3. Attempt Refresh using rotated/old token -> Fails with 401
+    mockMvc.perform(
+        post("/auth/refresh")
+          .with(request -> {
+            request.setRemoteAddr(TEST_IP);
+            return request;
+          })
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(
+            objectMapper.writeValueAsString(new RefreshRequest(refreshToken))
+          )
+      )
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
 
-        // 7) logout should be idempotent, calling again should still return 200
-        mockMvc.perform(post("/auth/logout")
-                        .with(req -> { req.setRemoteAddr("10.10.10.10"); return req; })
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new LogoutRequest(newestRefreshToken))))
-                .andExpect(status().isOk());
-    }
+    // 4. Second Refresh using valid rotated token
+    MvcResult secondRefreshResult = mockMvc.perform(
+        post("/auth/refresh")
+          .with(request -> {
+            request.setRemoteAddr(TEST_IP);
+            return request;
+          })
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(
+            objectMapper.writeValueAsString(new RefreshRequest(newRefreshToken))
+          )
+      )
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.accessToken").isNotEmpty())
+      .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+      .andReturn();
+
+    String newestRefreshToken = extractToken(secondRefreshResult, "refreshToken");
+
+    assertThat(newestRefreshToken)
+      .isNotBlank()
+      .isNotEqualTo(newRefreshToken)
+      .isNotEqualTo(refreshToken);
+
+    // 5. Logout using current active refresh token
+    mockMvc.perform(
+        post("/auth/logout")
+          .with(request -> {
+            request.setRemoteAddr(TEST_IP);
+            return request;
+          })
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(
+            objectMapper.writeValueAsString(new LogoutRequest(newestRefreshToken))
+          )
+      )
+      .andExpect(status().isOk());
+
+    // 6. Attempt Refresh with logged-out token -> Fails with 401
+    mockMvc.perform(
+        post("/auth/refresh")
+          .with(request -> {
+            request.setRemoteAddr(TEST_IP);
+            return request;
+          })
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(
+            objectMapper.writeValueAsString(new LogoutRequest(newestRefreshToken))
+          )
+      )
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+
+    // 7. Idempotent Logout check
+    mockMvc.perform(
+        post("/auth/logout")
+          .with(request -> {
+            request.setRemoteAddr(TEST_IP);
+            return request;
+          })
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(
+            objectMapper.writeValueAsString(new LogoutRequest(newestRefreshToken))
+          )
+      )
+      .andExpect(status().isOk());
+  }
+
+  private String extractToken(MvcResult result, String fieldName) throws Exception {
+    JsonNode responseNode = objectMapper.readTree(result.getResponse().getContentAsString());
+    return responseNode.get(fieldName).asText();
+  }
 }

@@ -2,6 +2,7 @@ package com.enterprise.ordersuite.auth.controllers;
 
 import com.enterprise.ordersuite.auth.domain.PasswordResetToken;
 import com.enterprise.ordersuite.auth.dtos.ForgotPasswordRequest;
+import com.enterprise.ordersuite.auth.dtos.RegisterRequest;
 import com.enterprise.ordersuite.auth.dtos.ResetPasswordRequest;
 import com.enterprise.ordersuite.auth.persistence.PasswordResetTokenRepository;
 import com.enterprise.ordersuite.auth.service.PasswordResetService;
@@ -9,17 +10,18 @@ import com.enterprise.ordersuite.identity.domain.Role;
 import com.enterprise.ordersuite.identity.domain.User;
 import com.enterprise.ordersuite.identity.persistence.RoleRepository;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
+import com.enterprise.ordersuite.profile.domain.UserProfile;
+import com.enterprise.ordersuite.profile.persistence.UserProfileRepository;
+import com.enterprise.ordersuite.support.IntegrationTest;
 import com.enterprise.ordersuite.support.TestEmailServiceConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
@@ -28,9 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@IntegrationTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
 @Import(TestEmailServiceConfig.class)
 class AuthenticationControllerIT {
 
@@ -45,6 +46,9 @@ class AuthenticationControllerIT {
 
   @Autowired
   private RoleRepository roleRepository;
+
+  @Autowired
+  private UserProfileRepository userProfileRepository;
 
   @Autowired
   private PasswordResetTokenRepository tokenRepository;
@@ -64,6 +68,80 @@ class AuthenticationControllerIT {
   void setup() {
     capturingEmailService.clear();
     userRole = roleRepository.findByName("USER").orElseThrow();
+    tokenRepository.deleteAll();
+  }
+
+  @Test
+  void register_ValidRequest_Returns200_AndCreatesUserAndProfile() throws Exception {
+
+    String email = "registration-" + UUID.randomUUID() + "@test.com";
+
+    RegisterRequest request = new RegisterRequest();
+    request.setFirstName("Integration");
+    request.setLastName("User");
+    request.setEmail(email);
+    request.setPassword("SecurePass123!@#");
+
+    mockMvc.perform(post("/auth/register")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isOk());
+
+    User user = userRepository.findByEmailIgnoreCase(email).orElseThrow();
+
+    assertThat(user.getFirstName()).isEqualTo("Integration");
+    assertThat(user.getLastName()).isEqualTo("User");
+    assertThat(user.getEmail()).isEqualTo(email);
+    assertThat(user.getRole().getName()).isEqualTo("USER");
+    assertThat(user.getActive()).isTrue();
+
+    assertThat(
+      passwordEncoder.matches(
+        "SecurePass123!@#",
+        user.getPassword()
+      )
+    ).isTrue();
+
+    UserProfile profile =
+      userProfileRepository.findByUserId(user.getId()).orElseThrow();
+
+    assertThat(profile.getUserId()).isEqualTo(user.getId());
+    assertThat(profile.getPhone()).isNull();
+    assertThat(profile.getCountry()).isNull();
+    assertThat(profile.getTimezone()).isNull();
+    assertThat(profile.getDepartment()).isNull();
+    assertThat(profile.getOffice()).isNull();
+    assertThat(profile.getBio()).isNull();
+  }
+
+  @Test
+  void register_ValidRequest_CreatesExactlyOneProfileForUser() throws Exception {
+
+    String email = "registration-profile-" + UUID.randomUUID() + "@test.com";
+
+    RegisterRequest request = new RegisterRequest();
+    request.setFirstName("Profile");
+    request.setLastName("Test");
+    request.setEmail(email);
+    request.setPassword("SecurePass123!@#");
+
+    mockMvc.perform(post("/auth/register")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isOk());
+
+    User user = userRepository.findByEmailIgnoreCase(email).orElseThrow();
+
+    assertThat(
+      userProfileRepository.findByUserId(user.getId())
+    ).isPresent();
+
+    assertThat(
+      userProfileRepository.findAll()
+        .stream()
+        .filter(profile -> profile.getUserId().equals(user.getId()))
+        .count()
+    ).isEqualTo(1);
   }
 
   @Test
