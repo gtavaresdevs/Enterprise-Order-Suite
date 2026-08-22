@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -19,65 +21,67 @@ import java.util.function.Function;
 @RequiredArgsConstructor
 public class JwtService {
 
-    private final JwtProperties jwtProperties;
+  private final JwtProperties jwtProperties;
+  private final Clock clock;
 
-    public String generateToken(User user) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("userId", user.getId());
-        claims.put("roles", List.of(user.getRole().getName()));
-        return buildToken(claims, user.getEmail());
-    }
+  public String generateToken(User user) {
+    Map<String, Object> claims = new HashMap<>();
+    claims.put("userId", user.getId());
+    claims.put("roles", List.of(user.getRole().getName()));
+    return buildToken(claims, user.getEmail());
+  }
 
-    private String buildToken(Map<String, Object> extraClaims, String subject) {
-        return Jwts.builder()
-                .claims(extraClaims)
-                .subject(subject)
-                .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + jwtProperties.getExpiration()))
-                .signWith(getSignInKey())
-                .compact();
-    }
+  private String buildToken(Map<String, Object> extraClaims, String subject) {
+    Instant now = clock.instant();
+    return Jwts.builder()
+      .claims(extraClaims)
+      .subject(subject)
+      .issuedAt(Date.from(now))
+      .expiration(Date.from(now.plusMillis(jwtProperties.getExpiration())))
+      .signWith(getSignInKey())
+      .compact();
+  }
 
-    public String extractEmail(String token) {
-        return extractClaim(token, Claims::getSubject);
-    }
+  public String extractEmail(String token) {
+    return extractClaim(token, Claims::getSubject);
+  }
 
-    public Long extractUserId(String token) {
-        return extractClaim(token, claims -> claims.get("userId", Long.class));
-    }
+  public Long extractUserId(String token) {
+    return extractClaim(token, claims -> claims.get("userId", Long.class));
+  }
 
-    @SuppressWarnings("unchecked")
-    public List<String> extractRoles(String token) {
-        return extractClaim(token, claims -> claims.get("roles", List.class));
-    }
+  @SuppressWarnings("unchecked")
+  public List<String> extractRoles(String token) {
+    return extractClaim(token, claims -> claims.get("roles", List.class));
+  }
 
-    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
-        final Claims claims = extractAllClaims(token);
-        return claimsResolver.apply(claims);
-    }
+  public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+    final Claims claims = extractAllClaims(token);
+    return claimsResolver.apply(claims);
+  }
 
-    public boolean isTokenValid(String token) {
-        return !isTokenExpired(token);
-    }
+  public boolean isTokenValid(String token) {
+    return !isTokenExpired(token);
+  }
 
-    private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
-    }
+  private boolean isTokenExpired(String token) {
+    return extractExpiration(token).before(Date.from(clock.instant()));
+  }
 
-    private Date extractExpiration(String token) {
-        return extractClaim(token, Claims::getExpiration);
-    }
+  private Date extractExpiration(String token) {
+    return extractClaim(token, Claims::getExpiration);
+  }
 
-    private Claims extractAllClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(getSignInKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-    }
+  private Claims extractAllClaims(String token) {
+    return Jwts.parser()
+      .verifyWith(getSignInKey())
+      .build()
+      .parseSignedClaims(token)
+      .getPayload();
+  }
 
-    private SecretKey getSignInKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(jwtProperties.getSecret());
-        return Keys.hmacShaKeyFor(keyBytes);
-    }
+  private SecretKey getSignInKey() {
+    byte[] keyBytes = Decoders.BASE64.decode(jwtProperties.getSecret());
+    return Keys.hmacShaKeyFor(keyBytes);
+  }
 }
