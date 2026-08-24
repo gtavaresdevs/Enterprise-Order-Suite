@@ -1,171 +1,228 @@
 package com.enterprise.ordersuite.security.ratelimit;
 
 import com.enterprise.ordersuite.api.errors.ApiErrorResponse;
+import com.enterprise.ordersuite.support.IntegrationTest;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
 
-import java.util.Collections;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(properties = {
-  "security.rate-limit.enabled=true",
-  // Ensure this property matches the exact name used in your RateLimiter configuration class!
-  "security.rate-limit.forgot-password.limit=3"
-})
+@IntegrationTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
+@TestPropertySource(properties = {
+  "security.rate-limit.enabled=true",
+  "security.rate-limit.forgot-password.capacity=3",
+  "security.rate-limit.forgot-password.refill-seconds=10"
+})
 class ForgotPasswordRateLimitIT {
 
+  private static final int RATE_LIMIT_CAPACITY = 3;
+
   @Autowired
-  private WebApplicationContext context;
+  private MockMvc mockMvc;
 
   @Autowired
   private ObjectMapper objectMapper;
 
-  @Autowired
-  @Qualifier("forgotPasswordRateLimiter")
-  private RateLimiter forgotPasswordLimiter;
-
-  private MockMvc mockMvc;
-
-  // Enterprise Standard: If your configuration doesn't parse properties reactively,
-  // use a higher iteration roof to ensure the fallback limit is explicitly broken.
-  private static final int ROBUST_EXHAUSTION_ATTEMPTS = 50;
-
-  @BeforeEach
-  void setUp() {
-    this.mockMvc = MockMvcBuilders.webAppContextSetup(context)
-      .apply(springSecurity())
-      .build();
-  }
-
   @Test
-  @DisplayName("Should allow initial requests under threshold and strictly return 429 when threshold exceeded")
-  void forgotPassword_enforcesThresholdLimit() throws Exception {
-    String ip = "1.2.3.4";
-    String email = "target@example.com";
-    String content = objectMapper.writeValueAsString(Collections.singletonMap("email", email));
+  @DisplayName("Should allow requests up to configured capacity and return 429 when capacity is exceeded")
+  void forgotPassword_enforcesConfiguredCapacity() throws Exception {
+    String ip = uniqueIp();
+    String email = uniqueEmail();
+    String content = forgotPasswordPayload(email);
 
-    // 1. Send the very first request—it must pass through without a 429
-    MvcResult firstResult = performRequest(ip, content);
-    assertThat(firstResult.getResponse().getStatus())
-      .as("First request must be under any standard enterprise rate limit constraint")
-      .isNotEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+    for (int attempt = 1; attempt <= RATE_LIMIT_CAPACITY; attempt++) {
+      int finalAttempt = attempt;
+      mockMvc.perform(post("/auth/forgot-password")
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(content)
+          .remoteAddress(ip))
+        .andExpect(result -> {
+          int actualStatus = result.getResponse().getStatus();
 
-    // 2. Loop robustly to force exhaustion regardless of whether the threshold is 3 or 20
-    boolean limitTriggered = false;
-    for (int i = 0; i < ROBUST_EXHAUSTION_ATTEMPTS; i++) {
-      MvcResult result = performRequest(ip, content);
-      if (result.getResponse().getStatus() == HttpStatus.TOO_MANY_REQUESTS.value()) {
-        limitTriggered = true;
-        verifyRateLimitResponse(result);
-        break;
-      }
+          assertThat(actualStatus)
+            .as("Request %d of %d should not be rate limited", finalAttempt, RATE_LIMIT_CAPACITY)
+            .isNotEqualTo(429);
+        });
     }
 
-    assertThat(limitTriggered)
-      .as("The rate limiter should have eventually triggered a 429 after continuous rapid requests")
-      .isTrue();
+    MvcResult rateLimitedResult = mockMvc.perform(post("/auth/forgot-password")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(content)
+        .remoteAddress(ip))
+      .andExpect(status().isTooManyRequests())
+      .andReturn();
+
+    verifyRateLimitResponse(rateLimitedResult);
   }
 
   @Test
-  @DisplayName("Should not share rate limits across different IP addresses")
+  @DisplayName("Should return Retry-After and RATE_LIMITED error when request is rate limited")
+  void forgotPassword_rateLimitedResponse_containsRetryAfterAndError() throws Exception {
+    String ip = uniqueIp();
+    String email = uniqueEmail();
+    String content = forgotPasswordPayload(email);
+
+    exhaustLimit(ip, content);
+
+    MvcResult result = mockMvc.perform(post("/auth/forgot-password")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(content)
+        .remoteAddress(ip))
+      .andExpect(status().isTooManyRequests())
+      .andReturn();
+
+    verifyRateLimitResponse(result);
+
+    String retryAfter = result.getResponse().getHeader("Retry-After");
+
+    assertThat(retryAfter)
+      .as("Rate-limited responses must provide a Retry-After header")
+      .isNotBlank();
+
+    assertThat(Long.parseLong(retryAfter))
+      .as("Retry-After must contain a positive number of seconds")
+      .isPositive();
+  }
+
+  @Test
+  @DisplayName("Should keep rate-limit buckets independent for different IP addresses")
   void forgotPassword_independentPerIp() throws Exception {
-    String email = "shared@example.com";
-    String content = objectMapper.writeValueAsString(Collections.singletonMap("email", email));
+    String email = uniqueEmail();
 
-    // Exhaust limit for IP 1 completely
-    exhaustLimit("1.1.1.1", content);
+    String ip1 = uniqueIp();
+    String ip2 = uniqueIp();
 
-    // A brand new client IP addressing the same endpoint must not be pre-blocked
-    MvcResult result = performRequest("2.2.2.2", content);
-    assertThat(result.getResponse().getStatus())
-      .as("A clean client IP should not inherit block states from another IP context")
-      .isNotEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+    String content = forgotPasswordPayload(email);
+
+    exhaustLimit(ip1, content);
+
+    mockMvc.perform(post("/auth/forgot-password")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(content)
+        .remoteAddress(ip2))
+      .andExpect(result -> {
+        assertThat(result.getResponse().getStatus())
+          .as("A different IP must use a different rate-limit key")
+          .isNotEqualTo(429);
+      });
   }
 
   @Test
-  @DisplayName("Should rate limit emails independently even when originating from the same IP address")
+  @DisplayName("Should keep rate-limit buckets independent for different emails from the same IP")
   void forgotPassword_independentPerEmailSameIp() throws Exception {
-    String ip = "5.5.5.5";
-    String email1Content = objectMapper.writeValueAsString(Collections.singletonMap("email", "user1@example.com"));
-    String email2Content = objectMapper.writeValueAsString(Collections.singletonMap("email", "user2@example.com"));
+    String ip = uniqueIp();
 
-    // Exhaust target account 1
+    String email1 = uniqueEmail();
+    String email2 = uniqueEmail();
+
+    String email1Content = forgotPasswordPayload(email1);
+    String email2Content = forgotPasswordPayload(email2);
+
     exhaustLimit(ip, email1Content);
 
-    // Target Email 1 should be caught by the filter block
-    assertThat(performRequest(ip, email1Content).getResponse().getStatus())
-      .as("Target user 1 should receive a 429")
-      .isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+    mockMvc.perform(post("/auth/forgot-password")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(email1Content)
+        .remoteAddress(ip))
+      .andExpect(status().isTooManyRequests());
 
-    // Target Email 2 requested from the SAME IP should remain unblocked
-    assertThat(performRequest(ip, email2Content).getResponse().getStatus())
-      .as("Target user 2 should pass since keys are composite (IP + Email)")
-      .isNotEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
+    mockMvc.perform(post("/auth/forgot-password")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(email2Content)
+        .remoteAddress(ip))
+      .andExpect(result -> {
+        assertThat(result.getResponse().getStatus())
+          .as("A different email must use a different composite rate-limit key")
+          .isNotEqualTo(429);
+      });
   }
 
   @Test
-  @DisplayName("Should instantly reject oversized requests before processing stream payloads (DoS Guard Validation)")
-  void forgotPassword_rejectsOversizedPayloads() throws Exception {
-    String ip = "9.9.9.9";
+  @DisplayName("Should reject oversized auth payload before processing the request")
+  void forgotPassword_rejectsOversizedPayload() throws Exception {
+    String ip = uniqueIp();
 
-    String heavyPadding = "a".repeat(9000);
-    String oversizedContent = String.format("{\"email\":\"test@test.com\",\"padding\":\"%s\"}", heavyPadding);
+    String oversizedPadding = "a".repeat(9000);
+    String oversizedContent = """
+      {"email":"test@test.com","padding":"%s"}
+      """.formatted(oversizedPadding);
 
-    MvcResult result = performRequest(ip, oversizedContent);
-
-    assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+    MvcResult result = mockMvc.perform(post("/auth/forgot-password")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(oversizedContent)
+        .remoteAddress(ip))
+      .andExpect(status().isBadRequest())
+      .andReturn();
 
     ApiErrorResponse error = objectMapper.readValue(
       result.getResponse().getContentAsString(),
       ApiErrorResponse.class
     );
-    assertThat(error.code()).isEqualTo("BAD_REQUEST");
-  }
 
-  private MvcResult performRequest(String ip, String content) throws Exception {
-    return mockMvc.perform(post("/auth/forgot-password")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(content)
-        .remoteAddress(ip))
-      .andReturn();
+    assertThat(error.code()).isEqualTo("BAD_REQUEST");
+    assertThat(error.message())
+      .isEqualTo("Payload size exceeds maximum allowed limit.");
   }
 
   private void exhaustLimit(String ip, String content) throws Exception {
-    for (int i = 0; i < ROBUST_EXHAUSTION_ATTEMPTS; i++) {
-      if (performRequest(ip, content).getResponse().getStatus() == HttpStatus.TOO_MANY_REQUESTS.value()) {
-        return;
-      }
+    for (int attempt = 0; attempt < RATE_LIMIT_CAPACITY; attempt++) {
+      int finalAttempt = attempt;
+      mockMvc.perform(post("/auth/forgot-password")
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(content)
+          .remoteAddress(ip))
+        .andExpect(result -> {
+          assertThat(result.getResponse().getStatus())
+            .as("Request %d should still be within the configured rate limit", finalAttempt + 1)
+            .isNotEqualTo(429);
+        });
     }
   }
 
   private void verifyRateLimitResponse(MvcResult result) throws Exception {
     assertThat(result.getResponse().getHeader("Retry-After"))
-      .as("Compliance requires a standard back-off window specification header")
-      .isNotNull();
+      .as("Rate-limited responses must provide a Retry-After header")
+      .isNotBlank();
 
     ApiErrorResponse error = objectMapper.readValue(
       result.getResponse().getContentAsString(),
       ApiErrorResponse.class
     );
+
     assertThat(error.code()).isEqualTo("RATE_LIMITED");
-    assertThat(error.message()).contains("Too many requests");
+    assertThat(error.message()).isEqualTo("Too many requests. Please try again later.");
+    assertThat(error.timestamp()).isNotNull();
+  }
+
+  private String forgotPasswordPayload(String email) throws Exception {
+    return objectMapper.writeValueAsString(
+      java.util.Map.of("email", email)
+    );
+  }
+
+  private String uniqueEmail() {
+    return "ratelimit-" + UUID.randomUUID() + "@test.com";
+  }
+
+  private String uniqueIp() {
+    UUID uuid = UUID.randomUUID();
+
+    int octet2 = Math.abs(uuid.hashCode() % 254) + 1;
+    int octet3 = Math.abs(uuid.hashCode() / 254 % 254) + 1;
+    int octet4 = Math.abs(uuid.hashCode() / 64516 % 254) + 1;
+
+    return "10." + octet2 + "." + octet3 + "." + octet4;
   }
 }

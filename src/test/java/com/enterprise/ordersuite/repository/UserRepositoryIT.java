@@ -4,54 +4,68 @@ import com.enterprise.ordersuite.identity.domain.Role;
 import com.enterprise.ordersuite.identity.domain.User;
 import com.enterprise.ordersuite.identity.persistence.RoleRepository;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
+import com.enterprise.ordersuite.support.IntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
+
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class UserRepositoryIT extends AbstractPostgresRepositoryTest {
+@IntegrationTest
+class UserRepositoryIT {
 
-    @Autowired
-    private UserRepository userRepository;
+  @Autowired
+  private UserRepository userRepository;
 
-    @Autowired
-    private RoleRepository roleRepository;
+  @Autowired
+  private RoleRepository roleRepository;
 
-    private Role userRole() {
-        return roleRepository.findByName("USER")
-                .orElseThrow(() -> new IllegalStateException("Expected role USER to exist from Flyway seed"));
-    }
+  private Role userRole() {
+    return roleRepository.findByName("USER")
+      .orElseThrow(() ->
+        new IllegalStateException("Expected role USER to exist from Flyway seed"));
+  }
 
-    private User newValidUser(String email, String password) {
-        User u = new User();
-        u.setFirstName("Gabriel");
-        u.setLastName("Almeida");
-        u.setEmail(email);
-        u.setPassword(password);
-        u.setActive(true);
-        u.setRole(userRole());
-        return u;
-    }
+  private User newValidUser(String email, String password) {
+    User user = new User();
+    user.setFirstName("Test");
+    user.setLastName("User");
+    user.setEmail(email);
+    user.setPassword(password);
+    user.setActive(true);
+    user.setRole(userRole());
+    return user;
+  }
 
-    @Test
-    void findByEmail_works() {
-        userRepository.saveAndFlush(newValidUser("gabriel@example.com", "encoded"));
+  @Test
+  void findByEmail_works() {
+    String email = "repository-" + UUID.randomUUID() + "@test.com";
 
-        var found = userRepository.findByEmail("gabriel@example.com");
-        assertTrue(found.isPresent());
-        assertEquals("gabriel@example.com", found.get().getEmail());
-    }
+    userRepository.saveAndFlush(
+      newValidUser(email, "encoded")
+    );
 
-    @Test
-    void uniqueEmailConstraint_enforced() {
-        userRepository.saveAndFlush(newValidUser("dup@example.com", "encoded1"));
+    var found = userRepository.findByEmail(email);
 
-        assertThrows(DataIntegrityViolationException.class,
-                () -> userRepository.saveAndFlush(newValidUser("dup@example.com", "encoded2")));
-    }
+    assertTrue(found.isPresent());
+    assertEquals(email, found.get().getEmail());
+  }
+
+  @Test
+  void uniqueEmailConstraint_enforced() {
+    String email = "duplicate-" + UUID.randomUUID() + "@test.com";
+
+    userRepository.saveAndFlush(
+      newValidUser(email, "encoded1")
+    );
+
+    assertThrows(
+      DataIntegrityViolationException.class,
+      () -> userRepository.saveAndFlush(
+        newValidUser(email, "encoded2")
+      )
+    );
+  }
 }

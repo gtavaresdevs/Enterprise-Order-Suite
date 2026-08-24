@@ -1,21 +1,21 @@
-package com.enterprise.ordersuite.security.ratelimit;
+package com.enterprise.ordersuite.support;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Objects;
 
-final class MutableClock extends Clock {
+public class MutableClock extends Clock {
 
-    private Instant instant;
-    private final ZoneId zone;
+    public Instant instant;
+    public final ZoneId zone;
 
-    MutableClock(Instant initialInstant, ZoneId zone) {
+    public MutableClock(Instant initialInstant, ZoneId zone) {
         this.instant = Objects.requireNonNull(initialInstant);
         this.zone = Objects.requireNonNull(zone);
     }
 
-    void plusSeconds() {
+    public void plusSeconds() {
         instant = instant.plusSeconds(121);
     }
 

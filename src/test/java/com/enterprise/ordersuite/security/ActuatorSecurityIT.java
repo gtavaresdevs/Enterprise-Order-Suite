@@ -1,10 +1,9 @@
 package com.enterprise.ordersuite.security;
 
-import com.enterprise.ordersuite.repository.AbstractPostgresRepositoryTest;
+import com.enterprise.ordersuite.support.IntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -12,9 +11,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@IntegrationTest
 @AutoConfigureMockMvc
-class ActuatorSecurityIT extends AbstractPostgresRepositoryTest {
+class ActuatorSecurityIT {
 
   @Autowired
   private MockMvc mockMvc;
@@ -41,7 +40,7 @@ class ActuatorSecurityIT extends AbstractPostgresRepositoryTest {
   }
 
   @Test
-  void info_requiresAdmin() throws Exception {
+  void info_requiresAuthentication() throws Exception {
     mockMvc.perform(get("/actuator/info"))
       .andExpect(status().isUnauthorized());
   }
@@ -56,7 +55,6 @@ class ActuatorSecurityIT extends AbstractPostgresRepositoryTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void info_forbiddenForAdmin() throws Exception {
-    // Admin is no longer sufficient for info endpoint
     mockMvc.perform(get("/actuator/info"))
       .andExpect(status().isForbidden());
   }
@@ -64,14 +62,13 @@ class ActuatorSecurityIT extends AbstractPostgresRepositoryTest {
   @Test
   @WithMockUser(roles = "SUPER_ADMIN")
   void info_accessibleForSuperAdmin() throws Exception {
-    // Only SUPER_ADMIN can access
     mockMvc.perform(get("/actuator/info"))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.app.name").value("enterprise-order-suite"));
   }
 
   @Test
-  void metrics_requiresAdmin() throws Exception {
+  void metrics_requiresAuthentication() throws Exception {
     mockMvc.perform(get("/actuator/metrics"))
       .andExpect(status().isUnauthorized());
   }
@@ -86,7 +83,6 @@ class ActuatorSecurityIT extends AbstractPostgresRepositoryTest {
   @Test
   @WithMockUser(roles = "ADMIN")
   void metrics_forbiddenForAdmin() throws Exception {
-    // Admin is no longer sufficient for metrics endpoint
     mockMvc.perform(get("/actuator/metrics"))
       .andExpect(status().isForbidden());
   }
@@ -94,7 +90,6 @@ class ActuatorSecurityIT extends AbstractPostgresRepositoryTest {
   @Test
   @WithMockUser(roles = "SUPER_ADMIN")
   void metrics_accessibleForSuperAdmin() throws Exception {
-    // Only SUPER_ADMIN can access
     mockMvc.perform(get("/actuator/metrics"))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.names").isArray());
