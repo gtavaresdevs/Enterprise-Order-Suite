@@ -1,73 +1,156 @@
 package com.enterprise.ordersuite.security.ratelimit;
 
+import com.enterprise.ordersuite.support.MutableClock;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class InMemoryBucketedSlidingWindowRateLimiterTest {
 
-    @Test
-    void allowsUpToLimitWithinWindow_thenDenies() {
-        MutableClock clock = new MutableClock(Instant.parse("2026-01-23T12:00:10Z"), ZoneOffset.UTC);
+  @Test
+  void allowsUpToLimitWithinWindow_thenDenies() {
+    MutableClock clock = new MutableClock(
+      Instant.parse("2026-01-23T12:00:10Z"),
+      ZoneOffset.UTC
+    );
 
-        RateLimiter limiter = new InMemoryBucketedSlidingWindowRateLimiter(3, 10, clock);
+    RateLimiter limiter = new InMemoryBucketedSlidingWindowRateLimiter(3, 10, clock);
 
-        assertThat(limiter.check("k").allowed()).isTrue();
-        assertThat(limiter.check("k").allowed()).isTrue();
-        assertThat(limiter.check("k").allowed()).isTrue();
+    assertThat(limiter.check("k").allowed()).isTrue();
+    assertThat(limiter.check("k").allowed()).isTrue();
+    assertThat(limiter.check("k").allowed()).isTrue();
 
-        RateLimitDecision denied = limiter.check("k");
-        assertThat(denied.allowed()).isFalse();
-        assertThat(denied.retryAfterSeconds()).isGreaterThanOrEqualTo(1);
-    }
+    RateLimitDecision denied = limiter.check("k");
 
-    @Test
-    void afterWindowPasses_allowsAgain() {
-        // Window = 2 minutes, limit = 2
-        MutableClock clock = new MutableClock(Instant.parse("2026-01-23T12:00:10Z"), ZoneOffset.UTC);
+    assertThat(denied.allowed()).isFalse();
+    assertThat(denied.retryAfterSeconds()).isGreaterThan(0);
+  }
 
-        RateLimiter limiter = new InMemoryBucketedSlidingWindowRateLimiter(2, 2, clock);
+  @Test
+  void afterWindowPasses_allowsAgain() {
+    MutableClock clock = new MutableClock(
+      Instant.parse("2026-01-23T12:00:10Z"),
+      ZoneOffset.UTC
+    );
 
-        assertThat(limiter.check("k").allowed()).isTrue();
-        assertThat(limiter.check("k").allowed()).isTrue();
+    RateLimiter limiter = new InMemoryBucketedSlidingWindowRateLimiter(2, 2, clock);
 
-        RateLimitDecision denied = limiter.check("k");
-        assertThat(denied.allowed()).isFalse();
+    assertThat(limiter.check("k").allowed()).isTrue();
+    assertThat(limiter.check("k").allowed()).isTrue();
 
-        // Oldest minute bucket will fall out at:
-        // allowedAtMinute = oldestMinute + windowMinutes
-        // To guarantee we crossed the boundary, jump forward 2 minutes + 1 second.
-        clock.plusSeconds();
+    RateLimitDecision denied = limiter.check("k");
 
-        assertThat(limiter.check("k").allowed()).isTrue();
-    }
+    assertThat(denied.allowed()).isFalse();
 
-    @Test
-    void differentKeys_areIndependent() {
-        MutableClock clock = new MutableClock(Instant.parse("2026-01-23T12:00:10Z"), ZoneOffset.UTC);
+    clock.plusSeconds();
 
-        RateLimiter limiter = new InMemoryBucketedSlidingWindowRateLimiter(1, 10, clock);
+    assertThat(limiter.check("k").allowed()).isTrue();
+  }
 
-        assertThat(limiter.check("a").allowed()).isTrue();
-        assertThat(limiter.check("a").allowed()).isFalse();
+  @Test
+  void differentKeys_areIndependent() {
+    MutableClock clock = new MutableClock(
+      Instant.parse("2026-01-23T12:00:10Z"),
+      ZoneOffset.UTC
+    );
 
-        assertThat(limiter.check("b").allowed()).isTrue();
-        assertThat(limiter.check("b").allowed()).isFalse();
-    }
+    RateLimiter limiter = new InMemoryBucketedSlidingWindowRateLimiter(1, 10, clock);
 
-    @Test
-    void retryAfter_isAtLeastOneSecond_whenDenied() {
-        MutableClock clock = new MutableClock(Instant.parse("2026-01-23T12:00:59Z"), ZoneOffset.UTC);
+    assertThat(limiter.check("a").allowed()).isTrue();
+    assertThat(limiter.check("a").allowed()).isFalse();
 
-        RateLimiter limiter = new InMemoryBucketedSlidingWindowRateLimiter(1, 1, clock);
+    assertThat(limiter.check("b").allowed()).isTrue();
+    assertThat(limiter.check("b").allowed()).isFalse();
+  }
 
-        assertThat(limiter.check("k").allowed()).isTrue();
+  @Test
+  void retryAfter_calculatesSecondsUntilOldestBucketExpires() {
+    MutableClock clock = new MutableClock(
+      Instant.parse("2026-01-23T12:00:59Z"),
+      ZoneOffset.UTC
+    );
 
-        RateLimitDecision denied = limiter.check("k");
-        assertThat(denied.allowed()).isFalse();
-        assertThat(denied.retryAfterSeconds()).isGreaterThanOrEqualTo(1);
-    }
+    RateLimiter limiter = new InMemoryBucketedSlidingWindowRateLimiter(1, 1, clock);
+
+    assertThat(limiter.check("k").allowed()).isTrue();
+
+    RateLimitDecision denied = limiter.check("k");
+
+    assertThat(denied.allowed()).isFalse();
+    assertThat(denied.retryAfterSeconds()).isEqualTo(1);
+  }
+
+  @Test
+  void nullKey_isRejected() {
+    MutableClock clock = new MutableClock(
+      Instant.parse("2026-01-23T12:00:10Z"),
+      ZoneOffset.UTC
+    );
+
+    RateLimiter limiter = new InMemoryBucketedSlidingWindowRateLimiter(3, 10, clock);
+
+    assertThatThrownBy(() -> limiter.check(null))
+      .isInstanceOf(NullPointerException.class)
+      .hasMessage("key must not be null");
+  }
+
+  @Test
+  void zeroLimit_isRejected() {
+    MutableClock clock = new MutableClock(
+      Instant.parse("2026-01-23T12:00:10Z"),
+      ZoneOffset.UTC
+    );
+
+    assertThatThrownBy(
+      () -> new InMemoryBucketedSlidingWindowRateLimiter(0, 10, clock)
+    )
+      .isInstanceOf(IllegalArgumentException.class)
+      .hasMessage("limit must be > 0");
+  }
+
+  @Test
+  void negativeLimit_isRejected() {
+    MutableClock clock = new MutableClock(
+      Instant.parse("2026-01-23T12:00:10Z"),
+      ZoneOffset.UTC
+    );
+
+    assertThatThrownBy(
+      () -> new InMemoryBucketedSlidingWindowRateLimiter(-1, 10, clock)
+    )
+      .isInstanceOf(IllegalArgumentException.class)
+      .hasMessage("limit must be > 0");
+  }
+
+  @Test
+  void zeroWindowMinutes_isRejected() {
+    MutableClock clock = new MutableClock(
+      Instant.parse("2026-01-23T12:00:10Z"),
+      ZoneOffset.UTC
+    );
+
+    assertThatThrownBy(
+      () -> new InMemoryBucketedSlidingWindowRateLimiter(3, 0, clock)
+    )
+      .isInstanceOf(IllegalArgumentException.class)
+      .hasMessage("windowMinutes must be > 0");
+  }
+
+  @Test
+  void negativeWindowMinutes_isRejected() {
+    MutableClock clock = new MutableClock(
+      Instant.parse("2026-01-23T12:00:10Z"),
+      ZoneOffset.UTC
+    );
+
+    assertThatThrownBy(
+      () -> new InMemoryBucketedSlidingWindowRateLimiter(3, -1, clock)
+    )
+      .isInstanceOf(IllegalArgumentException.class)
+      .hasMessage("windowMinutes must be > 0");
+  }
 }

@@ -6,220 +6,246 @@ import com.enterprise.ordersuite.identity.domain.User;
 import com.enterprise.ordersuite.identity.persistence.RoleRepository;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import com.enterprise.ordersuite.products.api.dto.ProductRequest;
-import com.enterprise.ordersuite.repository.AbstractPostgresRepositoryTest;
+import com.enterprise.ordersuite.support.IntegrationTest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.WebApplicationContext;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 import static org.hamcrest.Matchers.is;
-import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-@Transactional
-class ProductControllerIT extends AbstractPostgresRepositoryTest {
+@IntegrationTest
+@AutoConfigureMockMvc
+class ProductControllerIT {
 
-    private static final String DEFAULT_PASSWORD = "Password123!";
+  private static final String TEST_PASSWORD = "Password123!";
 
-    @Autowired
-    private WebApplicationContext webApplicationContext;
+  @Autowired
+  private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+  @Autowired
+  private ObjectMapper objectMapper;
 
-    @Autowired
-    private UserRepository userRepository;
+  @Autowired
+  private UserRepository userRepository;
 
-    @Autowired
-    private RoleRepository roleRepository;
+  @Autowired
+  private RoleRepository roleRepository;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+  @Autowired
+  private PasswordEncoder passwordEncoder;
 
-    private MockMvc mockMvc;
+  private String adminToken;
+  private String userToken;
 
-    private String adminToken;
-    private String userToken;
+  @BeforeEach
+  void setUp() throws Exception {
+    User adminUser = createTestUser(
+      "ADMIN",
+      "Admin",
+      "User",
+      "admin-" + UUID.randomUUID() + "@test.com"
+    );
 
-    @BeforeEach
-    void setUp() throws Exception {
-        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext)
-                .apply(springSecurity())
-                .build();
+    User regularUser = createTestUser(
+      "USER",
+      "Regular",
+      "User",
+      "user-" + UUID.randomUUID() + "@test.com"
+    );
 
-        User adminUser = createTestUser("ADMIN", "Admin", "User", "admin_prod_" + System.currentTimeMillis() + "@test.com");
-        User regularUser = createTestUser("USER", "Regular", "User", "user_prod_" + System.currentTimeMillis() + "@test.com");
+    adminToken = loginAndGetAccessToken(
+      adminUser.getEmail(),
+      TEST_PASSWORD
+    );
 
-        adminToken = loginAndGetAccessToken(adminUser.getEmail(), DEFAULT_PASSWORD);
-        userToken = loginAndGetAccessToken(regularUser.getEmail(), DEFAULT_PASSWORD);
-    }
+    userToken = loginAndGetAccessToken(
+      regularUser.getEmail(),
+      TEST_PASSWORD
+    );
+  }
 
-    @Test
-    void createProduct_admin_success() throws Exception {
-        ProductRequest request = ProductRequest.builder()
-                .name("Test Product")
-                .sku("TEST-SKU-001")
-                .price(new BigDecimal("19.99"))
-                .stockQuantity(100)
-                .build();
+  @Test
+  void createProduct_asAdmin_returns201() throws Exception {
+    ProductRequest request = ProductRequest.builder()
+      .name("Test Product")
+      .sku("TEST-SKU-" + UUID.randomUUID())
+      .price(new BigDecimal("19.99"))
+      .stockQuantity(100)
+      .build();
 
-        mockMvc.perform(post("/api/v1/products")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andDo(print())
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.name", is("Test Product")))
-                .andExpect(jsonPath("$.sku", is("TEST-SKU-001")));
-    }
+    mockMvc.perform(post("/api/v1/products")
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isCreated())
+      .andExpect(jsonPath("$.name", is("Test Product")))
+      .andExpect(jsonPath("$.sku", is(request.getSku())));
+  }
 
-    @Test
-    void createProduct_user_forbidden() throws Exception {
-        ProductRequest request = ProductRequest.builder()
-                .name("Test Product")
-                .sku("TEST-SKU-USER")
-                .price(new BigDecimal("19.99"))
-                .stockQuantity(100)
-                .build();
+  @Test
+  void createProduct_asUser_returns403() throws Exception {
+    ProductRequest request = ProductRequest.builder()
+      .name("Test Product")
+      .sku("TEST-SKU-" + UUID.randomUUID())
+      .price(new BigDecimal("19.99"))
+      .stockQuantity(100)
+      .build();
 
-        mockMvc.perform(post("/api/v1/products")
-                        .header("Authorization", "Bearer " + userToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andDo(print())
-                .andExpect(status().isForbidden());
-    }
+    mockMvc.perform(post("/api/v1/products")
+        .header("Authorization", "Bearer " + userToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isForbidden());
+  }
 
-    @Test
-    void updateProduct_admin_success() throws Exception {
-        ProductRequest createRequest = ProductRequest.builder()
-                .name("Original Name")
-                .sku("SKU-UPDATE")
-                .price(new BigDecimal("10.00"))
-                .stockQuantity(50)
-                .build();
+  @Test
+  void updateProduct_asAdmin_returns200() throws Exception {
+    ProductRequest createRequest = ProductRequest.builder()
+      .name("Original Name")
+      .sku("SKU-" + UUID.randomUUID())
+      .price(new BigDecimal("10.00"))
+      .stockQuantity(50)
+      .build();
 
-        String response = mockMvc.perform(post("/api/v1/products")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createRequest)))
-                .andDo(print())
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        Long productId = objectMapper.readTree(response).get("id").asLong();
+    String response = mockMvc.perform(post("/api/v1/products")
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(createRequest)))
+      .andExpect(status().isCreated())
+      .andReturn()
+      .getResponse()
+      .getContentAsString();
 
-        ProductRequest updateRequest = ProductRequest.builder()
-                .name("Updated Name")
-                .sku("SKU-UPDATE")
-                .price(new BigDecimal("15.00"))
-                .stockQuantity(40)
-                .build();
+    Long productId = objectMapper.readTree(response)
+      .get("id")
+      .asLong();
 
-        mockMvc.perform(put("/api/v1/products/{id}", productId)
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updateRequest)))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name", is("Updated Name")))
-                .andExpect(jsonPath("$.price", is(15.00)));
-    }
+    ProductRequest updateRequest = ProductRequest.builder()
+      .name("Updated Name")
+      .sku(createRequest.getSku())
+      .price(new BigDecimal("15.00"))
+      .stockQuantity(40)
+      .build();
 
-    @Test
-    void getProductById_user_success() throws Exception {
-        ProductRequest createRequest = ProductRequest.builder()
-                .name("Public Product")
-                .sku("SKU-PUBLIC")
-                .price(new BigDecimal("5.00"))
-                .stockQuantity(10)
-                .build();
+    mockMvc.perform(put("/api/v1/products/{id}", productId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(updateRequest)))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.name", is("Updated Name")))
+      .andExpect(jsonPath("$.price", is(15.00)));
+  }
 
-        // Admin creates it first
-        String response = mockMvc.perform(post("/api/v1/products")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createRequest)))
-                .andDo(print())
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        Long productId = objectMapper.readTree(response).get("id").asLong();
+  @Test
+  void getProductById_asUser_returns200() throws Exception {
+    ProductRequest createRequest = ProductRequest.builder()
+      .name("Public Product")
+      .sku("SKU-" + UUID.randomUUID())
+      .price(new BigDecimal("5.00"))
+      .stockQuantity(10)
+      .build();
 
-        // User reads it
-        mockMvc.perform(get("/api/v1/products/{id}", productId)
-                        .header("Authorization", "Bearer " + userToken))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name", is("Public Product")));
-    }
+    String response = mockMvc.perform(post("/api/v1/products")
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(createRequest)))
+      .andExpect(status().isCreated())
+      .andReturn()
+      .getResponse()
+      .getContentAsString();
 
-    @Test
-    void deleteProduct_admin_success() throws Exception {
-        ProductRequest createRequest = ProductRequest.builder()
-                .name("To Be Deleted")
-                .sku("SKU-DELETE")
-                .price(new BigDecimal("1.00"))
-                .stockQuantity(1)
-                .build();
+    Long productId = objectMapper.readTree(response)
+      .get("id")
+      .asLong();
 
-        String response = mockMvc.perform(post("/api/v1/products")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createRequest)))
-                .andDo(print())
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        Long productId = objectMapper.readTree(response).get("id").asLong();
+    mockMvc.perform(get("/api/v1/products/{id}", productId)
+        .header("Authorization", "Bearer " + userToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.name", is("Public Product")));
+  }
 
-        mockMvc.perform(delete("/api/v1/products/{id}", productId)
-                        .header("Authorization", "Bearer " + adminToken))
-                .andDo(print())
-                .andExpect(status().isNoContent());
+  @Test
+  void deleteProduct_asAdmin_returns204() throws Exception {
+    ProductRequest createRequest = ProductRequest.builder()
+      .name("To Be Deleted")
+      .sku("SKU-" + UUID.randomUUID())
+      .price(new BigDecimal("1.00"))
+      .stockQuantity(1)
+      .build();
 
-        mockMvc.perform(get("/api/v1/products/{id}", productId)
-                        .header("Authorization", "Bearer " + adminToken))
-                .andDo(print())
-                .andExpect(status().isNotFound());
-    }
+    String response = mockMvc.perform(post("/api/v1/products")
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(createRequest)))
+      .andExpect(status().isCreated())
+      .andReturn()
+      .getResponse()
+      .getContentAsString();
 
-    private User createTestUser(String roleName, String firstName, String lastName, String email) {
-        Role role = roleRepository.findByName(roleName).orElseThrow();
+    Long productId = objectMapper.readTree(response)
+      .get("id")
+      .asLong();
 
-        User user = new User();
-        user.setEmail(email);
-        user.setPassword(passwordEncoder.encode(DEFAULT_PASSWORD));
-        user.setRole(role);
-        user.setActive(true);
-        user.setFirstName(firstName);
-        user.setLastName(lastName);
+    mockMvc.perform(delete("/api/v1/products/{id}", productId)
+        .header("Authorization", "Bearer " + adminToken))
+      .andExpect(status().isNoContent());
 
-        return userRepository.save(user);
-    }
+    mockMvc.perform(get("/api/v1/products/{id}", productId)
+        .header("Authorization", "Bearer " + adminToken))
+      .andExpect(status().isNotFound());
+  }
 
-    private String loginAndGetAccessToken(String email, String password) throws Exception {
-        var payload = new AuthRequest(email, password);
+  private User createTestUser(
+    String roleName,
+    String firstName,
+    String lastName,
+    String email
+  ) {
+    Role role = roleRepository.findByName(roleName)
+      .orElseThrow();
 
-        var result = mockMvc.perform(post("/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(payload)))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").exists())
-                .andReturn();
+    User user = new User();
+    user.setEmail(email);
+    user.setPassword(passwordEncoder.encode(TEST_PASSWORD));
+    user.setRole(role);
+    user.setActive(true);
+    user.setFirstName(firstName);
+    user.setLastName(lastName);
 
-        String body = result.getResponse().getContentAsString();
-        return objectMapper.readTree(body).get("accessToken").asText();
-    }
+    return userRepository.save(user);
+  }
+
+  private String loginAndGetAccessToken(
+    String email,
+    String password
+  ) throws Exception {
+    AuthRequest request = new AuthRequest(email, password);
+
+    String response = mockMvc.perform(post("/auth/login")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.accessToken").exists())
+      .andReturn()
+      .getResponse()
+      .getContentAsString();
+
+    return objectMapper.readTree(response)
+      .get("accessToken")
+      .asText();
+  }
 }

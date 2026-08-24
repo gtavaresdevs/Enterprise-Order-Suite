@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -95,8 +96,7 @@ class ProfileServiceTest {
     when(profileMapper.toResponse(user, profile))
       .thenReturn(expectedResponse);
 
-    ProfileResponse result =
-      profileService.getProfile(1L);
+    ProfileResponse result = profileService.getProfile(1L);
 
     assertThat(result).isEqualTo(expectedResponse);
 
@@ -116,7 +116,11 @@ class ProfileServiceTest {
       .hasMessage("User not found with ID: 1");
 
     verify(userRepository).findById(1L);
-    verifyNoInteractions(userProfileRepository, profileMapper);
+
+    verifyNoInteractions(
+      userProfileRepository,
+      profileMapper
+    );
   }
 
   @Test
@@ -134,6 +138,7 @@ class ProfileServiceTest {
 
     verify(userRepository).findById(1L);
     verify(userProfileRepository).findByUserId(1L);
+
     verifyNoInteractions(profileMapper);
   }
 
@@ -195,10 +200,13 @@ class ProfileServiceTest {
     assertThat(profile.getBio())
       .isEqualTo("Senior backend engineer");
 
+    assertThat(result)
+      .isEqualTo(expectedResponse);
+
+    verify(userRepository).findById(1L);
+    verify(userProfileRepository).findByUserId(1L);
     verify(userProfileRepository).save(profile);
     verify(profileMapper).toResponse(user, profile);
-
-    assertThat(result).isEqualTo(expectedResponse);
   }
 
   @Test
@@ -223,7 +231,11 @@ class ProfileServiceTest {
       .hasMessage("User not found with ID: 1");
 
     verify(userRepository).findById(1L);
-    verifyNoInteractions(userProfileRepository, profileMapper);
+
+    verifyNoInteractions(
+      userProfileRepository,
+      profileMapper
+    );
   }
 
   @Test
@@ -252,7 +264,11 @@ class ProfileServiceTest {
 
     verify(userRepository).findById(1L);
     verify(userProfileRepository).findByUserId(1L);
+
     verifyNoInteractions(profileMapper);
+
+    verify(userProfileRepository, never())
+      .save(org.mockito.ArgumentMatchers.any(UserProfile.class));
   }
 
   @Test
@@ -267,12 +283,30 @@ class ProfileServiceTest {
 
     UserProfile savedProfile = captor.getValue();
 
-    assertThat(savedProfile.getUserId()).isEqualTo(1L);
-    assertThat(savedProfile.getPhone()).isNull();
-    assertThat(savedProfile.getCountry()).isNull();
-    assertThat(savedProfile.getTimezone()).isNull();
-    assertThat(savedProfile.getDepartment()).isNull();
-    assertThat(savedProfile.getOffice()).isNull();
-    assertThat(savedProfile.getBio()).isNull();
+    assertThat(savedProfile.getUserId())
+      .isEqualTo(1L);
+
+    assertThat(savedProfile.getPhone())
+      .isNull();
+
+    assertThat(savedProfile.getCountry())
+      .isNull();
+
+    assertThat(savedProfile.getTimezone())
+      .isNull();
+
+    assertThat(savedProfile.getDepartment())
+      .isNull();
+
+    assertThat(savedProfile.getOffice())
+      .isNull();
+
+    assertThat(savedProfile.getBio())
+      .isNull();
+
+    verifyNoInteractions(
+      userRepository,
+      profileMapper
+    );
   }
 }
