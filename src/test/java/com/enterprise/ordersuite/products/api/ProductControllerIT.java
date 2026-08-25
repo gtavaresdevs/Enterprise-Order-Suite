@@ -87,7 +87,7 @@ class ProductControllerIT {
       .stockQuantity(100)
       .build();
 
-    mockMvc.perform(post("/api/v1/products")
+    mockMvc.perform(post("/products")
         .header("Authorization", "Bearer " + adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(request)))
@@ -105,7 +105,7 @@ class ProductControllerIT {
       .stockQuantity(100)
       .build();
 
-    mockMvc.perform(post("/api/v1/products")
+    mockMvc.perform(post("/products")
         .header("Authorization", "Bearer " + userToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(request)))
@@ -121,7 +121,7 @@ class ProductControllerIT {
       .stockQuantity(50)
       .build();
 
-    String response = mockMvc.perform(post("/api/v1/products")
+    String response = mockMvc.perform(post("/products")
         .header("Authorization", "Bearer " + adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(createRequest)))
@@ -141,7 +141,7 @@ class ProductControllerIT {
       .stockQuantity(40)
       .build();
 
-    mockMvc.perform(put("/api/v1/products/{id}", productId)
+    mockMvc.perform(put("/products/{id}", productId)
         .header("Authorization", "Bearer " + adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(updateRequest)))
@@ -159,7 +159,7 @@ class ProductControllerIT {
       .stockQuantity(10)
       .build();
 
-    String response = mockMvc.perform(post("/api/v1/products")
+    String response = mockMvc.perform(post("/products")
         .header("Authorization", "Bearer " + adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(createRequest)))
@@ -172,7 +172,7 @@ class ProductControllerIT {
       .get("id")
       .asLong();
 
-    mockMvc.perform(get("/api/v1/products/{id}", productId)
+    mockMvc.perform(get("/products/{id}", productId)
         .header("Authorization", "Bearer " + userToken))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.name", is("Public Product")));
@@ -187,7 +187,7 @@ class ProductControllerIT {
       .stockQuantity(1)
       .build();
 
-    String response = mockMvc.perform(post("/api/v1/products")
+    String response = mockMvc.perform(post("/products")
         .header("Authorization", "Bearer " + adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(createRequest)))
@@ -200,11 +200,11 @@ class ProductControllerIT {
       .get("id")
       .asLong();
 
-    mockMvc.perform(delete("/api/v1/products/{id}", productId)
+    mockMvc.perform(delete("/products/{id}", productId)
         .header("Authorization", "Bearer " + adminToken))
       .andExpect(status().isNoContent());
 
-    mockMvc.perform(get("/api/v1/products/{id}", productId)
+    mockMvc.perform(get("/products/{id}", productId)
         .header("Authorization", "Bearer " + adminToken))
       .andExpect(status().isNotFound());
   }

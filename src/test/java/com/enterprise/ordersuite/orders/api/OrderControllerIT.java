@@ -109,7 +109,7 @@ class OrderControllerIT {
       orderNumber
     );
 
-    mockMvc.perform(get("/api/v1/orders/{id}", orderId)
+    mockMvc.perform(get("/orders/{id}", orderId)
         .header("Authorization", "Bearer " + userToken))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.orderNumber").value(orderNumber));
@@ -123,7 +123,7 @@ class OrderControllerIT {
       "ORD-OTHER-" + UUID.randomUUID()
     );
 
-    mockMvc.perform(get("/api/v1/orders/{id}", orderId)
+    mockMvc.perform(get("/orders/{id}", orderId)
         .header("Authorization", "Bearer " + otherToken))
       .andExpect(status().isForbidden());
   }
@@ -136,7 +136,7 @@ class OrderControllerIT {
       "ORD-ADMIN-" + UUID.randomUUID()
     );
 
-    mockMvc.perform(get("/api/v1/orders/{id}", orderId)
+    mockMvc.perform(get("/orders/{id}", orderId)
         .header("Authorization", "Bearer " + adminToken))
       .andExpect(status().isOk());
   }
@@ -163,7 +163,7 @@ class OrderControllerIT {
       .items(List.of(item))
       .build();
 
-    mockMvc.perform(post("/api/v1/orders")
+    mockMvc.perform(post("/orders")
         .header("Authorization", "Bearer " + adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(request)))
@@ -196,7 +196,7 @@ class OrderControllerIT {
       .items(List.of(item))
       .build();
 
-    String createResponse = mockMvc.perform(post("/api/v1/orders")
+    String createResponse = mockMvc.perform(post("/orders")
         .header("Authorization", "Bearer " + adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(createRequest)))
@@ -216,7 +216,7 @@ class OrderControllerIT {
       .status(OrderStatus.CANCELLED)
       .build();
 
-    mockMvc.perform(put("/api/v1/orders/{id}", orderId)
+    mockMvc.perform(put("/orders/{id}", orderId)
         .header("Authorization", "Bearer " + adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(updateRequest)))
@@ -249,7 +249,7 @@ class OrderControllerIT {
       .items(List.of(item))
       .build();
 
-    String response = mockMvc.perform(post("/api/v1/orders")
+    String response = mockMvc.perform(post("/orders")
         .header("Authorization", "Bearer " + adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(createRequest)))
@@ -266,7 +266,7 @@ class OrderControllerIT {
       .status(OrderStatus.PROCESSING)
       .build();
 
-    mockMvc.perform(put("/api/v1/orders/{id}", orderId)
+    mockMvc.perform(put("/orders/{id}", orderId)
         .header("Authorization", "Bearer " + adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(updateRequest)))
@@ -296,7 +296,7 @@ class OrderControllerIT {
       .items(List.of(item))
       .build();
 
-    String response = mockMvc.perform(post("/api/v1/orders")
+    String response = mockMvc.perform(post("/orders")
         .header("Authorization", "Bearer " + adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(createRequest)))
@@ -313,7 +313,7 @@ class OrderControllerIT {
       .status(OrderStatus.DELIVERED)
       .build();
 
-    mockMvc.perform(put("/api/v1/orders/{id}", orderId)
+    mockMvc.perform(put("/orders/{id}", orderId)
         .header("Authorization", "Bearer " + adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(updateRequest)))
@@ -330,7 +330,7 @@ class OrderControllerIT {
       .items(List.of())
       .build();
 
-    mockMvc.perform(post("/api/v1/orders")
+    mockMvc.perform(post("/orders")
         .header("Authorization", "Bearer " + adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(request)))
@@ -403,7 +403,7 @@ class OrderControllerIT {
       .items(List.of(item))
       .build();
 
-    String response = mockMvc.perform(post("/api/v1/orders")
+    String response = mockMvc.perform(post("/orders")
         .header("Authorization", "Bearer " + token)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(request)))
@@ -430,7 +430,7 @@ class OrderControllerIT {
       .stockQuantity(stockQuantity)
       .build();
 
-    String response = mockMvc.perform(post("/api/v1/products")
+    String response = mockMvc.perform(post("/products")
         .header("Authorization", "Bearer " + adminToken)
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(request)))
@@ -445,7 +445,7 @@ class OrderControllerIT {
   }
 
   private Integer getProductStock(Long productId) throws Exception {
-    String response = mockMvc.perform(get("/api/v1/products/{id}", productId)
+    String response = mockMvc.perform(get("/products/{id}", productId)
         .header("Authorization", "Bearer " + adminToken))
       .andExpect(status().isOk())
       .andReturn()

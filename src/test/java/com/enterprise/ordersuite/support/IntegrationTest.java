@@ -11,6 +11,9 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @SpringBootTest
-@Import(PostgresTestContainerConfig.class)
+@Import({
+  PostgresTestContainerConfig.class,
+  MinioTestContainerConfig.class
+})
 public @interface IntegrationTest {
 }
