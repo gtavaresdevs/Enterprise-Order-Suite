@@ -36,6 +36,9 @@ public class UserProfile extends BaseEntity {
   @Column(columnDefinition = "TEXT")
   private String bio;
 
+  @Column(name = "avatar_key", length = 255)
+  private String avatarKey;
+
   public UserProfile(Long userId) {
     this.userId = userId;
   }

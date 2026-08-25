@@ -8,7 +8,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class ProfileMapper {
 
-  public ProfileResponse toResponse(User user, UserProfile profile) {
+  public ProfileResponse toResponse(
+    User user,
+    UserProfile profile,
+    String avatarUrl
+  ) {
     return new ProfileResponse(
       user.getId(),
       user.getEmail(),
@@ -21,6 +25,7 @@ public class ProfileMapper {
       profile.getDepartment(),
       profile.getOffice(),
       profile.getBio(),
+      avatarUrl,
       profile.getCreatedAt(),
       profile.getUpdatedAt()
     );

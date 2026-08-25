@@ -14,6 +14,7 @@ public record ProfileResponse(
   String department,
   String office,
   String bio,
+  String avatarUrl,
   LocalDateTime createdAt,
   LocalDateTime updatedAt
 ) {

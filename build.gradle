@@ -77,6 +77,10 @@ dependencies {
   implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.15'
   implementation "org.apache.commons:commons-compress:1.26.0"
   implementation "org.apache.commons:commons-lang3:3.18.0"
+  implementation platform('software.amazon.awssdk:bom:2.34.5')
+  implementation 'software.amazon.awssdk:s3'
+  implementation 'org.apache.tika:tika-core:3.2.2'
+  implementation 'com.github.usefulness:webp-imageio:0.11.0'
 
   compileOnly 'org.projectlombok:lombok'
   developmentOnly 'org.springframework.boot:spring-boot-devtools'
@@ -96,6 +100,7 @@ dependencies {
   testImplementation 'org.testcontainers:junit-jupiter'
   testImplementation 'org.testcontainers:postgresql'
   testImplementation "org.assertj:assertj-core:3.27.7"
+  testImplementation 'org.testcontainers:minio'
 }
 
 test {

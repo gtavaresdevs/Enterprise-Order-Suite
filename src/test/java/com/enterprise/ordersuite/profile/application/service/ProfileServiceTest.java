@@ -10,21 +10,28 @@ import com.enterprise.ordersuite.profile.domain.UserProfile;
 import com.enterprise.ordersuite.profile.domain.exception.ProfileNotFoundException;
 import com.enterprise.ordersuite.profile.domain.exception.UserNotFoundException;
 import com.enterprise.ordersuite.profile.persistence.UserProfileRepository;
+import com.enterprise.ordersuite.storage.ObjectStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +45,15 @@ class ProfileServiceTest {
 
   @Mock
   private ProfileMapper profileMapper;
+
+  @Mock
+  private ObjectStorageService objectStorageService;
+
+  @Mock
+  private AvatarValidator avatarValidator;
+
+  @Mock
+  private AvatarImageProcessor avatarImageProcessor;
 
   @InjectMocks
   private ProfileService profileService;
@@ -71,21 +87,7 @@ class ProfileServiceTest {
   @Test
   void getProfile_ExistingUserAndProfile_ReturnsProfileResponse() {
 
-    ProfileResponse expectedResponse = new ProfileResponse(
-      1L,
-      "user@test.com",
-      "John",
-      "Doe",
-      "USER",
-      "+1 555 123 4567",
-      "United States",
-      "America/New_York",
-      "Operations",
-      "New York",
-      "Operations manager",
-      profile.getCreatedAt(),
-      profile.getUpdatedAt()
-    );
+    ProfileResponse expectedResponse = profileResponse(null);
 
     when(userRepository.findById(1L))
       .thenReturn(Optional.of(user));
@@ -93,16 +95,72 @@ class ProfileServiceTest {
     when(userProfileRepository.findByUserId(1L))
       .thenReturn(Optional.of(profile));
 
-    when(profileMapper.toResponse(user, profile))
+    when(profileMapper.toResponse(user, profile, null))
       .thenReturn(expectedResponse);
 
-    ProfileResponse result = profileService.getProfile(1L);
+    ProfileResponse result =
+      profileService.getProfile(1L);
 
-    assertThat(result).isEqualTo(expectedResponse);
+    assertThat(result)
+      .isEqualTo(expectedResponse);
 
-    verify(userRepository).findById(1L);
-    verify(userProfileRepository).findByUserId(1L);
-    verify(profileMapper).toResponse(user, profile);
+    verify(userRepository)
+      .findById(1L);
+
+    verify(userProfileRepository)
+      .findByUserId(1L);
+
+    verify(profileMapper)
+      .toResponse(user, profile, null);
+
+    verifyNoInteractions(objectStorageService);
+  }
+
+  @Test
+  void getProfile_WithAvatar_ReturnsAvatarUrl() {
+
+    String avatarKey =
+      "avatars/existing-avatar.webp";
+
+    String avatarUrl =
+      "http://localhost:9000/eos-storage/"
+        + avatarKey;
+
+    profile.setAvatarKey(avatarKey);
+
+    ProfileResponse expectedResponse =
+      profileResponse(avatarUrl);
+
+    when(userRepository.findById(1L))
+      .thenReturn(Optional.of(user));
+
+    when(userProfileRepository.findByUserId(1L))
+      .thenReturn(Optional.of(profile));
+
+    when(objectStorageService.getUrl(avatarKey))
+      .thenReturn(avatarUrl);
+
+    when(profileMapper.toResponse(
+      user,
+      profile,
+      avatarUrl
+    )).thenReturn(expectedResponse);
+
+    ProfileResponse result =
+      profileService.getProfile(1L);
+
+    assertThat(result)
+      .isEqualTo(expectedResponse);
+
+    verify(objectStorageService)
+      .getUrl(avatarKey);
+
+    verify(profileMapper)
+      .toResponse(
+        user,
+        profile,
+        avatarUrl
+      );
   }
 
   @Test
@@ -111,15 +169,19 @@ class ProfileServiceTest {
     when(userRepository.findById(1L))
       .thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> profileService.getProfile(1L))
+    assertThatThrownBy(
+      () -> profileService.getProfile(1L)
+    )
       .isInstanceOf(UserNotFoundException.class)
       .hasMessage("User not found with ID: 1");
 
-    verify(userRepository).findById(1L);
+    verify(userRepository)
+      .findById(1L);
 
     verifyNoInteractions(
       userProfileRepository,
-      profileMapper
+      profileMapper,
+      objectStorageService
     );
   }
 
@@ -132,43 +194,41 @@ class ProfileServiceTest {
     when(userProfileRepository.findByUserId(1L))
       .thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> profileService.getProfile(1L))
+    assertThatThrownBy(
+      () -> profileService.getProfile(1L)
+    )
       .isInstanceOf(ProfileNotFoundException.class)
-      .hasMessage("Profile not found for user with ID: 1");
+      .hasMessage(
+        "Profile not found for user with ID: 1"
+      );
 
-    verify(userRepository).findById(1L);
-    verify(userProfileRepository).findByUserId(1L);
+    verify(userRepository)
+      .findById(1L);
 
-    verifyNoInteractions(profileMapper);
+    verify(userProfileRepository)
+      .findByUserId(1L);
+
+    verifyNoInteractions(
+      profileMapper,
+      objectStorageService
+    );
   }
 
   @Test
   void updateProfile_ExistingUserAndProfile_UpdatesAndReturnsProfile() {
 
-    UpdateProfileRequest request = new UpdateProfileRequest(
-      "+55 62 99999-9999",
-      "Brazil",
-      "America/Sao_Paulo",
-      "Engineering",
-      "Goiania",
-      "Senior backend engineer"
-    );
+    UpdateProfileRequest request =
+      new UpdateProfileRequest(
+        "+55 62 99999-9999",
+        "Brazil",
+        "America/Sao_Paulo",
+        "Engineering",
+        "Goiania",
+        "Senior backend engineer"
+      );
 
-    ProfileResponse expectedResponse = new ProfileResponse(
-      1L,
-      "user@test.com",
-      "John",
-      "Doe",
-      "USER",
-      "+55 62 99999-9999",
-      "Brazil",
-      "America/Sao_Paulo",
-      "Engineering",
-      "Goiania",
-      "Senior backend engineer",
-      profile.getCreatedAt(),
-      profile.getUpdatedAt()
-    );
+    ProfileResponse expectedResponse =
+      profileResponse(null);
 
     when(userRepository.findById(1L))
       .thenReturn(Optional.of(user));
@@ -176,11 +236,17 @@ class ProfileServiceTest {
     when(userProfileRepository.findByUserId(1L))
       .thenReturn(Optional.of(profile));
 
-    when(profileMapper.toResponse(user, profile))
-      .thenReturn(expectedResponse);
+    when(profileMapper.toResponse(
+      user,
+      profile,
+      null
+    )).thenReturn(expectedResponse);
 
     ProfileResponse result =
-      profileService.updateProfile(1L, request);
+      profileService.updateProfile(
+        1L,
+        request
+      );
 
     assertThat(profile.getPhone())
       .isEqualTo("+55 62 99999-9999");
@@ -203,52 +269,68 @@ class ProfileServiceTest {
     assertThat(result)
       .isEqualTo(expectedResponse);
 
-    verify(userRepository).findById(1L);
-    verify(userProfileRepository).findByUserId(1L);
-    verify(userProfileRepository).save(profile);
-    verify(profileMapper).toResponse(user, profile);
+    verify(userProfileRepository)
+      .save(profile);
+
+    verify(profileMapper)
+      .toResponse(
+        user,
+        profile,
+        null
+      );
+
+    verifyNoInteractions(objectStorageService);
   }
 
   @Test
   void updateProfile_UserDoesNotExist_ThrowsUserNotFoundException() {
 
-    UpdateProfileRequest request = new UpdateProfileRequest(
-      "123",
-      "Brazil",
-      "America/Sao_Paulo",
-      "Engineering",
-      "Goiania",
-      "Bio"
-    );
+    UpdateProfileRequest request =
+      new UpdateProfileRequest(
+        "123",
+        "Brazil",
+        "America/Sao_Paulo",
+        "Engineering",
+        "Goiania",
+        "Bio"
+      );
 
     when(userRepository.findById(1L))
       .thenReturn(Optional.empty());
 
     assertThatThrownBy(
-      () -> profileService.updateProfile(1L, request)
+      () -> profileService.updateProfile(
+        1L,
+        request
+      )
     )
       .isInstanceOf(UserNotFoundException.class)
-      .hasMessage("User not found with ID: 1");
+      .hasMessage(
+        "User not found with ID: 1"
+      );
 
-    verify(userRepository).findById(1L);
+    verify(userRepository)
+      .findById(1L);
 
     verifyNoInteractions(
       userProfileRepository,
-      profileMapper
+      profileMapper,
+      objectStorageService
     );
   }
 
   @Test
   void updateProfile_ProfileDoesNotExist_ThrowsProfileNotFoundException() {
 
-    UpdateProfileRequest request = new UpdateProfileRequest(
-      "123",
-      "Brazil",
-      "America/Sao_Paulo",
-      "Engineering",
-      "Goiania",
-      "Bio"
-    );
+    UpdateProfileRequest request =
+      new UpdateProfileRequest(
+        "123",
+        "Brazil",
+        "America/Sao_Paulo",
+        "Engineering",
+        "Goiania",
+        "Bio"
+      );
 
     when(userRepository.findById(1L))
       .thenReturn(Optional.of(user));
@@ -257,18 +339,469 @@ class ProfileServiceTest {
       .thenReturn(Optional.empty());
 
     assertThatThrownBy(
-      () -> profileService.updateProfile(1L, request)
+      () -> profileService.updateProfile(
+        1L,
+        request
+      )
     )
       .isInstanceOf(ProfileNotFoundException.class)
-      .hasMessage("Profile not found for user with ID: 1");
+      .hasMessage(
+        "Profile not found for user with ID: 1"
+      );
 
-    verify(userRepository).findById(1L);
-    verify(userProfileRepository).findByUserId(1L);
+    verify(userRepository)
+      .findById(1L);
 
-    verifyNoInteractions(profileMapper);
+    verify(userProfileRepository)
+      .findByUserId(1L);
+
+    verifyNoInteractions(
+      profileMapper,
+      objectStorageService
+    );
 
     verify(userProfileRepository, never())
-      .save(org.mockito.ArgumentMatchers.any(UserProfile.class));
+      .save(any(UserProfile.class));
+  }
+
+  @Test
+  void uploadAvatar_ValidFile_UploadsProcessedImageAndUpdatesProfile() {
+
+    MultipartFile file =
+      new MockMultipartFile(
+        "file",
+        "avatar.png",
+        "image/png",
+        new byte[] {1, 2, 3}
+      );
+
+    byte[] webpImage =
+      new byte[] {10, 20, 30, 40};
+
+    String avatarKey =
+      "avatars/generated.webp";
+
+    String avatarUrl =
+      "http://localhost:9000/eos-storage/"
+        + avatarKey;
+
+    ProfileResponse expectedResponse =
+      profileResponse(avatarUrl);
+
+    when(userRepository.findById(1L))
+      .thenReturn(Optional.of(user));
+
+    when(userProfileRepository.findByUserId(1L))
+      .thenReturn(Optional.of(profile));
+
+    when(avatarImageProcessor.convertToWebp(file))
+      .thenReturn(webpImage);
+
+    when(objectStorageService.upload(
+      any(String.class),
+      any(ByteArrayInputStream.class),
+      anyLong(),
+      eq("image/webp")
+    )).thenReturn(avatarKey);
+
+    when(objectStorageService.getUrl(any(String.class)))
+      .thenReturn(avatarUrl);
+
+    when(profileMapper.toResponse(
+      user,
+      profile,
+      avatarUrl
+    )).thenReturn(expectedResponse);
+
+    ProfileResponse result =
+      profileService.uploadAvatar(
+        1L,
+        file
+      );
+
+    assertThat(result)
+      .isEqualTo(expectedResponse);
+
+    assertThat(profile.getAvatarKey())
+      .isEqualTo(avatarKey);
+
+    verify(avatarValidator)
+      .validate(file);
+
+    verify(avatarImageProcessor)
+      .convertToWebp(file);
+
+    verify(objectStorageService)
+      .upload(
+        eq(avatarKey),
+        any(ByteArrayInputStream.class),
+        eq((long) webpImage.length),
+        eq("image/webp")
+      );
+
+    verify(userProfileRepository)
+      .save(profile);
+
+    verify(profileMapper)
+      .toResponse(
+        user,
+        profile,
+        avatarUrl
+      );
+
+    verify(objectStorageService)
+      .getUrl(avatarKey);
+
+    verify(objectStorageService, never())
+      .delete(any(String.class));
+  }
+
+  @Test
+  void uploadAvatar_ReplacesExistingAvatar_DeletesOldAvatar() {
+
+    String oldAvatarKey =
+      "avatars/old-avatar.webp";
+
+    String newAvatarKey =
+      "avatars/new-avatar.webp";
+
+    profile.setAvatarKey(oldAvatarKey);
+
+    MultipartFile file =
+      new MockMultipartFile(
+        "file",
+        "avatar.png",
+        "image/png",
+        new byte[] {1, 2, 3}
+      );
+
+    byte[] webpImage =
+      new byte[] {10, 20, 30};
+
+    String avatarUrl =
+      "http://localhost:9000/eos-storage/"
+        + newAvatarKey;
+
+    ProfileResponse expectedResponse =
+      profileResponse(avatarUrl);
+
+    when(userRepository.findById(1L))
+      .thenReturn(Optional.of(user));
+
+    when(userProfileRepository.findByUserId(1L))
+      .thenReturn(Optional.of(profile));
+
+    when(avatarImageProcessor.convertToWebp(file))
+      .thenReturn(webpImage);
+
+    when(objectStorageService.upload(
+      any(String.class),
+      any(ByteArrayInputStream.class),
+      anyLong(),
+      eq("image/webp")
+    )).thenReturn(newAvatarKey);
+
+    when(objectStorageService.getUrl(newAvatarKey))
+      .thenReturn(avatarUrl);
+
+    when(profileMapper.toResponse(
+      user,
+      profile,
+      avatarUrl
+    )).thenReturn(expectedResponse);
+
+    ProfileResponse result =
+      profileService.uploadAvatar(
+        1L,
+        file
+      );
+
+    assertThat(result)
+      .isEqualTo(expectedResponse);
+
+    assertThat(profile.getAvatarKey())
+      .isEqualTo(newAvatarKey);
+
+    verify(objectStorageService)
+      .delete(oldAvatarKey);
+
+    verify(objectStorageService)
+      .upload(
+        eq(newAvatarKey),
+        any(ByteArrayInputStream.class),
+        eq((long) webpImage.length),
+        eq("image/webp")
+      );
+
+    verify(userProfileRepository)
+      .save(profile);
+  }
+
+  @Test
+  void uploadAvatar_UserDoesNotExist_ThrowsUserNotFoundException() {
+
+    MultipartFile file =
+      new MockMultipartFile(
+        "file",
+        "avatar.png",
+        "image/png",
+        new byte[] {1, 2, 3}
+      );
+
+    when(userRepository.findById(1L))
+      .thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+      () -> profileService.uploadAvatar(
+        1L,
+        file
+      )
+    )
+      .isInstanceOf(UserNotFoundException.class)
+      .hasMessage(
+        "User not found with ID: 1"
+      );
+
+    verify(userRepository)
+      .findById(1L);
+
+    verifyNoInteractions(
+      userProfileRepository,
+      profileMapper,
+      objectStorageService,
+      avatarValidator,
+      avatarImageProcessor
+    );
+  }
+
+  @Test
+  void uploadAvatar_ProfileDoesNotExist_ThrowsProfileNotFoundException() {
+
+    MultipartFile file =
+      new MockMultipartFile(
+        "file",
+        "avatar.png",
+        "image/png",
+        new byte[] {1, 2, 3}
+      );
+
+    when(userRepository.findById(1L))
+      .thenReturn(Optional.of(user));
+
+    when(userProfileRepository.findByUserId(1L))
+      .thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+      () -> profileService.uploadAvatar(
+        1L,
+        file
+      )
+    )
+      .isInstanceOf(ProfileNotFoundException.class)
+      .hasMessage(
+        "Profile not found for user with ID: 1"
+      );
+
+    verify(userRepository)
+      .findById(1L);
+
+    verify(userProfileRepository)
+      .findByUserId(1L);
+
+    verifyNoInteractions(
+      profileMapper,
+      objectStorageService,
+      avatarValidator,
+      avatarImageProcessor
+    );
+  }
+
+  @Test
+  void uploadAvatar_InvalidFile_DoesNotProcessOrUpload() {
+
+    MultipartFile file =
+      new MockMultipartFile(
+        "file",
+        "avatar.txt",
+        "text/plain",
+        "invalid".getBytes()
+      );
+
+    when(userRepository.findById(1L))
+      .thenReturn(Optional.of(user));
+
+    when(userProfileRepository.findByUserId(1L))
+      .thenReturn(Optional.of(profile));
+
+    RuntimeException exception =
+      new RuntimeException("Invalid avatar");
+
+    org.mockito.Mockito
+      .doThrow(exception)
+      .when(avatarValidator)
+      .validate(file);
+
+    assertThatThrownBy(
+      () -> profileService.uploadAvatar(
+        1L,
+        file
+      )
+    )
+      .isSameAs(exception);
+
+    verify(avatarValidator)
+      .validate(file);
+
+    verify(avatarImageProcessor, never())
+      .convertToWebp(any(MultipartFile.class));
+
+    verifyNoInteractions(objectStorageService);
+
+    verify(userProfileRepository, never())
+      .save(any(UserProfile.class));
+  }
+
+  @Test
+  void deleteAvatar_ExistingAvatar_DeletesObjectAndClearsKey() {
+
+    String avatarKey =
+      "avatars/avatar.webp";
+
+    profile.setAvatarKey(avatarKey);
+
+    ProfileResponse expectedResponse =
+      profileResponse(null);
+
+    when(userRepository.findById(1L))
+      .thenReturn(Optional.of(user));
+
+    when(userProfileRepository.findByUserId(1L))
+      .thenReturn(Optional.of(profile));
+
+    when(profileMapper.toResponse(
+      user,
+      profile,
+      null
+    )).thenReturn(expectedResponse);
+
+    ProfileResponse result =
+      profileService.deleteAvatar(1L);
+
+    assertThat(result)
+      .isEqualTo(expectedResponse);
+
+    assertThat(profile.getAvatarKey())
+      .isNull();
+
+    verify(objectStorageService)
+      .delete(avatarKey);
+
+    verify(userProfileRepository)
+      .save(profile);
+
+    verify(profileMapper)
+      .toResponse(
+        user,
+        profile,
+        null
+      );
+
+    verify(objectStorageService, never())
+      .getUrl(avatarKey);
+  }
+
+  @Test
+  void deleteAvatar_NoAvatar_ReturnsProfileWithoutStorageInteraction() {
+
+    profile.setAvatarKey(null);
+
+    ProfileResponse expectedResponse =
+      profileResponse(null);
+
+    when(userRepository.findById(1L))
+      .thenReturn(Optional.of(user));
+
+    when(userProfileRepository.findByUserId(1L))
+      .thenReturn(Optional.of(profile));
+
+    when(profileMapper.toResponse(
+      user,
+      profile,
+      null
+    )).thenReturn(expectedResponse);
+
+    ProfileResponse result =
+      profileService.deleteAvatar(1L);
+
+    assertThat(result)
+      .isEqualTo(expectedResponse);
+
+    verify(profileMapper)
+      .toResponse(
+        user,
+        profile,
+        null
+      );
+
+    verifyNoInteractions(
+      objectStorageService
+    );
+
+    verify(userProfileRepository, never())
+      .save(any(UserProfile.class));
+  }
+
+  @Test
+  void deleteAvatar_UserDoesNotExist_ThrowsUserNotFoundException() {
+
+    when(userRepository.findById(1L))
+      .thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+      () -> profileService.deleteAvatar(1L)
+    )
+      .isInstanceOf(UserNotFoundException.class)
+      .hasMessage(
+        "User not found with ID: 1"
+      );
+
+    verify(userRepository)
+      .findById(1L);
+
+    verifyNoInteractions(
+      userProfileRepository,
+      profileMapper,
+      objectStorageService
+    );
+  }
+
+  @Test
+  void deleteAvatar_ProfileDoesNotExist_ThrowsProfileNotFoundException() {
+
+    when(userRepository.findById(1L))
+      .thenReturn(Optional.of(user));
+
+    when(userProfileRepository.findByUserId(1L))
+      .thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+      () -> profileService.deleteAvatar(1L)
+    )
+      .isInstanceOf(ProfileNotFoundException.class)
+      .hasMessage(
+        "Profile not found for user with ID: 1"
+      );
+
+    verify(userRepository)
+      .findById(1L);
+
+    verify(userProfileRepository)
+      .findByUserId(1L);
+
+    verifyNoInteractions(
+      objectStorageService,
+      profileMapper
+    );
   }
 
   @Test
@@ -279,9 +812,11 @@ class ProfileServiceTest {
     ArgumentCaptor<UserProfile> captor =
       ArgumentCaptor.forClass(UserProfile.class);
 
-    verify(userProfileRepository).save(captor.capture());
+    verify(userProfileRepository)
+      .save(captor.capture());
 
-    UserProfile savedProfile = captor.getValue();
+    UserProfile savedProfile =
+      captor.getValue();
 
     assertThat(savedProfile.getUserId())
       .isEqualTo(1L);
@@ -304,9 +839,36 @@ class ProfileServiceTest {
     assertThat(savedProfile.getBio())
       .isNull();
 
+    assertThat(savedProfile.getAvatarKey())
+      .isNull();
+
     verifyNoInteractions(
       userRepository,
-      profileMapper
+      profileMapper,
+      objectStorageService,
+      avatarValidator,
+      avatarImageProcessor
+    );
+  }
+
+  private ProfileResponse profileResponse(
+    String avatarUrl
+  ) {
+    return new ProfileResponse(
+      1L,
+      "user@test.com",
+      "John",
+      "Doe",
+      "USER",
+      profile.getPhone(),
+      profile.getCountry(),
+      profile.getTimezone(),
+      profile.getDepartment(),
+      profile.getOffice(),
+      profile.getBio(),
+      avatarUrl,
+      profile.getCreatedAt(),
+      profile.getUpdatedAt()
     );
   }
 }

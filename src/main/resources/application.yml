@@ -1,7 +1,7 @@
 server:
   port: ${SERVER_PORT:8080}
   servlet:
-    context-path: ${SERVER_CONTEXT_PATH:}
+    context-path: ${SERVER_CONTEXT_PATH}
 
 spring:
   datasource:
@@ -32,6 +32,13 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION_MS:86400000}
+
+storage:
+  endpoint: ${MINIO_ENDPOINT}
+  region: ${MINIO_REGION}
+  access-key: ${MINIO_ROOT_USER}
+  secret-key: ${MINIO_ROOT_PASSWORD}
+  bucket: ${MINIO_BUCKET}
 
 app:
   urls:
