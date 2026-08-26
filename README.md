@@ -4,7 +4,7 @@
 
 **Enterprise Order Suite (EOS)** is a backend system for managing B2B purchasing workflows between companies. It demonstrates production-oriented Java backend engineering across **REST API design, Spring Boot, Spring Security, JWT authentication, hierarchical RBAC, PostgreSQL, JPA, Flyway, object storage, Docker, and automated integration testing with Testcontainers**.
 
-The project focuses on the engineering problems that matter in real backend systems: **security, business rules, data integrity, API design, maintainability, observability, resilience, and automated testing**.
+The project focuses on the engineering problems that matter in real backend systems: **security, business rules, data integrity, API design, maintainability, request traceability, resilience, and automated testing**.
 
 > **Target role:** Java Backend Developer | Java + Spring Boot | REST APIs | PostgreSQL | Spring Security | Docker | Automated Testing
 
@@ -18,50 +18,50 @@ The system models a B2B environment where users operate within an authenticated 
 
 The project intentionally incorporates engineering concerns commonly found in professional Java backend development:
 
-* Secure authentication and authorization
-* Business-rule enforcement
-* Transactional persistence
-* Relational data modeling
-* Version-controlled database migrations
-* API validation and error handling
-* Request tracing
-* Abuse protection
-* Object storage
-* Integration testing against real infrastructure
-* Containerized development
+- Secure authentication and authorization
+- Business-rule enforcement
+- Transactional persistence
+- Relational data modeling
+- Version-controlled database migrations
+- API validation and error handling
+- Request tracing
+- Abuse protection
+- Object storage
+- Integration testing against real infrastructure
+- Containerized development
 
 ---
 
 # ⚡ Technical Snapshot
 
-| Area                | Implementation              |
-| ------------------- | --------------------------- |
-| Language            | Java 17                     |
-| Framework           | Spring Boot 3               |
-| API                 | REST                        |
-| Security            | Spring Security + JWT       |
-| Authorization       | Hierarchical RBAC           |
-| Persistence         | Spring Data JPA / Hibernate |
-| Database            | PostgreSQL                  |
-| Migrations          | Flyway                      |
-| Object Storage      | MinIO / S3-compatible       |
-| Mapping             | MapStruct                   |
-| Validation          | Jakarta Bean Validation     |
-| Email               | Spring Mail + Thymeleaf     |
-| Testing             | JUnit 5 + Mockito + MockMvc |
-| Integration Testing | Testcontainers              |
-| Containers          | Docker / Docker Compose     |
-| Build               | Gradle                      |
-| API Documentation   | OpenAPI / Swagger           |
-| Logging             | SLF4J + MDC                 |
+| Area | Implementation |
+|---|---|
+| Language | Java 17 |
+| Framework | Spring Boot 3 |
+| API | REST |
+| Security | Spring Security + JWT |
+| Authorization | Hierarchical RBAC |
+| Persistence | Spring Data JPA / Hibernate |
+| Database | PostgreSQL |
+| Migrations | Flyway |
+| Object Storage | MinIO / S3-compatible |
+| Mapping | MapStruct |
+| Validation | Jakarta Bean Validation |
+| Email | Spring Mail + Thymeleaf |
+| Testing | JUnit 5 + Mockito + MockMvc |
+| Integration Testing | Testcontainers |
+| Containers | Docker / Docker Compose |
+| Build | Gradle |
+| API Documentation | OpenAPI / Swagger |
+| Logging | SLF4J + MDC |
 
 ---
 
 # 🏗️ Architecture
 
-EOS follows a **Vertical Slice Architecture** with feature-oriented organization.
+EOS follows a **modular, feature-oriented architecture** with clear separation between API, application, domain, and persistence concerns.
 
-Instead of structuring the entire application around global technical layers, functionality is grouped by business capability.
+Business capabilities are organized by feature rather than placing every controller, service, and repository into a single global technical layer.
 
 ```text
 src/main/java/com/enterprise/ordersuite
@@ -75,6 +75,25 @@ src/main/java/com/enterprise/ordersuite
 ├── notifications/
 ├── security/
 └── support/
+````
+
+Within individual features, responsibilities are further separated according to their role in the application:
+
+```text
+Feature
+│
+├── api/
+│   ├── controllers
+│   └── DTOs
+│
+├── application/
+│   └── business/application services
+│
+├── domain/
+│   └── domain models and rules
+│
+└── persistence/
+    └── repositories and persistence concerns
 ```
 
 A simplified request flow looks like:
@@ -93,20 +112,22 @@ Spring Security
 REST Controller
      │
      ▼
-Application / Business Logic
+Application Layer
      │
      ├── Validation
      ├── Business Rules
      └── Transactions
      │
      ▼
-Repository / Persistence
+Persistence Layer
      │
      ▼
 PostgreSQL
 ```
 
-The architecture is designed to keep business capabilities cohesive while avoiding unnecessary coupling between unrelated features.
+This structure keeps business capabilities cohesive while maintaining clear boundaries between HTTP/API concerns, application logic, domain behavior, and persistence.
+
+The architecture also keeps infrastructure-specific concerns isolated where practical, allowing implementations such as object storage to be changed without unnecessarily coupling business logic to a specific provider.
 
 ---
 
@@ -114,7 +135,7 @@ The architecture is designed to keep business capabilities cohesive while avoidi
 
 Security is one of the core areas of EOS.
 
-### Authentication
+## Authentication
 
 The application implements:
 
@@ -128,7 +149,7 @@ The application implements:
 * Password history enforcement
 * Account activation/deactivation
 
-### Authorization
+## Authorization
 
 EOS uses Spring Security's role hierarchy:
 
@@ -152,7 +173,7 @@ Authorization is enforced at the API/security layer rather than relying solely o
 
 EOS goes beyond basic JWT authentication and implements additional defensive controls.
 
-### Dual-Key Rate Limiting
+## Dual-Key Rate Limiting
 
 Authentication-related requests can be constrained using both:
 
@@ -164,13 +185,13 @@ Target account email
 
 This provides protection against credential-stuffing and brute-force scenarios where attackers attempt to distribute requests across multiple addresses.
 
-### Request Payload Protection
+## Request Payload Protection
 
 Incoming request payload sizes can be rejected early using request metadata before unnecessarily processing oversized JSON bodies.
 
 This provides an additional defense against memory-exhaustion attacks.
 
-### Request Correlation
+## Request Correlation
 
 Each request receives a unique `requestId`.
 
@@ -317,6 +338,24 @@ This provides an auditable representation of the order lifecycle.
 
 ---
 
+# 🔎 Advanced Filtering
+
+Orders can be queried using multiple filtering criteria, including:
+
+* Company
+* Status
+* Date range
+* Value range
+
+The API also supports:
+
+* Pagination
+* Sorting
+
+Filtering and pagination are handled server-side so clients do not need to retrieve the entire dataset before applying filters.
+
+---
+
 # 🗄️ Persistence & Database Engineering
 
 EOS uses **PostgreSQL** with **Spring Data JPA / Hibernate**.
@@ -393,11 +432,11 @@ HTTP / MockMvc
 
 PostgreSQL is provided through **Testcontainers**, meaning integration tests run against an actual PostgreSQL database inside a Docker container rather than relying on a developer's local database.
 
-Spring Boot's Testcontainers integration is specifically designed for this type of real-service integration testing.
-
 The project centralizes the PostgreSQL test infrastructure and uses Spring Boot's `@ServiceConnection` mechanism to provide the container connection details to the application context.
 
 This makes the tests reproducible across developer machines and CI environments.
+
+Integration tests cover application behavior through the real Spring context, security configuration, persistence layer, database schema, and HTTP layer rather than replacing these components with mocks.
 
 ---
 
@@ -438,7 +477,7 @@ Docker is also required for Testcontainers integration tests.
 
 EOS exposes RESTful endpoints organized around business capabilities.
 
-### Authentication
+## Authentication
 
 ```http
 POST /auth/register
@@ -449,7 +488,7 @@ POST /auth/reset-password
 POST /auth/logout
 ```
 
-### Profile
+## Profile
 
 ```http
 GET    /api/me/profile
@@ -458,7 +497,7 @@ POST   /api/me/profile/avatar
 DELETE /api/me/profile/avatar
 ```
 
-### Companies
+## Companies
 
 ```http
 POST   /companies
@@ -468,7 +507,7 @@ PUT    /companies/{id}
 DELETE /companies/{id}
 ```
 
-### Products
+## Products
 
 ```http
 POST   /products
@@ -478,7 +517,7 @@ PUT    /products/{id}
 DELETE /products/{id}
 ```
 
-### Orders
+## Orders
 
 ```http
 POST /orders
@@ -496,31 +535,42 @@ API contracts are documented using OpenAPI/Swagger.
 
 One of the goals of EOS is to demonstrate **engineering judgment**, not just technology usage.
 
-### Why PostgreSQL?
+## Why PostgreSQL?
 
 The core domain contains strongly related entities, transactional workflows, historical records, and relational constraints.
 
 PostgreSQL provides a strong fit for this data model while supporting transactional consistency and complex querying.
 
-### Why Flyway?
+## Why Flyway?
 
 Database schema changes are treated as version-controlled application artifacts instead of relying on manually synchronized developer databases.
 
-### Why Testcontainers?
+## Why Testcontainers?
 
 Integration tests should validate behavior against the same type of database the application uses in real environments.
 
 Testcontainers provides disposable infrastructure that can be created and destroyed automatically during testing.
 
-### Why MinIO?
+## Why MinIO?
 
 MinIO provides an S3-compatible local object-storage environment without requiring a cloud account during development.
 
 This allows the application to develop against an object-storage API while keeping local development self-contained.
 
-### Why Vertical Slice Architecture?
+## Why Feature-Oriented Modular Architecture?
 
-Feature-oriented organization keeps related business functionality together and reduces unnecessary coupling between unrelated technical layers.
+The application is organized around business capabilities while maintaining clear boundaries between API, application, domain, and persistence concerns.
+
+This provides a balance between:
+
+* Feature cohesion
+* Separation of concerns
+* Testability
+* Maintainability
+* Clear ownership of business logic
+* Reduced coupling between unrelated features
+
+Rather than forcing the entire application into a single global controller/service/repository structure, each business capability has its own cohesive module.
 
 ---
 
@@ -528,7 +578,7 @@ Feature-oriented organization keeps related business functionality together and 
 
 EOS is intentionally designed to demonstrate the skills expected from a modern Java backend engineer.
 
-### Java & Spring
+## Java & Spring
 
 * Java 17
 * Spring Boot 3
@@ -540,7 +590,7 @@ EOS is intentionally designed to demonstrate the skills expected from a modern J
 * Transaction management
 * REST API development
 
-### API Engineering
+## API Engineering
 
 * RESTful endpoint design
 * DTO-based contracts
@@ -552,7 +602,7 @@ EOS is intentionally designed to demonstrate the skills expected from a modern J
 * Filtering
 * Sorting
 
-### Security
+## Security
 
 * JWT
 * Refresh tokens
@@ -564,7 +614,7 @@ EOS is intentionally designed to demonstrate the skills expected from a modern J
 * Request-size protection
 * Request tracing
 
-### Database
+## Database
 
 * PostgreSQL
 * SQL
@@ -573,7 +623,7 @@ EOS is intentionally designed to demonstrate the skills expected from a modern J
 * Transactions
 * Flyway migrations
 
-### Testing
+## Testing
 
 * JUnit 5
 * Mockito
@@ -583,7 +633,7 @@ EOS is intentionally designed to demonstrate the skills expected from a modern J
 * Testcontainers
 * Real PostgreSQL integration
 
-### Infrastructure
+## Infrastructure
 
 * Docker
 * Docker Compose
@@ -687,11 +737,9 @@ src/
 
 # 💼 Why EOS Is Relevant to Java Backend Roles
 
-EOS intentionally covers a broad set of backend engineering concerns found in current Java development roles.
+EOS intentionally covers a broad set of backend engineering concerns found in modern Java development roles.
 
-Current Java backend vacancies commonly emphasize combinations of **Java, Spring Boot, REST APIs, PostgreSQL/JPA, Spring Security, Docker, automated testing, CI/CD, cloud, and distributed systems**.
-
-EOS currently demonstrates strong hands-on evidence across:
+The project demonstrates hands-on experience across:
 
 ```text
 Java 17
@@ -771,3 +819,6 @@ That means prioritizing:
 ## License
 
 This project is maintained as a personal software engineering project and portfolio demonstration.
+
+```
+```
