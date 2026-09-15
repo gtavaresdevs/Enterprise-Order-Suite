@@ -30,6 +30,9 @@ out/
 # VS Code
 .vscode/
 
+# Claude Code
+.claude/
+
 # NetBeans
 /nbproject/private/
 /nbbuild/

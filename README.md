@@ -202,39 +202,40 @@ password: ${DB_PASSWORD}
 
 ▶️ How to Run Locally (Without Docker)
 1. Start PostgreSQL manually
-Create a database:
-b2b_order_db
+Create a database matching DB_NAME below.
 
-2. Set environment variables (or edit application.yml):
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/b2b_order_db
-   username: ${DB_USER}
-   password: ${DB_PASSWORD}
+2. Set environment variables in a `.env` file at the project root (see `.env.example`):
+DB_NAME=...
+DB_USER=...
+DB_PASSWORD=...
+JWT_SECRET=...
 
 3. Run the app:
-./mvnw spring-boot:run
+./gradlew bootRun
 
 (or use your IDE)
 
-📁 Project Structure (Recommended)
-src/main/java/com/yourname/b2border
-    config/
-    controllers/
-    services/
-    repositories/
-    dtos/
-    entities/
-    exceptions/
+📁 Project Structure
+src/main/java/com/enterprise/ordersuite
+    api/            (shared API config + error handling)
+    auth/
+    identity/
+    orders/
+    products/
+    profile/
     security/
-    mappers/
+    storage/
+    notifications/
+    common/
+
+Each module follows an api / application / domain / persistence layering.
 
 🧪 Tests
 Includes:
 
 - Unit tests for services
-- Integration tests for controllers
+- Integration tests for controllers (via Testcontainers — Postgres + MinIO, requires Docker)
 - Authentication flow tests
 
 To run:
-./mvnw test
+./gradlew test
