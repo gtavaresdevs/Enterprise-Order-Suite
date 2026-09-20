@@ -41,6 +41,12 @@ storage:
   bucket: ${MINIO_BUCKET}
 
 app:
+  # The anti-lockout root account. Both values are absent by default so tests and fresh
+  # clones boot without a secret; when unset, nothing is seeded and no account is protected.
+  # SUPER_ADMIN_PASSWORD_HASH is a bcrypt hash, never a plaintext password.
+  root-super-admin:
+    email: ${SUPER_ADMIN_EMAIL:}
+    password-hash: ${SUPER_ADMIN_PASSWORD_HASH:}
   urls:
     password-reset: ${APP_PASSWORD_RESET_URL}
   # CUSTOM MAPS CORRESPONDING TO THE @ConfigurationProperties(prefix = "app.email") CLASS

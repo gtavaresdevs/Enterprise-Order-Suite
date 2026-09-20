@@ -60,6 +60,9 @@ logs/
 .env
 .env.*
 *.env
+# The template is the documented reference for the required variables (see CLAUDE.md) and
+# holds placeholders only, so it has to be tracked - every real env file above stays ignored.
+!.env.example
 
 ############################
 # Spring Boot local overrides

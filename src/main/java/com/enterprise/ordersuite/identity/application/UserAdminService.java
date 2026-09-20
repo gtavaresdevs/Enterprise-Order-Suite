@@ -2,6 +2,7 @@ package com.enterprise.ordersuite.identity.application;
 
 import com.enterprise.ordersuite.auth.service.PasswordResetService;
 import com.enterprise.ordersuite.identity.api.dto.*;
+import com.enterprise.ordersuite.identity.config.RootSuperAdminProperties;
 import com.enterprise.ordersuite.identity.domain.IdentityAuditEventType;
 import com.enterprise.ordersuite.identity.domain.Role;
 import com.enterprise.ordersuite.identity.domain.User;
@@ -25,8 +26,11 @@ public class UserAdminService {
 
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
-  // SAFETY GUARD: The immutable root account
-  private static final String ROOT_SUPER_ADMIN_EMAIL = "gtavaresdev@gmail.com";
+  // SAFETY GUARD: The immutable root account. Its address is configuration, not a constant -
+  // the same SUPER_ADMIN_EMAIL the seeder uses - so the value is not committed to the repo.
+  // When nothing is configured no account is protected, which is the right answer for a
+  // fresh clone or a test: there is no root account to lock anyone out of.
+  private final RootSuperAdminProperties rootSuperAdmin;
 
   private final RoleRepository roleRepository;
   private final UserRepository userRepository;
@@ -43,8 +47,10 @@ public class UserAdminService {
     IdentityAuditService identityAuditService,
     PasswordResetService passwordResetService,
     PasswordEncoder passwordEncoder,
-    MeterRegistry meterRegistry
+    MeterRegistry meterRegistry,
+    RootSuperAdminProperties rootSuperAdmin
   ) {
+    this.rootSuperAdmin = rootSuperAdmin;
     this.userRepository = userRepository;
     this.roleRepository = roleRepository;
     this.currentUserService = currentUserService;
@@ -62,7 +68,7 @@ public class UserAdminService {
       .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
     // ANTI-LOCKOUT: Protect the root account
-    if (target.getEmail().equalsIgnoreCase(ROOT_SUPER_ADMIN_EMAIL)) {
+    if (rootSuperAdmin.matches(target.getEmail())) {
       throw new IllegalArgumentException("Action strictly prohibited: Cannot deactivate the root super admin.");
     }
 
@@ -138,7 +144,7 @@ public class UserAdminService {
       .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
     // ANTI-LOCKOUT: Protect the root account
-    if (target.getEmail().equalsIgnoreCase(ROOT_SUPER_ADMIN_EMAIL)) {
+    if (rootSuperAdmin.matches(target.getEmail())) {
       throw new IllegalArgumentException("Action strictly prohibited: Cannot modify the role of the root super admin.");
     }
 
@@ -302,7 +308,7 @@ public class UserAdminService {
       if (!newEmail.equalsIgnoreCase(previousEmail)) {
 
         // ANTI-LOCKOUT: Prevent altering the root email address and losing access
-        if (previousEmail.equalsIgnoreCase(ROOT_SUPER_ADMIN_EMAIL)) {
+        if (rootSuperAdmin.matches(previousEmail)) {
           throw new IllegalArgumentException("Action strictly prohibited: Cannot change the email of the root super admin.");
         }
 
