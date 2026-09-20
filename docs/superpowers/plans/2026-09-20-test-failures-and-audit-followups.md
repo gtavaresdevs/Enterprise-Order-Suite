@@ -54,6 +54,37 @@ swallow `AccessDeniedException`, `IllegalArgumentException` and the token/refres
    variables there reached nobody. `.gitignore` now negates it; every real env file stays
    ignored.
 
+### Post-audit fixes (`129bd32`)
+
+`spring-security-reviewer` over `4b3535c..HEAD` confirmed Tasks 6 and 7 change no permission
+and that Task 7 is a genuine no-op for USER/ADMIN/SUPER_ADMIN. It found one regression
+introduced by Task 8 and five smaller items, all fixed in `129bd32`:
+
+- **Task 8 opened a hole while closing one.** `holdsStock` excluded only `CANCELLED`, so
+  replacing the items of a `SHIPPED`/`DELIVERED` order credited its lines back.
+  `PUT {"status":"DELIVERED","items":[]}` on a delivered order minted its whole quantity —
+  `items` has no `@NotEmpty` and an unchanged status skips the transition. Now: an order's
+  stock claim is settleable only while it can still be cancelled.
+- `getAllOrders` asserts non-null like `searchOrders`; a derived query's null becomes
+  `IS NULL`, so the old comment's "fails closed" rested on `customer_id NOT NULL`, not on the
+  query. The restaurant-ops migration is what makes that column nullable.
+- The seeder WARNs when no root admin is configured, naming the consequence (finding 1).
+- The seeder normalizes the email — login is exact-match, so capitals would have seeded an
+  unusable account.
+- `OrderItemMapper` ignores `unitPrice`; `OrderControllerIT` gains the two missing
+  SUPER_ADMIN cases; `EmailProperties`' javadoc no longer ships a personal address.
+
+**Task 9's widening, accepted knowingly.** Where `SUPER_ADMIN_EMAIL` is unset, an environment
+that ran the old V15 still holds that account and the anti-lockout guard no longer protects
+it, so one SUPER_ADMIN can deactivate/demote/re-email another with no recovery path. That is
+correct for a fresh clone and wrong for an existing one; the startup WARN is the mitigation,
+and setting `SUPER_ADMIN_EMAIL` is a deploy step for every existing environment.
+
+**Not fixed, left for the user to decide** — a delivered order's items can still be wiped and
+its `totalAmount` rewritten to 0 with no history row. Pre-existing (Task 8 only added the
+stock side, now removed), and the correct fix — rejecting item edits outside `PENDING` — is a
+behaviour narrowing the frontend could notice, so it needs the user's call.
+
 ### Outstanding for the user
 
 - **`./gradlew flywayRepair`** (or drop the local schema) before the next `bootRun` — editing
