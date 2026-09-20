@@ -1,0 +1,995 @@
+openapi: 3.0.3
+info:
+  title: Restaurant Ops — Backend Integration Manifest
+  version: "0.2.0"
+  description: |
+    Contract the frontend needs from the backend to finish the restaurant-ops
+    redesign. Generated from the CURRENT frontend mock services/types under
+    `src/features/{menu,tables,orders,storefront,table-menu}` and
+    `src/types/{menu,tables,orders}.ts`, cross-checked against
+    `docs/superpowers/specs/2026-09-09-restaurant-ops-redesign-design.md`
+    (source of truth for the target concept) and
+    `docs/superpowers/plans/RESTAURANT-OPS-ROADMAP.md` (phase status).
+
+    Scope of this file: ONLY the endpoints still backed by mock data as of
+    2026-09-14 — Menu, Tables, Orders, and their public (unauthenticated)
+    counterparts for the storefront/QR-table flow. `Team` (`/users`,
+    `/admin/users/*`), `Roles` (`/roles`), and `Audit Log`
+    (`/admin/identity-audit`) are a REAL, already-working backend
+    (confirmed live against `/api/v3/api-docs` during Phase 5) — not included
+    here, no changes needed there.
+
+    Not modeled as REST endpoints in this file (backend/integration work, not
+    frontend-actionable — see design spec "Backend gaps" #5/#6):
+      - Payment processor integration (card/PIX) for Online-channel checkout.
+        Processor TBD (Stripe / Mercado Pago / PIX-specific). Frontend only
+        needs `Order.paymentStatus` to reflect the outcome; the checkout flow
+        itself (redirect/SDK/webhook) depends entirely on which processor is
+        chosen, so its contract isn't specified yet.
+      - WhatsApp notification on every order status change. This is a
+        backend-triggered side effect of `PATCH /orders/{id}/status`, not
+        something the frontend calls — no request/response contract to add
+        here beyond the status endpoint already below. Provider TBD (Meta
+        Cloud API vs. a Twilio-equivalent).
+
+    Field-level caveat: request/response shapes below reflect the frontend's
+    MOCK data shapes (its intended target contract), not a backend already
+    confirmed live for these resources — unlike Administration (Phase 5),
+    nobody has checked these against a running `/api/v3/api-docs` yet.
+    Pagination, sort order, and exact error payloads are assumed from how the
+    UI already consumes the mock data and should be confirmed/adjusted during
+    backend implementation, not treated as binding.
+
+    ── Read this first (added in 0.2.0) ─────────────────────────────────────
+    STATUS LEGEND. Unless a path/schema carries `x-status`, it is the default:
+    the frontend's MOCK-backed TARGET contract (not yet implemented by the
+    backend). Otherwise:
+      - `live`          exists in the running backend today (verified against `/api/v3/api-docs`).
+      - `target-change` exists live but the frontend needs it CHANGED — the change is described here.
+      - `proposed`      new resource the frontend needs; shape is a proposal, confirm before building.
+
+    LIVE BASELINE (verified 2026-09-19 against http://localhost:8080/api/v3/api-docs):
+      - Base path is `/api` with NO version segment (`servers[0].url`). This file's earlier
+        `/api/v1` was wrong; corrected in 0.2.0 (see x-changelog). The `TODO: connect-backend —
+        /api/v1/...` comments in frontend services are superseded by this and get fixed when each
+        service is wired.
+      - `/orders` and `/products` already exist with a LEGACY shape: OrderResponse
+        {id:int64, orderNumber, status: PENDING|PROCESSING|SHIPPED|DELIVERED|CANCELLED, customerId,
+        totalAmount, items[{productId, quantity, unitPrice, subtotal}], createdAt(date-time), updatedAt};
+        list endpoints are paginated (PagedResultOrderResponse / PagedResultProductResponse);
+        `GET /orders/search` takes orderNumber/status/customerId. Products require `sku`.
+        The Order/MenuItem schemas below are the TARGET that REPLACES these (breaking; see
+        OrderStatus). Ids are int64 live but `string` in the frontend types — see x-open-decisions.
+      - Auth (`/auth/*`), `/me`, `/me/profile`, `/users`, `/roles`, `/admin/*` are live; only Auth
+        has a pending change (tag `Auth`).
+
+    KEEPING THIS FILE CURRENT — see `x-maintenance` at the bottom. Short version: patch only what a
+    decision touches, bump `info.version`, add an `x-changelog` entry, never rewrite untouched parts.
+
+servers:
+  - url: /api
+    description: >
+      Same host, auth and base path as the live backend (`/auth`, `/me`, `/users`, `/orders`...).
+      Customer-facing endpoints live under `/public/*` (paths below already include the prefix);
+      they are unauthenticated (permitAll) and power /storefront, /table-menu?table=<id> and
+      /track-order, all rendered OUTSIDE the authenticated app shell. A `/public/*` endpoint must
+      never reuse an admin-scoped one or leak admin-only fields (full table roster, stockQuantity
+      internals).
+
+tags:
+  - name: Menu
+    description: Canonical MenuItem catalog — owned by features/menu, consumed by Storefront, KDS, Orders, and the Tables QR view.
+  - name: Tables
+    description: Table CRUD + QR code target, owned by features/tables.
+  - name: Orders
+    description: Unified Order model — single source for Orders (back-office), KDS (kitchen queue filter), Analytics, and Home.
+  - name: Public Storefront
+    description: Unauthenticated customer-facing endpoints for the Online channel, the QR-tagged table menu view and order tracking.
+  - name: Auth
+    description: LIVE endpoints with a TARGET CHANGE (x-status target-change) — identity claims in the JWT, refresh token moved to an HttpOnly cookie, CORS with credentials.
+  - name: Menu Categories
+    description: Managed category list behind MenuItem.category (x-status proposed) — used by the Menu category manager.
+  - name: Restaurant Settings
+    description: Storefront branding, WhatsApp number and delivery zones (x-status proposed) — today persisted only in the browser's localStorage.
+
+components:
+  schemas:
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+          description: 'Machine-readable error code the frontend maps to translated copy (additive in 0.2.0). Known: categoryNameRequired, categoryNameTaken, categoryInUse.'
+        details:
+          type: object
+          additionalProperties: true
+
+    SizeOption:
+      type: object
+      required: [id, label, price]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        price: { type: number, format: double }
+
+    AddonOption:
+      type: object
+      required: [id, label, price]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        price: { type: number, format: double }
+        maxQuantity:
+          type: integer
+          minimum: 1
+          description: Optional cap on how many units of this addon one order line may carry. Absent = unlimited. Added in 0.2.0 (frontend AddonOption.maxQuantity).
+
+    MenuItem:
+      type: object
+      description: >
+        Extends the current backend's ProductRequest/ProductResponse
+        (name/sku/description/price/stockQuantity) with category, image,
+        available, and sizes/addons — see design spec "Backend gaps" #2.
+        `stockQuantity` doubles as the restaurant's inventory count; there is
+        no separate ingredient-level inventory model.
+      required: [id, name, description, category, price, image, stockQuantity, available]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        category:
+          type: string
+          description: Free-text grouping label used for filtering (e.g. "Appetizers", "Mains", "Drinks"). Now backed by the managed list in `/menu-categories` (0.2.0) - the value MUST match an existing category name; renaming a category rewrites this field on every item that uses it. Still transported as the category NAME (see x-open-decisions on name vs id).
+        price: { type: number, format: double }
+        image:
+          type: string
+          format: uri
+          description: Image URL. Upload/storage mechanism (S3, local, CDN) not specified by the frontend — same asset-upload pattern as Profile's avatar upload may apply.
+        stockQuantity:
+          type: integer
+          description: Current count available. 0 does not automatically mean unavailable — `available` is a separate manual toggle ("86'd").
+        available:
+          type: boolean
+          description: Manual 86-toggle, independent of stockQuantity. MUST be false to hide the item from every customer-facing (non-admin) view — enforced today in table-menu/storefront filtering client-side; consider also enforcing server-side on the public endpoints so a stale/compromised client can't leak 86'd items.
+        sizes:
+          type: array
+          items: { $ref: '#/components/schemas/SizeOption' }
+        addons:
+          type: array
+          items: { $ref: '#/components/schemas/AddonOption' }
+
+    MenuItemCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/MenuItem'
+      description: Same shape as MenuItem, minus `id` (server-assigned).
+
+    Table:
+      type: object
+      required: [id, name, qrCodeUrl]
+      properties:
+        id: { type: string }
+        name:
+          type: string
+          description: e.g. "Table 4", "Patio 2". No occupancy/status tracking in this pass (explicitly out of scope per design spec).
+        qrCodeUrl:
+          type: string
+          description: Currently frontend-generated client-side pointing at `/table-menu?table=<id>`; confirm whether QR generation should move server-side (e.g. if a print/export endpoint is added later) or stay a frontend concern.
+
+    OrderChannel:
+      type: string
+      enum: [Online, Dine-in, Phone]
+      description: Online = self-service via the shared link. Dine-in = waiter enters after customer views the QR menu. Phone = staff enters on the customer's behalf. All three funnel into one Order model and one KDS queue.
+
+    Fulfillment:
+      type: string
+      enum: [Pickup, Delivery]
+      description: Applies to Online/Phone orders only. Dine-in orders carry `table` instead — the two fields are mutually exclusive by channel, not independently optional.
+
+    OrderStatus:
+      type: string
+      enum: [New, Preparing, Ready, Completed, Cancelled]
+      description: >
+        Single enum across all channels — meaning adapts per channel rather
+        than needing per-channel values: Ready = ready to serve (Dine-in) /
+        ready for pickup (Pickup) / ready for courier (Delivery). Completed =
+        served / picked up / handed off. Replaces the current backend's
+        PENDING|PROCESSING|SHIPPED|DELIVERED|CANCELLED (see design spec
+        "Backend gaps" #1) — this is a breaking enum rename, not additive.
+        A status change here (from either the Orders admin page or KDS) must
+        trigger the WhatsApp notification side-effect described in info.description.
+
+    PaymentStatus:
+      type: string
+      enum: [Paid, Pending, PayLater]
+      description: >
+        Online orders require payment before confirmation (Paid/Pending). Dine-in/Phone default to
+        PayLater (settled at the table or over the phone) since staff already handles those directly.
+        The mock storefront sets Cash -> PayLater and PIX/Card -> Paid immediately at creation (there is
+        no processor). Real flow: PIX/Card orders start Pending and flip to Paid on processor
+        confirmation; the storefront already has a `pixWaiting` screen that needs a status to poll
+        (GET /public/orders/{id}?phone=). Sequencing depends on the processor (see info.description).
+
+    Modifier:
+      type: object
+      required: [label, price]
+      properties:
+        label: { type: string }
+        price: { type: number, format: double }
+
+    OrderLine:
+      type: object
+      required: [menuItemId, name, quantity, unitPrice]
+      properties:
+        menuItemId:
+          type: string
+          description: Must reference an existing MenuItem id. `name`/`unitPrice` are captured at order time (price snapshot) — not re-derived from the live MenuItem, so later menu price/name edits don't retroactively change past orders.
+        name: { type: string }
+        quantity: { type: integer, minimum: 1 }
+        unitPrice: { type: number, format: double }
+        modifiers:
+          type: array
+          items: { $ref: '#/components/schemas/Modifier' }
+
+    Order:
+      type: object
+      description: >
+        Single unified model replacing the current backend's Order plus the
+        frontend's now-retired KdsTicket — KDS is a filtered
+        (New/Preparing/Ready), kitchen-oriented view of this same stream, not
+        a separate dataset. See design spec "Backend gaps" #1/#3.
+      required: [id, channel, customerName, customerPhone, items, status, paymentStatus, createdAt, total]
+      properties:
+        id:
+          type: string
+          description: 'Currently client-generated in the mock as `{PREFIX}-{year}-{random}` (DEL/DIN/PHN per channel) — server-side generation is expected once wired to a real backend; frontend does not need a specific format, just a stable unique id.'
+        channel: { $ref: '#/components/schemas/OrderChannel' }
+        fulfillment:
+          allOf: [{ $ref: '#/components/schemas/Fulfillment' }]
+          description: Present only when channel is Online or Phone.
+        table:
+          type: string
+          description: Table id reference, present only when channel is Dine-in.
+        customerName:
+          type: string
+          description: 'New concept: anonymous customer captured per-order (design spec "Backend gaps" #3), distinct from the RBAC `User`/staff accounts — customers never appear in /users.'
+        customerPhone:
+          type: string
+          description: WhatsApp target for status notifications.
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OrderLine' }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        paymentStatus: { $ref: '#/components/schemas/PaymentStatus' }
+        paymentMethod:
+          allOf: [{ $ref: '#/components/schemas/PaymentMethod' }]
+          description: Set on Online orders (storefront checkout) and optionally on staff-entered ones. Added in 0.2.0.
+        cardType:
+          allOf: [{ $ref: '#/components/schemas/CardType' }]
+          description: Only when paymentMethod is Card.
+        changeFor:
+          type: number
+          format: double
+          description: Only when paymentMethod is Cash — the banknote value the customer will pay with, so the courier brings change. When present it must be >= total.
+        deliveryZone:
+          type: string
+          description: Neighborhood name captured at order time (snapshot, like OrderLine.name). Required when fulfillment is Delivery; the server must resolve it against an ACTIVE DeliveryZone and derive the fee itself.
+        etaMinutes:
+          type: integer
+          description: Promised ETA captured at order time. Delivery = the zone's etaMinutes; Pickup = the restaurant's pickup ETA (a frontend constant today, PICKUP_ETA_MINUTES).
+        createdAt:
+          type: string
+          description: 'Date-only in the current mock fixture (not a full timestamp) — confirm whether the real backend should capture full datetime; several derived views (Analytics revenue-over-time, Home "today" snapshot) currently key off exact date-string equality, so a format change is a breaking change for those consumers, not just this schema. Home earnings (today / last 7 days / this month plus deltas vs the previous period) compare this value as a `YYYY-MM-DD` string (`===`, `>`, `startsWith(YYYY-MM)`); a full datetime breaks the equality check. Open decision: keep it date-only, or send a datetime and let the frontend derive the restaurant-local date (needs the restaurant timezone).'
+        total:
+          type: number
+          format: double
+          description: Order total. Not verified server-side today (mock trusts the client-computed sum) — recommend the backend compute/validate this from `items` rather than accepting a client-supplied total, to avoid price tampering. It INCLUDES the delivery fee (the storefront sums cartTotal + zone.feeAmount for Delivery), so the server must add the active zone's fee itself.
+
+    OrderCreateRequest:
+      allOf:
+        - $ref: '#/components/schemas/Order'
+      description: Same shape as Order, minus `id` (server-assigned).
+
+    OrderStatusUpdateRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { $ref: '#/components/schemas/OrderStatus' }
+
+    PaymentMethod:
+      type: string
+      enum: [PIX, Card, Cash]
+
+    CardType:
+      type: string
+      enum: [Credit, Debit]
+
+    DeliveryZone:
+      type: object
+      description: 'x-status proposed. Today lives in browser localStorage (Preferences > Delivery zones) and is consumed by the storefront checkout and staff order creation.'
+      required: [id, neighborhood, feeAmount, etaMinutes, active]
+      properties:
+        id: { type: string }
+        neighborhood: { type: string, description: 'Shown to the customer and copied into Order.deliveryZone at order time.' }
+        feeAmount: { type: number, format: double, minimum: 0 }
+        etaMinutes: { type: integer, minimum: 1 }
+        active: { type: boolean, description: 'Inactive zones are hidden from the storefront and rejected on order creation.' }
+
+    DeliveryZoneInput:
+      type: object
+      required: [neighborhood, feeAmount, etaMinutes, active]
+      properties:
+        neighborhood: { type: string }
+        feeAmount: { type: number, format: double, minimum: 0 }
+        etaMinutes: { type: integer, minimum: 1 }
+        active: { type: boolean }
+
+    RestaurantSettings:
+      type: object
+      description: 'x-status proposed. The storefront-facing subset of the frontend PreferencesState (storefrontLogo, storefrontCover, storefrontBrandColor, whatsappNumber). Per-user UI preferences (theme, font size, language, dense table, sidebar...) are NOT part of this — they stay client-side.'
+      properties:
+        logoUrl: { type: string, format: uri, nullable: true }
+        coverUrl: { type: string, format: uri, nullable: true }
+        brandColor: { type: string, description: 'Hex color, e.g. #0f172a.' }
+        whatsappNumber: { type: string, description: 'Number the storefront and status notifications use, digits with country code.' }
+
+    PublicRestaurantSettings:
+      type: object
+      description: 'What an unauthenticated customer may see: branding, the WhatsApp number and ONLY the active delivery zones.'
+      properties:
+        logoUrl: { type: string, format: uri, nullable: true }
+        coverUrl: { type: string, format: uri, nullable: true }
+        brandColor: { type: string }
+        whatsappNumber: { type: string }
+        deliveryZones:
+          type: array
+          items: { $ref: '#/components/schemas/DeliveryZone' }
+
+    MenuCategory:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, description: 'Trimmed, non-empty, unique case-insensitively.' }
+
+    AuthRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+
+    AuthResponse:
+      type: object
+      x-status: target-change
+      description: >
+        TARGET: only the access token in the body. The refresh token is delivered as an HttpOnly cookie
+        (see the Set-Cookie header on each /auth response) and is never readable by the frontend.
+        LIVE today: {accessToken, refreshToken} both in the body and both kept in localStorage.
+      required: [accessToken]
+      properties:
+        accessToken: { type: string, description: 'JWT, 24h lifetime today (do not change without notice). Sent as Authorization: Bearer.' }
+
+    JwtClaims:
+      type: object
+      x-status: target-change
+      description: >
+        Payload of the access token, documented so the frontend and backend agree. LIVE claims: roles,
+        userId, sub, iat, exp (verified 2026-09-19). NEW in 0.2.0: firstName, lastName, email — they let
+        the UI greet the user on the very first render, including after F5, with no /me/profile round
+        trip. The payload is only base64, so display data ONLY (never phone, address or anything sensitive).
+        Names are not re-issued when PATCH /me changes them; the UI corrects itself from GET /me/profile.
+      properties:
+        sub: { type: string }
+        userId: { type: integer, format: int64 }
+        roles: { type: array, items: { type: string }, description: 'e.g. ["SUPER_ADMIN"]. The frontend also accepts role / authorities shapes and a ROLE_ prefix.' }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email }
+        iat: { type: integer }
+        exp: { type: integer }
+
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      x-status: target-change
+      summary: Log in
+      description: >
+        LIVE today returns {accessToken, refreshToken} in the body. TARGET: accessToken in the body,
+        refresh token via Set-Cookie only. Access token carries the identity claims in JwtClaims.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuthRequest' }
+      responses:
+        '200':
+          description: OK
+          headers:
+            Set-Cookie:
+              description: 'refreshToken=<opaque>; HttpOnly; Secure (configurable in dev without HTTPS); SameSite=Lax; Path=/api/auth; Max-Age=<refresh lifetime>'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { description: Invalid credentials, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      x-status: target-change
+      summary: Register — same response contract as /auth/login (body + refresh cookie)
+      description: Request body is unchanged from live (firstName, lastName, email, password — all required).
+      responses:
+        '200':
+          description: OK
+          headers:
+            Set-Cookie:
+              description: 'refreshToken=<opaque>; HttpOnly; Secure (configurable in dev without HTTPS); SameSite=Lax; Path=/api/auth; Max-Age=<refresh lifetime>'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      x-status: target-change
+      summary: Rotate the refresh token and issue a new access token
+      description: >
+        LIVE today takes {refreshToken} in the body. TARGET: no body; the refresh token is read from the
+        HttpOnly cookie. Rotate on every call (old token invalidated, new cookie set). Reuse of an already
+        rotated token must revoke the whole token family. The frontend calls this once at boot (the access
+        token lives only in memory, so F5 loses it) and on any 401. CORS must allow credentials and the
+        exact frontend origin; validate the Origin header and require Content-Type application/json —
+        this endpoint and /auth/logout are the only ones that depend on a cookie, so they are the only
+        CSRF surface (the rest authenticate with the Authorization header).
+      responses:
+        '200':
+          description: OK
+          headers:
+            Set-Cookie:
+              description: 'refreshToken=<opaque>; HttpOnly; Secure (configurable in dev without HTTPS); SameSite=Lax; Path=/api/auth; Max-Age=<refresh lifetime>'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { description: 'Cookie missing, invalid, expired or already used', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '403': { description: Origin not allowed, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      x-status: target-change
+      summary: Revoke the refresh token and clear the cookie
+      description: >
+        LIVE takes {refreshToken} in the body (the frontend now calls it with that body since 2026-09-19).
+        TARGET: read it from the cookie, revoke server-side, answer with Set-Cookie ... Max-Age=0 (same
+        Path and attributes). Stays idempotent: 200 even when there is no cookie.
+      responses:
+        '200':
+          description: OK
+          headers:
+            Set-Cookie:
+              description: 'refreshToken=; Max-Age=0; HttpOnly; Secure; SameSite=Lax; Path=/api/auth'
+              schema: { type: string }
+
+  /menu-items:
+    get:
+      tags: [Menu]
+      summary: List menu items (admin — includes unavailable/86'd items)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MenuItem' }
+    post:
+      tags: [Menu]
+      summary: Create menu item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MenuItemCreateRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MenuItem' }
+        '400':
+          description: Validation error (e.g. blank name/price — enforced client-side today, should also be enforced server-side)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /menu-items/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Menu]
+      summary: Update menu item (including the 86-toggle via `available`)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MenuItem' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MenuItem' }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    delete:
+      tags: [Menu]
+      summary: Delete menu item
+      description: 'No usage-check specified by the frontend — confirm with backend whether deleting a MenuItem referenced by past OrderLine records should be blocked, soft-deleted, or allowed (OrderLine snapshots name/unitPrice already, so past orders would be unaffected either way).'
+      responses:
+        '204': { description: Deleted }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /tables:
+    get:
+      tags: [Tables]
+      summary: List tables (admin)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Table' }
+    post:
+      tags: [Tables]
+      summary: Create table
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Table' }
+
+  /tables/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [Tables]
+      summary: Delete table
+      description: Confirm whether a Table referenced by an in-flight (non-terminal-status) Dine-in Order should block deletion — unspecified by the current mock.
+      responses:
+        '204': { description: Deleted }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /orders:
+    get:
+      tags: [Orders]
+      summary: List orders (admin/staff — Orders back-office and KDS both read this)
+      description: >
+        The mock returns the full unfiltered list and lets the frontend
+        filter client-side (KDS filters to New/Preparing/Ready; Analytics/
+        Home compute aggregates from the full set). At real data volume this
+        should almost certainly support server-side filtering/pagination —
+        confirm query params with backend rather than assuming the ones
+        listed below, which are proposed, not confirmed against a live spec.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: array
+            items: { $ref: '#/components/schemas/OrderStatus' }
+          style: form
+          explode: true
+          description: 'Proposed — needed so KDS can request only New/Preparing/Ready server-side instead of over-fetching.'
+        - name: channel
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/OrderChannel' }
+          description: Proposed.
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0 }
+          description: 'Proposed — no pagination in the mock today (small fixture size). Follow the same paginated-list pattern already established by GET /users (Phase 5) if adopted.'
+        - name: size
+          in: query
+          required: false
+          schema: { type: integer }
+          description: Proposed.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Order' }
+    post:
+      tags: [Orders]
+      summary: Create order (staff-entered Dine-in/Phone; Online orders are created via the public endpoint below)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderCreateRequest' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+
+  /orders/{id}/status:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Orders]
+      summary: Update order status
+      description: >
+        Callable from both the Orders admin page and KDS (same endpoint,
+        same record) — whichever caller changes it should trigger the
+        WhatsApp notification side effect (see info.description). No
+        transition-validity rules are enforced in the current mock (any
+        status can go to any other); confirm with backend whether e.g.
+        Completed→New should be rejected.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderStatusUpdateRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /menu-categories:
+    get:
+      tags: [Menu Categories]
+      x-status: proposed
+      summary: List categories
+      description: 'Ordered by creation. The frontend maps the objects to a plain string list today (features/menu/services/menu.service.ts getCategories).'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MenuCategory' }
+    post:
+      tags: [Menu Categories]
+      x-status: proposed
+      summary: Create category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MenuCategory' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MenuCategory' }
+        '400': { description: Blank name (code categoryNameRequired), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: Name already exists, case-insensitive (code categoryNameTaken), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /menu-categories/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { type: string }
+        description: 'URL-encoded category name. Name-as-identifier is what the frontend uses today; see x-open-decisions.'
+    patch:
+      tags: [Menu Categories]
+      x-status: proposed
+      summary: Rename category
+      description: 'Renaming MUST atomically rewrite MenuItem.category on every item that used the old name. Renaming to the same name with different casing is allowed.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MenuCategory' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MenuCategory' }
+        '400': { description: Blank name (categoryNameRequired), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: Name already taken by another category (categoryNameTaken), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    delete:
+      tags: [Menu Categories]
+      x-status: proposed
+      summary: Delete category
+      description: 'Blocked while any MenuItem still uses it — the UI expects a 409 with code categoryInUse and never cascades or reassigns items.'
+      responses:
+        '204': { description: Deleted }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: Category still in use (categoryInUse), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /delivery-zones:
+    get:
+      tags: [Restaurant Settings]
+      x-status: proposed
+      summary: List delivery zones (admin — includes inactive)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DeliveryZone' }
+    post:
+      tags: [Restaurant Settings]
+      x-status: proposed
+      summary: Create delivery zone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeliveryZoneInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryZone' }
+
+  /delivery-zones/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Restaurant Settings]
+      x-status: proposed
+      summary: Update delivery zone (fee, ETA, active toggle)
+      description: 'Past orders are unaffected: Order.deliveryZone, etaMinutes and total are snapshots.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeliveryZoneInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryZone' }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    delete:
+      tags: [Restaurant Settings]
+      x-status: proposed
+      summary: Delete delivery zone
+      responses:
+        '204': { description: Deleted }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /restaurant-settings:
+    get:
+      tags: [Restaurant Settings]
+      x-status: proposed
+      summary: Read storefront branding and WhatsApp number (admin)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RestaurantSettings' }
+    patch:
+      tags: [Restaurant Settings]
+      x-status: proposed
+      summary: Update storefront branding and WhatsApp number
+      description: 'Logo/cover are data URLs in localStorage today; a real upload mechanism (like POST /me/profile/avatar) is an open decision.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RestaurantSettings' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RestaurantSettings' }
+
+  /public/menu-items:
+    get:
+      tags: [Public Storefront]
+      summary: List menu items for customers (storefront + QR table view)
+      description: MUST be filtered server-side to `available === true` — the current mock filters client-side after fetching the full admin list, which is fine for a mock but would leak 86'd items (and internal stockQuantity precision) to an unauthenticated caller against a real backend.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MenuItem' }
+
+  /public/tables/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Public Storefront]
+      summary: Look up one table by id, for the QR-scanned table-name banner
+      description: >
+        MUST be a dedicated public, single-table lookup — the current mock
+        fetches the ENTIRE admin table roster and finds one client-side
+        (`tableMenuService.getTable`, explicitly flagged as a TODO not to
+        wire to the admin GET /tables). Do not expose the full table list to
+        this unauthenticated route.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Table' }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  /public/restaurant-settings:
+    get:
+      tags: [Public Storefront]
+      x-status: proposed
+      summary: Branding, WhatsApp number and ACTIVE delivery zones for the storefront and checkout
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicRestaurantSettings' }
+
+  /public/orders:
+    post:
+      tags: [Public Storefront]
+      summary: Customer places an Online order (storefront checkout)
+      description: >
+        Built in the frontend (2026-09): /storefront runs cart -> checkout ->
+        PIX waiting -> success and today calls the mock ordersService.createOrder.
+        The checkout collects customerName, customerPhone, fulfillment,
+        deliveryZone (Delivery only), paymentMethod, cardType (Card) and
+        changeFor (Cash); it sends items plus those fields and does NOT need
+        the client to be trusted for total, etaMinutes or paymentStatus — the
+        server should derive all three (total = items + zone fee).
+        `channel` is implicitly "Online" and should probably be
+        server-assigned rather than client-supplied on this public endpoint,
+        to prevent a customer spoofing Dine-in/Phone. Payment sequencing
+        (pay-then-create vs. create-then-pay) depends entirely on the
+        payment processor chosen — flagged as a dependency, not specified here.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/OrderCreateRequest'
+              description: 'channel is expected to be fixed to "Online" server-side regardless of what the client sends.'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+
+  /public/orders/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: phone
+        in: query
+        required: true
+        schema: { type: string }
+        description: 'Required as a lookup credential since customers have no login — must match the order''s customerPhone or the lookup should 404/403, to avoid letting anyone guess an order id and see another customer''s order.'
+    get:
+      tags: [Public Storefront]
+      summary: Customer-facing order status lookup (no login)
+      description: 'Built in the frontend as /track-order (order id + phone form), currently filtering the mock order list client-side. The storefront pixWaiting screen should reuse this same lookup to poll paymentStatus.'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '403':
+          description: Phone does not match this order's customerPhone
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+x-out-of-scope-for-this-manifest:
+  - Team/Roles/Audit Log — already real (GET /users, POST /admin/users, PATCH /admin/users/{id}, PATCH /admin/users/{id}/role, deactivate/reactivate/resend-setup-email, GET /roles, GET /admin/identity-audit). No changes needed; see Phase 5 in RESTAURANT-OPS-ROADMAP.md.
+  - Analytics & Home dashboard — currently 100% derived client-side from GET /orders + GET /menu-items (see analytics.service.ts / home.service.ts). No dedicated backend endpoint is required for the v1 scope. Home semantics the frontend computes today (so a future aggregate endpoint can match them) - "today" = the newest createdAt date present in the data (a mock artifact — production should use the restaurant-local calendar date); "last 7 days" = 7 calendar days ending today (not the calendar week); "this month" = the calendar month of today; each compared with the previous equivalent period (yesterday / the 7 days before / last month); Cancelled orders excluded from earnings; in-progress counts (New/Preparing/Ready) span all dates; if order volume later makes client-side aggregation too slow, revisit as a backend aggregate-endpoint addition, not a blocker now.
+  - Notifications/Settings/Preferences (security panel, API keys, sessions) — pre-existing generic account features, not part of the restaurant-ops redesign scope; Preferences' NEW branding/ordering-link fields ARE in scope and now have a proposal (`/restaurant-settings`, `/delivery-zones` and `/public/restaurant-settings`; x-status proposed, localStorage only until built). Everything else in Preferences (theme, font size, language, timezone, date format, currency, sidebar, dense table...) stays per-user and client-side.
+  - Payment processor integration and WhatsApp notification integration — see info.description; external dependency, processor/provider TBD, not modeled as REST paths here.
+
+x-open-decisions:
+  - id: base-path
+    status: decided-2026-09-19
+    text: 'Base path is /api (no /v1), matching the live backend and the frontend axios baseURL. Reopen only if the backend chooses to introduce versioning; then every path here and the frontend baseURL change together.'
+  - id: id-type
+    status: open
+    text: 'Live ids are int64; frontend types use string ids (mock ids like DEL-2026-8123 and slugs). Decide: backend keeps int64 and the frontend types become number, or the API exposes string ids. Order.id may stay a human-readable orderNumber string either way.'
+  - id: category-identity
+    status: open
+    text: 'Categories are addressed by NAME in the path and in MenuItem.category. Rename cascades to items; names with slashes or special characters need URL-encoding. Consider adding a stable id later (additive: MenuCategory {id, name}).'
+  - id: created-at-format
+    status: open
+    text: 'Order.createdAt is date-only in the mock; Home earnings compare it as a YYYY-MM-DD string. Keep date-only or send a datetime plus the restaurant timezone (see the Order.createdAt note).'
+  - id: payment-sequencing
+    status: open
+    text: 'Mock marks PIX/Card orders Paid immediately. Real sequencing (pay-then-create vs create-then-pay, webhook to flip Pending -> Paid) depends on the processor, which is TBD.'
+  - id: settings-images
+    status: open
+    text: 'Storefront logo/cover are data URLs in localStorage. Needs an upload endpoint (like POST /me/profile/avatar) before /restaurant-settings can return real URLs.'
+  - id: dev-cookie-secure
+    status: open
+    text: 'HttpOnly refresh cookie needs Secure in production; in local HTTP dev it must be configurable. localhost:3000 (frontend) and localhost:8080 (API) are the same SITE for SameSite, but CORS still needs the exact origin http://localhost:3000. If production serves front and API from different registrable domains, SameSite=None; Secure plus an anti-CSRF token become mandatory.'
+
+x-maintenance:
+  canonical-copy: 'order-ui/docs/superpowers/specs/2026-09-14-backend-integration-manifest.openapi.yaml in the frontend repo. Any copy saved in the backend repo is a snapshot: re-copy it when the version changes, and if the backend changes something here, report it back so the canonical copy is patched.'
+  source-of-truth-order: '1) live /api/v3/api-docs for anything x-status live/target-change; 2) frontend src/types/* and services for the mock-backed target shapes; 3) docs/superpowers/specs/2026-09-09-restaurant-ops-redesign-design.md for the concept.'
+  rules:
+    - 'Patch, never rewrite: edit only the schema/path a decision touches; leave every other line byte-identical.'
+    - 'Every change bumps info.version (patch = clarification, minor = additive or new endpoint, major = breaking) and adds an x-changelog entry at the TOP with date, version, what and why.'
+    - 'Mark status with x-status (live | target-change | proposed); no marker = mock-backed target contract.'
+    - 'A decision that is not final goes in x-open-decisions, not silently into a schema. When it is decided, flip its status and reflect it in the affected schema in the same change.'
+    - 'Never delete a superseded decision: record it in x-changelog with the reason, then update the schema.'
+    - 'When a mock-backed service is wired to the real backend, verify against live api-docs, then flip x-status to live and note any drift in x-changelog.'
+    - 'Keep the file valid OpenAPI 3.0.3 YAML; validate after editing.'
+
+x-changelog:
+  - version: "0.2.0"
+    date: 2026-09-19
+    changes:
+      - 'Base path corrected to /api (was /api/v1); servers reduced to one, the second server duplicated the /public prefix already in the paths.'
+      - 'Added Auth target change: JWT identity claims (firstName, lastName, email), refresh token in HttpOnly cookie, /auth/refresh and /auth/logout read the cookie, CORS with credentials, Origin check as the CSRF defense.'
+      - 'Menu: AddonOption.maxQuantity; managed category CRUD (/menu-categories) with rename cascade and 409 categoryInUse; Error.code added.'
+      - 'Orders: paymentMethod, cardType, changeFor, deliveryZone, etaMinutes added; total includes the delivery fee; createdAt format note tied to Home earnings; paymentStatus sequencing note.'
+      - 'Proposed: /delivery-zones, /restaurant-settings, /public/restaurant-settings (storefront branding, WhatsApp number, active zones).'
+      - 'Public orders: storefront checkout and /track-order are built in the frontend (descriptions updated, contract unchanged).'
+      - 'Documented the live baseline (legacy /orders and /products shape) and the Home earnings semantics; added x-open-decisions and x-maintenance.'
+    why: 'Bring the manifest in line with the frontend as of 2026-09-19 and the auth decisions taken in this session, so the backend can implement against one accurate file.'
+    breaking: 'Auth response drops refreshToken from the body (coordinated switch with the frontend); paths lose the /v1 segment.'
+  - version: "0.1.0"
+    date: 2026-09-14
+    changes:
+      - 'Initial manifest generated from the frontend mock services and types (Menu, Tables, Orders, public storefront).'
