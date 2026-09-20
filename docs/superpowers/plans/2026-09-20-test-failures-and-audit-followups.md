@@ -5,16 +5,61 @@
 
 ## Status
 
-**Phase A is COMPLETE** — commits `8d135bf..9e520f4`, 2026-09-20. `./gradlew test` is
-**189 tests, 0 failures, 0 errors**, the repo's first fully green run. Do not redo Tasks 1–5.
+**COMPLETE** — both phases. `./gradlew test` is **208 tests, 0 failures, 0 errors**.
 
-One correction worth carrying forward: Task 3's advice ordering was applied backwards on the
-first attempt (`GlobalExceptionHandler` first), which let its `RuntimeException` catch-all
+| Task | Commit | Notes |
+|---|---|---|
+| 1–5 (Phase A) | `8d135bf..9e520f4` | 189/189, the repo's first fully green run |
+| 6 — fail-closed list scoping | `76cc3ae` | as written |
+| 7 — narrow the orders endpoints | `b97b795` | as written; `OrderControllerIT` passed unchanged |
+| 8 — phantom stock + server-side pricing | `f09befa` | three deviations, below |
+| 9 — env-driven root super admin | `9069ed7` | three deviations, below |
+
+Phase A correction worth carrying forward: Task 3's advice ordering was applied backwards on
+the first attempt (`GlobalExceptionHandler` first), which let its `RuntimeException` catch-all
 swallow `AccessDeniedException`, `IllegalArgumentException` and the token/refresh exceptions —
 16 failures instead of 5. The working arrangement is `AuthExceptionHandler` `@Order(1)` with
 **no** catch-all, `GlobalExceptionHandler` `@Order(2)` owning the fallback.
 
-**Phase B (Tasks 6–9) is OUTSTANDING.** Start at Task 6.
+### Deviations from the plan as written
+
+**Task 8.**
+1. The plan's Step 2 did not account for a request that both replaces items *and* cancels.
+   Incrementing stock for the removed items after `handleStatusTransition` had already
+   credited them was a second way to mint stock, so item replacement now runs **before** the
+   status block. `orderMapper.updateEntityFromDto` still runs after `transitionTo` — it
+   copies the requested status straight onto the entity, so ahead of the transition it would
+   make `transitionTo` see an unchanged status and skip the state machine entirely.
+2. Replacing the items of an **already-cancelled** order was a third minting path, reachable
+   because `OrderUpdateRequest.status` is `@NotNull` and `CANCELLED -> CANCELLED` skips the
+   transition. Such an order holds no stock, so item movements on it now move none.
+3. Step 3's decision: `unitPrice` is **accepted and ignored**, not rejected. The manifest
+   declares it required on `OrderLine`, so rejecting it would break the documented contract.
+   No snapshot re-copied — the backend is implementing the manifest's own recommendation
+   (`Order.total`: "recommend the backend compute/validate this from `items`"), and the
+   request shape is unchanged. Worth confirming back to the canonical copy: `OrderLine`'s
+   "not re-derived from the live MenuItem" is about later catalogue edits, which still holds —
+   the price is snapshotted, just from the catalogue rather than from the client.
+
+**Task 9.**
+1. Step 4 claimed `AdminUserUpdateControllerIT` and `AdminUsersControllerIT` exercise the
+   anti-lockout guard. **They do not** — the guard had no coverage anywhere, so binding the
+   address to a property could have disabled it silently. `RootSuperAdminGuardIT` is new and
+   covers all three sites plus a non-root account that must still be deactivatable.
+2. Step 5 said tests were unaffected by V15's checksum change. True only of the
+   `@IntegrationTest` ones: `EnterpriseOrderSuiteApplicationTests` was a bare
+   `@SpringBootTest` booting against whatever database `.env` pointed at, and it failed.
+   Converted to `@IntegrationTest`; it is now the only such test in the tree.
+3. `.env.example` was itself gitignored by the `.env.*` rule, so documenting the new
+   variables there reached nobody. `.gitignore` now negates it; every real env file stays
+   ignored.
+
+### Outstanding for the user
+
+- **`./gradlew flywayRepair`** (or drop the local schema) before the next `bootRun` — editing
+  V15 changed its checksum and the existing local database will fail Flyway validation.
+- **Rotate the exposed super admin password.** The old hash is in git history regardless of
+  this change, so rotation is the step that actually remediates it.
 
 **Goal:** Clear the five long-standing test failures on `feature/ai-agent` by fixing their
 root causes, then action the four follow-ups raised by the `spring-security-reviewer` audit of
@@ -35,8 +80,8 @@ v2 / MinIO, JUnit 5, Mockito, AssertJ, Testcontainers.
   migration or entity schema change. The `PreToolUse` hook will ask for confirmation.
 - 4-space indentation in `src/main`, 2-space in `src/test`.
 - All code and comments in English.
-- **The baseline is 180/185, not green.** Those five failures are the subject of Phase A. Any
-  failure outside the five named here is new and must be fixed, not explained away.
+- ~~**The baseline is 180/185, not green.**~~ Obsolete since Phase A. The baseline is green;
+  any failure is new and must be fixed, not explained away.
 - Run the full `./gradlew test` (Docker required) before any completion claim.
 
 ## Decisions already taken by the user (2026-09-20)
