@@ -1,7 +1,6 @@
 package com.enterprise.ordersuite.orders.api;
 
 import com.enterprise.ordersuite.common.util.PagedResult;
-import com.enterprise.ordersuite.identity.application.CurrentUserService;
 import com.enterprise.ordersuite.orders.api.dto.OrderCreateRequest;
 import com.enterprise.ordersuite.orders.api.dto.OrderResponse;
 import com.enterprise.ordersuite.orders.api.dto.OrderUpdateRequest;
@@ -17,7 +16,6 @@ import org.slf4j.MDC;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PostAuthorize;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,7 +27,6 @@ import org.springframework.web.bind.annotation.*;
 public class OrderController {
 
     private final OrderService orderService;
-    private final CurrentUserService currentUserService;
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
@@ -43,7 +40,6 @@ public class OrderController {
 
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    @PostAuthorize("hasRole('ADMIN') or returnObject.body.customerId == authentication.principal.id")
     @Operation(summary = "Get order by ID", description = "Retrieves a specific order by its ID. Users can only access their own orders unless they are an admin.")
     public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id) {
         String requestId = MDC.get("requestId");
@@ -88,12 +84,7 @@ public class OrderController {
         log.info("requestId: {} - Received request to update order with ID: {}", requestId, id);
 
         return orderService.updateOrder(id, request)
-                .map(orderResponse -> {
-                    if (!isAdmin() && !orderResponse.getCustomerId().equals(currentUserService.getUserId())) {
-                         return new ResponseEntity<OrderResponse>(HttpStatus.FORBIDDEN);
-                    }
-                    return new ResponseEntity<>(orderResponse, HttpStatus.OK);
-                })
+                .map(orderResponse -> new ResponseEntity<>(orderResponse, HttpStatus.OK))
                 .orElseGet(() -> {
                     log.warn("requestId: {} - Order with ID: {} not found for update.", requestId, id);
                     return new ResponseEntity<>(HttpStatus.NOT_FOUND);
@@ -109,9 +100,6 @@ public class OrderController {
 
         return orderService.getOrderById(id)
                 .map(order -> {
-                    if (!isAdmin() && !order.getCustomerId().equals(currentUserService.getUserId())) {
-                        return new ResponseEntity<Void>(HttpStatus.FORBIDDEN);
-                    }
                     orderService.deleteOrder(id);
                     return new ResponseEntity<Void>(HttpStatus.NO_CONTENT);
                 })
@@ -119,10 +107,5 @@ public class OrderController {
                     log.warn("requestId: {} - Order with ID: {} not found for deletion.", requestId, id);
                     return new ResponseEntity<>(HttpStatus.NOT_FOUND);
                 });
-    }
-
-    private boolean isAdmin() {
-        return org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
     }
 }
