@@ -1,3 +1,7 @@
 /gradlew text eol=lf
 *.bat text eol=crlf
 *.jar binary
+
+# The API contract snapshot is kept byte-identical to the canonical copy in the
+# frontend repository so re-syncing is a clean diff. CRLF would make every line differ.
+/docs/contracts/*.yaml text eol=lf
