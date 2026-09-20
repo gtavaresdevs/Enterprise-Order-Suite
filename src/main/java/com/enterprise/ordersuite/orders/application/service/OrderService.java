@@ -31,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -96,7 +97,7 @@ public class OrderService {
             return orderRepository.findAll(pageable).map(orderMapper::toResponse);
         } else {
             Long currentUserId = currentUserService.getUserId();
-            return orderRepository.searchOrders(null, null, currentUserId, pageable).map(orderMapper::toResponse);
+            return orderRepository.findByCustomerId(currentUserId, pageable).map(orderMapper::toResponse);
         }
     }
 
@@ -106,7 +107,12 @@ public class OrderService {
         
         Long effectiveCustomerId = customerId;
         if (!isAdmin()) {
-            effectiveCustomerId = currentUserService.getUserId();
+            // searchOrders reads a null customerId as "no filter", so a null here would widen
+            // a non-admin's search to every order in the database. The tenant boundary must
+            // not depend on CurrentUserService never returning null - assert it.
+            effectiveCustomerId = Objects.requireNonNull(
+                    currentUserService.getUserId(),
+                    "A non-admin search must be scoped to a customer id");
             log.info("requestId: {} - Non-admin user detected. Overriding search customerId with current user ID: {}", requestId, effectiveCustomerId);
         }
 

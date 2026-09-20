@@ -15,6 +15,12 @@ import java.util.Optional;
 public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByOrderNumber(String orderNumber);
 
+    // Tenant-scoped listing for non-admins. Deliberately a derived query rather than
+    // searchOrders(null, null, customerId, ...): searchOrders treats a null customerId as
+    // "no filter" and would return every order in the database. This one always compares
+    // against the column, so a null customer id yields nothing - it fails closed.
+    Page<Order> findByCustomerId(Long customerId, Pageable pageable);
+
     // CAST(:orderNumber AS string) is required, not cosmetic: with a null orderNumber
     // Postgres cannot infer the parameter's type inside CONCAT and falls back to bytea,
     // so the query fails with "function lower(bytea) does not exist". The cast pins the

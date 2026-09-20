@@ -331,7 +331,7 @@ class OrderServiceTest {
   }
 
   @Test
-  void getAllOrders_asRegularUser_searchesOnlyCurrentUsersOrders() {
+  void getAllOrders_asRegularUser_listsOnlyCurrentUsersOrders() {
     setAuthenticatedUserAsRegularUser();
 
     PageRequest pageable = PageRequest.of(0, 10);
@@ -349,12 +349,8 @@ class OrderServiceTest {
     Page<Order> orderPage =
       new PageImpl<>(List.of(order), pageable, 1);
 
-    when(orderRepository.searchOrders(
-      null,
-      null,
-      CURRENT_USER_ID,
-      pageable
-    )).thenReturn(orderPage);
+    when(orderRepository.findByCustomerId(CURRENT_USER_ID, pageable))
+      .thenReturn(orderPage);
 
     when(orderMapper.toResponse(order))
       .thenReturn(response);
@@ -366,9 +362,15 @@ class OrderServiceTest {
       .containsExactly(response);
 
     verify(orderRepository)
-      .searchOrders(null, null, CURRENT_USER_ID, pageable);
+      .findByCustomerId(CURRENT_USER_ID, pageable);
 
     verify(orderRepository, never()).findAll(any(Pageable.class));
+
+    // searchOrders treats a null customerId as "no filter"; a non-admin's list must never
+    // be scoped by it, or one null user id away it returns every order in the database.
+    verify(orderRepository, never())
+      .searchOrders(any(), any(), any(), any());
+
     verify(orderMapper).toResponse(order);
   }
 
