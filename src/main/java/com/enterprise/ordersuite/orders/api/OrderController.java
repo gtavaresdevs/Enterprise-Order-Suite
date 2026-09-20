@@ -24,12 +24,16 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Orders", description = "Order Management APIs")
+// Every endpoint here names the roles it admits rather than using isAuthenticated().
+// Under the hierarchy hasAnyRole('USER','ADMIN') is exactly today's behaviour for all
+// three existing roles, but isAuthenticated() would also admit any role added later -
+// the restaurant-ops staff roles would have gained order access on creation.
 public class OrderController {
 
     private final OrderService orderService;
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
     @Operation(summary = "Create a new order", description = "Creates a new order in the system.")
     public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody OrderCreateRequest request) {
         String requestId = MDC.get("requestId");
@@ -39,7 +43,7 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
     @Operation(summary = "Get order by ID", description = "Retrieves a specific order by its ID. Users can only access their own orders unless they are an admin.")
     public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id) {
         String requestId = MDC.get("requestId");
@@ -53,7 +57,7 @@ public class OrderController {
     }
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
     @Operation(summary = "Get all orders", description = "Retrieves a paginated list of all orders. Non-admin users will only see their own orders.")
     public ResponseEntity<PagedResult<OrderResponse>> getAllOrders(Pageable pageable) {
         String requestId = MDC.get("requestId");
@@ -62,7 +66,7 @@ public class OrderController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
     @Operation(summary = "Search orders", description = "Retrieves a paginated list of orders based on search criteria. Non-admin users will only see their own orders.")
     public ResponseEntity<PagedResult<OrderResponse>> searchOrders(
             @RequestParam(required = false) String orderNumber,
@@ -77,7 +81,7 @@ public class OrderController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
     @Operation(summary = "Update an existing order", description = "Updates an existing order identified by its ID. Users can only update their own orders unless they are an admin.")
     public ResponseEntity<OrderResponse> updateOrder(@PathVariable Long id, @Valid @RequestBody OrderUpdateRequest request) {
         String requestId = MDC.get("requestId");
