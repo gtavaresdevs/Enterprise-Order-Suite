@@ -3,6 +3,19 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement
 > this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## Status
+
+**Phase A is COMPLETE** — commits `8d135bf..9e520f4`, 2026-09-20. `./gradlew test` is
+**189 tests, 0 failures, 0 errors**, the repo's first fully green run. Do not redo Tasks 1–5.
+
+One correction worth carrying forward: Task 3's advice ordering was applied backwards on the
+first attempt (`GlobalExceptionHandler` first), which let its `RuntimeException` catch-all
+swallow `AccessDeniedException`, `IllegalArgumentException` and the token/refresh exceptions —
+16 failures instead of 5. The working arrangement is `AuthExceptionHandler` `@Order(1)` with
+**no** catch-all, `GlobalExceptionHandler` `@Order(2)` owning the fallback.
+
+**Phase B (Tasks 6–9) is OUTSTANDING.** Start at Task 6.
+
 **Goal:** Clear the five long-standing test failures on `feature/ai-agent` by fixing their
 root causes, then action the four follow-ups raised by the `spring-security-reviewer` audit of
 the orders authorization refactor.
