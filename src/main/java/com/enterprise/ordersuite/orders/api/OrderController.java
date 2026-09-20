@@ -93,7 +93,7 @@ public class OrderController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Delete an order", description = "Deletes an order identified by its ID. Users can only delete their own orders unless they are an admin.")
+    @Operation(summary = "Delete an order", description = "Deletes an order identified by its ID. Restricted to ADMIN and above; a regular user cannot delete an order, including their own.")
     public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
         String requestId = MDC.get("requestId");
         log.info("requestId: {} - Received request to delete order with ID: {}", requestId, id);
