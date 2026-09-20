@@ -21,7 +21,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +45,7 @@ public class OrderService {
     private final CurrentUserService currentUserService;
     private final ProductService productService;
     private final NotificationService notificationService;
+    private final RoleHierarchy roleHierarchy;
 
     @Transactional
     public OrderResponse createOrder(OrderCreateRequest request) {
@@ -206,9 +209,21 @@ public class OrderService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
+    // Resolves through RoleHierarchy because getAuthorities() returns the raw, un-expanded
+    // list: methodSecurityExpressionHandler applies the hierarchy to @PreAuthorize only, so
+    // a SUPER_ADMIN carries ROLE_SUPER_ADMIN and nothing else. Comparing raw authorities
+    // against ROLE_ADMIN silently demoted them to a regular customer here.
+    // This scopes a query rather than guarding a method, which is why it is not @PreAuthorize.
     private boolean isAdmin() {
-        return SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null) {
+            return false;
+        }
+
+        return roleHierarchy.getReachableGrantedAuthorities(authentication.getAuthorities())
+                .stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
     }
 
     // Helper method for @PreAuthorize

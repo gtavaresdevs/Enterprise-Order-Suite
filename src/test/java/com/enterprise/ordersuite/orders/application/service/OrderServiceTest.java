@@ -29,6 +29,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -72,6 +73,9 @@ class OrderServiceTest {
   @Mock
   private NotificationService notificationService;
 
+  @Mock
+  private RoleHierarchy roleHierarchy;
+
   @InjectMocks
   private OrderService orderService;
 
@@ -86,6 +90,13 @@ class OrderServiceTest {
     lenient()
       .when(currentUserService.getEmail())
       .thenReturn(CURRENT_USER_EMAIL);
+
+    // Identity expansion: these unit tests assert the admin/non-admin branches from the
+    // authorities they set directly. The hierarchy's real expansion is proven against the
+    // actual bean in OrderControllerIT.getAllOrders_asSuperAdmin_seesOrdersFromEveryCustomer.
+    lenient()
+      .when(roleHierarchy.getReachableGrantedAuthorities(any()))
+      .thenAnswer(invocation -> invocation.getArgument(0));
   }
 
   @AfterEach
