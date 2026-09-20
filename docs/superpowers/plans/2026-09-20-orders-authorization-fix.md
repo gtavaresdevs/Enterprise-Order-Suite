@@ -2,6 +2,62 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## Status — executed 2026-09-20 (session C)
+
+| Task | State |
+|---|---|
+| 1 Characterization tests | done — 5 green against unmodified code, SUPER_ADMIN red as predicted |
+| 2 `isAdmin()` via `RoleHierarchy` | done |
+| 3 DELETE explicit, fabricated scopes dropped | done — service tightened before the scope was removed |
+| 4 Controller duplicate authorization removed | done |
+| 5 Independent verification | done — `spring-security-reviewer` confirms both defects resolved and no permission widened |
+
+Commits `bbfc489..87577bd`.
+
+**`./gradlew clean test` is 180/185, not green.** The five failures are pre-existing
+avatar/profile/storage tests, verified identical against base commit `7f27a55` in a separate
+worktree. Every orders and security test passes — `OrderControllerIT` 18/18,
+`OrderServiceTest` 18/18.
+
+Four deviations from the plan as written, recorded rather than silently applied:
+
+- **The plan's JSON paths were wrong.** `PagedResult` serializes its list as `items`, not
+  `content`. Left as written, `getAllOrders_asRegularUser_seesOnlyOwnOrders` would also have
+  failed in Task 1, breaking the plan's own "only the SUPER_ADMIN test may fail" gate.
+- **The plan's order numbers failed validation.** `OrderCreateRequest.orderNumber` is
+  `@Size(max = 50)` and a UUID is 36 characters, so all eight literal prefixes (15–21 chars)
+  returned 400. Shortened to ≤13, keeping the `+ UUID.randomUUID()` convention.
+- **One extra production fix was required, and the user approved it.**
+  `OrderRepository.searchOrders` threw `function lower(bytea) does not exist` whenever
+  `:orderNumber` was null, so `GET /orders` 500'd for every non-admin and `/orders/search`
+  for everyone including admins. No test had ever exercised either list endpoint against a
+  real database, and `OrderServiceTest` mocks the repository. Fixed with
+  `CAST(:orderNumber AS string)` in `bbfc489`, committed before the test commit.
+- **Pagination pinned for determinism.** `@IntegrationTest` has no rollback and the container
+  is shared, so the list assertions use `size=100&sort=id,desc` rather than trusting page 0
+  of an accumulating table.
+
+**The frozen matrix was itself incomplete.** It recorded the SUPER_ADMIN defect only for the
+list endpoints, but `PUT` and `DELETE` moved too: before the fix, a SUPER_ADMIN editing
+another user's order had the update **committed by the service** and was then handed a 403 by
+the controller's raw-authority check — a 403 that had already mutated data. Four tests were
+added in `87577bd` for the moved cells and for `/orders/search`, which had no integration
+coverage at all.
+
+Follow-ups the audit raised, none actioned here:
+
+1. `searchOrders`'s `customerId IS NULL` means "every order", and the non-admin branch's
+   tenant boundary is only the non-nullness of `getUserId()`. Not exploitable today; a
+   dedicated `findByCustomerId` for the non-admin path would make it fail closed.
+2. `isAuthenticated()` on the five non-DELETE endpoints admits any *future* role. The
+   restaurant-ops migration adds staff roles; `hasAnyRole('USER','ADMIN')` is a no-op against
+   today's matrix and keeps the fail-closed property.
+3. Pre-existing and unrelated to authorization: `updateOrder` replaces items without
+   decrementing stock while cancel increments it, so a user can mint phantom stock through
+   their own order; `calculateTotalAmount` trusts the client's `unitPrice`.
+4. Pre-existing: `V15__seed_super_admin.sql` commits a real bcrypt hash and email, seeded
+   into every environment the migration runs in.
+
 **Goal:** Fix the `isAdmin()` role-hierarchy defect that silently demotes `SUPER_ADMIN`, and collapse the three competing authorization styles in the `orders` module into one — without changing any permission the frontend can observe.
 
 **Architecture:** Lock the current behaviour behind characterization tests first, then refactor underneath them. Authorization ends up expressed only in `@PreAuthorize`: the controller declares the coarse permission, the service declares resource ownership, and no permission decision survives inside a method body.
