@@ -2,6 +2,29 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## Status — executed 2026-09-20 (session B)
+
+| Task | State |
+|---|---|
+| 1 Contract snapshot + provenance | done |
+| 2 `security-guidance` plugin | **outstanding** — needs `/plugin install security-guidance@claude-plugins-official` (interactive) |
+| 3–7 The five skills | done |
+| 8 Sensitive-file hook | done — script tested directly; registration applies from the next session |
+| 9–12 The four agents | done |
+| 13 `CLAUDE.md` pointers | done |
+| 14 End-to-end verification | **outstanding** — must run in a fresh session |
+
+Commits `39285b6..fd97da9`. No Java files were changed.
+
+Two deviations from the plan as written, both recorded here rather than silently:
+
+- Added `/docs/contracts/*.yaml text eol=lf` to `.gitattributes`. Without it, `core.autocrlf`
+  on Windows rewrites the snapshot to CRLF on checkout and every line diverges from the
+  canonical LF copy — which defeats Task 1's byte-identical premise.
+- Corrected the opening of `.claude/README.md`, which still described the directory as
+  gitignored and local-only. Commit `615cdaf` had already versioned it (spec D1), so the file
+  documenting these conventions contradicted them.
+
 **Goal:** Install the project's guardrails — 5 skills, 4 agents, 1 hook, the `security-guidance` plugin, the API contract snapshot and an updated `CLAUDE.md` — so later sessions inherit the conventions instead of re-deriving them.
 
 **Architecture:** Three layers with different reliability. Skills are documents Claude must choose to load. Agents are subagents someone must dispatch. The hook is harness-executed configuration that fires on every matching edit whether or not anyone remembers. The hook therefore carries the rule that has already been violated once in this repo.
