@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -55,10 +56,12 @@ class OrderControllerIT {
   private User adminUser;
   private User regularUser;
   private User otherUser;
+  private User superAdminUser;
 
   private String adminToken;
   private String userToken;
   private String otherToken;
+  private String superAdminToken;
 
   @BeforeEach
   void setUp() throws Exception {
@@ -83,6 +86,13 @@ class OrderControllerIT {
       "other-" + UUID.randomUUID() + "@test.com"
     );
 
+    superAdminUser = createTestUser(
+      "SUPER_ADMIN",
+      "Super",
+      "Admin",
+      "superadmin-" + UUID.randomUUID() + "@test.com"
+    );
+
     adminToken = loginAndGetAccessToken(
       adminUser.getEmail(),
       DEFAULT_PASSWORD
@@ -95,6 +105,11 @@ class OrderControllerIT {
 
     otherToken = loginAndGetAccessToken(
       otherUser.getEmail(),
+      DEFAULT_PASSWORD
+    );
+
+    superAdminToken = loginAndGetAccessToken(
+      superAdminUser.getEmail(),
       DEFAULT_PASSWORD
     );
   }
@@ -338,6 +353,118 @@ class OrderControllerIT {
       .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
   }
 
+  // ---- Frozen permission matrix ----
+  // These characterize the /orders permissions as they are enforced today, so the
+  // authorization refactor can be verified to change none of them. If one of these
+  // turns red during the refactor, the refactor is wrong - not the test.
+
+  @Test
+  void createOrder_asRegularUser_returns201() throws Exception {
+    OrderCreateRequest request = orderCreateRequestFor(
+      "ORD-FRZ-CRT-" + UUID.randomUUID(),
+      regularUser.getId()
+    );
+
+    mockMvc.perform(post("/orders")
+        .header("Authorization", "Bearer " + userToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isCreated());
+  }
+
+  @Test
+  void updateOrder_asNonOwner_returns403() throws Exception {
+    Long orderId = createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-UPD-" + UUID.randomUUID()
+    );
+
+    OrderUpdateRequest request = OrderUpdateRequest.builder()
+      .status(OrderStatus.PROCESSING)
+      .build();
+
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + otherToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void deleteOrder_asOwner_returns403() throws Exception {
+    Long orderId = createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-DLO-" + UUID.randomUUID()
+    );
+
+    mockMvc.perform(delete("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + userToken))
+      .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void deleteOrder_asAdmin_returns204() throws Exception {
+    Long orderId = createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-DLA-" + UUID.randomUUID()
+    );
+
+    mockMvc.perform(delete("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + adminToken))
+      .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void getAllOrders_asRegularUser_seesOnlyOwnOrders() throws Exception {
+    createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-MINE-" + UUID.randomUUID()
+    );
+    createOrderAsUser(
+      otherToken,
+      otherUser.getId(),
+      "ORD-FRZ-THRS-" + UUID.randomUUID()
+    );
+
+    mockMvc.perform(get("/orders")
+        .param("size", "100")
+        .param("sort", "id,desc")
+        .header("Authorization", "Bearer " + userToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.items[?(@.customerId == " + regularUser.getId() + ")]")
+        .isNotEmpty())
+      .andExpect(jsonPath("$.items[?(@.customerId != " + regularUser.getId() + ")]")
+        .isEmpty());
+  }
+
+  @Test
+  void getAllOrders_asSuperAdmin_seesOrdersFromEveryCustomer() throws Exception {
+    createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-SAA-" + UUID.randomUUID()
+    );
+    createOrderAsUser(
+      otherToken,
+      otherUser.getId(),
+      "ORD-FRZ-SAB-" + UUID.randomUUID()
+    );
+
+    mockMvc.perform(get("/orders")
+        .param("size", "100")
+        .param("sort", "id,desc")
+        .header("Authorization", "Bearer " + superAdminToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.items[?(@.customerId == " + regularUser.getId() + ")]")
+        .isNotEmpty())
+      .andExpect(jsonPath("$.items[?(@.customerId == " + otherUser.getId() + ")]")
+        .isNotEmpty());
+  }
+
   private User createTestUser(
     String roleName,
     String firstName,
@@ -378,10 +505,9 @@ class OrderControllerIT {
       .asText();
   }
 
-  private Long createOrderAsUser(
-    String token,
-    Long customerId,
-    String orderNumber
+  private OrderCreateRequest orderCreateRequestFor(
+    String orderNumber,
+    Long customerId
   ) throws Exception {
     Long productId = createProduct(
       "Generic Product",
@@ -396,12 +522,20 @@ class OrderControllerIT {
       .unitPrice(new BigDecimal("10.00"))
       .build();
 
-    OrderCreateRequest request = OrderCreateRequest.builder()
+    return OrderCreateRequest.builder()
       .orderNumber(orderNumber)
       .customerId(customerId)
       .status(OrderStatus.PENDING)
       .items(List.of(item))
       .build();
+  }
+
+  private Long createOrderAsUser(
+    String token,
+    Long customerId,
+    String orderNumber
+  ) throws Exception {
+    OrderCreateRequest request = orderCreateRequestFor(orderNumber, customerId);
 
     String response = mockMvc.perform(post("/orders")
         .header("Authorization", "Bearer " + token)
