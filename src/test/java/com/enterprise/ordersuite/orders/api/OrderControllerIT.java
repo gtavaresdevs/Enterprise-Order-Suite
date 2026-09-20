@@ -353,6 +353,161 @@ class OrderControllerIT {
       .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
   }
 
+  @Test
+  void updateOrder_replacingItemsThenCancelling_doesNotMintStock() throws Exception {
+    Long productId = createProduct(
+      "Phantom Stock Product",
+      "SKU-" + UUID.randomUUID(),
+      new BigDecimal("10.00"),
+      10
+    );
+
+    OrderCreateRequest createRequest = OrderCreateRequest.builder()
+      .orderNumber("ORD-PHANTOM-" + UUID.randomUUID())
+      .customerId(adminUser.getId())
+      .status(OrderStatus.PENDING)
+      .items(List.of(OrderItemRequest.builder()
+        .productId(productId)
+        .quantity(2)
+        .unitPrice(new BigDecimal("10.00"))
+        .build()))
+      .build();
+
+    String createResponse = mockMvc.perform(post("/orders")
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(createRequest)))
+      .andExpect(status().isCreated())
+      .andReturn()
+      .getResponse()
+      .getContentAsString();
+
+    Long orderId = objectMapper.readTree(createResponse)
+      .get("id")
+      .asLong();
+
+    assertThat(getProductStock(productId))
+      .as("creating the order must take 2 units")
+      .isEqualTo(8);
+
+    // Same status, so transitionTo returns early - but the items are still replaced.
+    // The replacement must settle stock, or the order ends up holding 5 units that were
+    // never debited and the cancellation below credits all 5 back.
+    OrderUpdateRequest replaceItems = OrderUpdateRequest.builder()
+      .status(OrderStatus.PENDING)
+      .items(List.of(OrderItemRequest.builder()
+        .productId(productId)
+        .quantity(5)
+        .unitPrice(new BigDecimal("10.00"))
+        .build()))
+      .build();
+
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(replaceItems)))
+      .andExpect(status().isOk());
+
+    assertThat(getProductStock(productId))
+      .as("replacing 2 units with 5 must credit the 2 back and debit the 5")
+      .isEqualTo(5);
+
+    OrderUpdateRequest cancel = OrderUpdateRequest.builder()
+      .status(OrderStatus.CANCELLED)
+      .build();
+
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(cancel)))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+    assertThat(getProductStock(productId))
+      .as("a create-replace-cancel round trip must leave the catalogue exactly as it started")
+      .isEqualTo(10);
+  }
+
+  @Test
+  void createOrder_withTamperedUnitPrice_pricesTheOrderFromTheCatalogue() throws Exception {
+    Long productId = createProduct(
+      "Tamper Test Product",
+      "SKU-" + UUID.randomUUID(),
+      new BigDecimal("10.00"),
+      10
+    );
+
+    OrderCreateRequest request = OrderCreateRequest.builder()
+      .orderNumber("ORD-TAMPER-" + UUID.randomUUID())
+      .customerId(regularUser.getId())
+      .status(OrderStatus.PENDING)
+      .items(List.of(OrderItemRequest.builder()
+        .productId(productId)
+        .quantity(2)
+        .unitPrice(new BigDecimal("0.01"))
+        .build()))
+      .build();
+
+    mockMvc.perform(post("/orders")
+        .header("Authorization", "Bearer " + userToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isCreated())
+      .andExpect(jsonPath("$.items[0].unitPrice").value(10.00))
+      .andExpect(jsonPath("$.totalAmount").value(20.00));
+  }
+
+  @Test
+  void updateOrder_withTamperedUnitPrice_pricesTheOrderFromTheCatalogue() throws Exception {
+    Long productId = createProduct(
+      "Tamper Update Product",
+      "SKU-" + UUID.randomUUID(),
+      new BigDecimal("10.00"),
+      20
+    );
+
+    OrderCreateRequest createRequest = OrderCreateRequest.builder()
+      .orderNumber("ORD-TMPU-" + UUID.randomUUID())
+      .customerId(regularUser.getId())
+      .status(OrderStatus.PENDING)
+      .items(List.of(OrderItemRequest.builder()
+        .productId(productId)
+        .quantity(1)
+        .unitPrice(new BigDecimal("10.00"))
+        .build()))
+      .build();
+
+    String createResponse = mockMvc.perform(post("/orders")
+        .header("Authorization", "Bearer " + userToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(createRequest)))
+      .andExpect(status().isCreated())
+      .andReturn()
+      .getResponse()
+      .getContentAsString();
+
+    Long orderId = objectMapper.readTree(createResponse)
+      .get("id")
+      .asLong();
+
+    OrderUpdateRequest updateRequest = OrderUpdateRequest.builder()
+      .status(OrderStatus.PENDING)
+      .items(List.of(OrderItemRequest.builder()
+        .productId(productId)
+        .quantity(3)
+        .unitPrice(new BigDecimal("0.01"))
+        .build()))
+      .build();
+
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + userToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(updateRequest)))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.items[0].unitPrice").value(10.00))
+      .andExpect(jsonPath("$.totalAmount").value(30.00));
+  }
+
   // ---- Frozen permission matrix ----
   // These characterize the /orders permissions as they are enforced today, so the
   // authorization refactor can be verified to change none of them. If one of these

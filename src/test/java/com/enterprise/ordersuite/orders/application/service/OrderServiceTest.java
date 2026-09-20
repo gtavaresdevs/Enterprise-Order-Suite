@@ -15,7 +15,6 @@ import com.enterprise.ordersuite.orders.domain.OrderStatus;
 import com.enterprise.ordersuite.orders.domain.exception.ProductNotFoundException;
 import com.enterprise.ordersuite.orders.persistence.OrderHistoryRepository;
 import com.enterprise.ordersuite.orders.persistence.OrderRepository;
-import com.enterprise.ordersuite.products.application.service.ProductService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,6 +66,8 @@ class OrderServiceTest {
   @Mock
   private CurrentUserService currentUserService;
 
+  // The orders-side interface, in this same package - not the products class that
+  // implements it. OrderService is not allowed to know that class exists.
   @Mock
   private ProductService productService;
 
@@ -149,6 +150,8 @@ class OrderServiceTest {
 
     when(productService.productExists(101L)).thenReturn(true);
     when(productService.productExists(102L)).thenReturn(true);
+    when(productService.getPrice(101L)).thenReturn(new BigDecimal("25.00"));
+    when(productService.getPrice(102L)).thenReturn(new BigDecimal("10.00"));
     when(orderMapper.toEntity(request)).thenReturn(order);
     when(orderItemMapper.toEntity(itemRequest1)).thenReturn(orderItem1);
     when(orderItemMapper.toEntity(itemRequest2)).thenReturn(orderItem2);
@@ -168,6 +171,11 @@ class OrderServiceTest {
     verify(productService).productExists(102L);
     verify(productService).decrementStock(101L, 2);
     verify(productService).decrementStock(102L, 1);
+
+    // The line prices are the catalogue's, not the request's - both itemRequests carried
+    // the same numbers here, so the proof that they were re-derived is these lookups.
+    verify(productService).getPrice(101L);
+    verify(productService).getPrice(102L);
 
     verify(orderRepository).save(order);
     verify(orderMapper).toResponse(order);
@@ -208,6 +216,7 @@ class OrderServiceTest {
 
     verify(productService).productExists(999L);
     verify(productService, never()).decrementStock(anyLong(), anyInt());
+    verify(productService, never()).getPrice(anyLong());
     verify(orderMapper, never()).toEntity(any());
     verify(orderRepository, never()).save(any());
     verify(orderHistoryRepository, never()).save(any());
@@ -609,6 +618,9 @@ class OrderServiceTest {
     when(productService.productExists(202L))
       .thenReturn(true);
 
+    when(productService.getPrice(202L))
+      .thenReturn(new BigDecimal("15.00"));
+
     when(orderItemMapper.toEntity(itemRequest))
       .thenReturn(newItem);
 
@@ -629,11 +641,142 @@ class OrderServiceTest {
     verify(productService)
       .productExists(202L);
 
+    verify(productService)
+      .decrementStock(202L, 3);
+
     verify(orderItemMapper)
       .toEntity(itemRequest);
 
     verify(orderRepository)
       .save(existingOrder);
+  }
+
+  @Test
+  void updateOrder_replacingItems_creditsTheOldItemsAndDebitsTheNewOnes() {
+    Long orderId = 1L;
+
+    OrderItem existingItem = OrderItem.builder()
+      .productId(101L)
+      .quantity(2)
+      .unitPrice(new BigDecimal("10.00"))
+      .build();
+
+    Order existingOrder = Order.builder()
+      .customerId(CURRENT_USER_ID)
+      .status(OrderStatus.PENDING)
+      .items(new ArrayList<>(List.of(existingItem)))
+      .build();
+
+    existingOrder.setId(orderId);
+
+    OrderItemRequest itemRequest = OrderItemRequest.builder()
+      .productId(101L)
+      .quantity(5)
+      .unitPrice(new BigDecimal("10.00"))
+      .build();
+
+    // Same status, so transitionTo returns early - the item replacement still runs, and
+    // is the path that used to hand out stock the order had never paid for.
+    OrderUpdateRequest request = OrderUpdateRequest.builder()
+      .status(OrderStatus.PENDING)
+      .items(List.of(itemRequest))
+      .build();
+
+    OrderItem newItem = OrderItem.builder()
+      .productId(101L)
+      .quantity(5)
+      .unitPrice(new BigDecimal("10.00"))
+      .build();
+
+    when(orderRepository.findById(orderId))
+      .thenReturn(Optional.of(existingOrder));
+
+    when(productService.productExists(101L))
+      .thenReturn(true);
+
+    when(productService.getPrice(101L))
+      .thenReturn(new BigDecimal("10.00"));
+
+    when(orderItemMapper.toEntity(itemRequest))
+      .thenReturn(newItem);
+
+    when(orderRepository.save(existingOrder))
+      .thenReturn(existingOrder);
+
+    when(orderMapper.toResponse(existingOrder))
+      .thenReturn(new OrderResponse());
+
+    orderService.updateOrder(orderId, request);
+
+    verify(productService)
+      .incrementStock(101L, 2);
+
+    verify(productService)
+      .decrementStock(101L, 5);
+  }
+
+  @Test
+  void updateOrder_replacingItemsOnACancelledOrder_movesNoStock() {
+    Long orderId = 1L;
+
+    OrderItem existingItem = OrderItem.builder()
+      .productId(101L)
+      .quantity(2)
+      .unitPrice(new BigDecimal("10.00"))
+      .build();
+
+    // The cancellation already credited these 2 units back, so the order holds no stock.
+    Order existingOrder = Order.builder()
+      .customerId(CURRENT_USER_ID)
+      .status(OrderStatus.CANCELLED)
+      .items(new ArrayList<>(List.of(existingItem)))
+      .build();
+
+    existingOrder.setId(orderId);
+
+    OrderItemRequest itemRequest = OrderItemRequest.builder()
+      .productId(101L)
+      .quantity(5)
+      .unitPrice(new BigDecimal("10.00"))
+      .build();
+
+    OrderUpdateRequest request = OrderUpdateRequest.builder()
+      .status(OrderStatus.CANCELLED)
+      .items(List.of(itemRequest))
+      .build();
+
+    OrderItem newItem = OrderItem.builder()
+      .productId(101L)
+      .quantity(5)
+      .unitPrice(new BigDecimal("10.00"))
+      .build();
+
+    when(orderRepository.findById(orderId))
+      .thenReturn(Optional.of(existingOrder));
+
+    when(productService.productExists(101L))
+      .thenReturn(true);
+
+    when(productService.getPrice(101L))
+      .thenReturn(new BigDecimal("10.00"));
+
+    when(orderItemMapper.toEntity(itemRequest))
+      .thenReturn(newItem);
+
+    when(orderRepository.save(existingOrder))
+      .thenReturn(existingOrder);
+
+    when(orderMapper.toResponse(existingOrder))
+      .thenReturn(new OrderResponse());
+
+    orderService.updateOrder(orderId, request);
+
+    // Crediting the old items a second time is exactly how stock gets minted.
+    verify(productService, never())
+      .incrementStock(anyLong(), anyInt());
+
+    verify(productService, never())
+      .decrementStock(anyLong(), anyInt());
   }
 
   @Test
@@ -670,6 +813,12 @@ class OrderServiceTest {
 
     verify(productService)
       .productExists(999L);
+
+    verify(productService, never())
+      .incrementStock(anyLong(), anyInt());
+
+    verify(productService, never())
+      .decrementStock(anyLong(), anyInt());
 
     verify(orderRepository, never())
       .save(any(Order.class));

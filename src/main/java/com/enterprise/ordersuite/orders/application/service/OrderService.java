@@ -15,7 +15,6 @@ import com.enterprise.ordersuite.orders.domain.OrderStatus;
 import com.enterprise.ordersuite.orders.domain.exception.ProductNotFoundException;
 import com.enterprise.ordersuite.orders.persistence.OrderHistoryRepository;
 import com.enterprise.ordersuite.orders.persistence.OrderRepository;
-import com.enterprise.ordersuite.products.application.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -44,6 +43,8 @@ public class OrderService {
     private final OrderMapper orderMapper;
     private final OrderItemMapper orderItemMapper;
     private final CurrentUserService currentUserService;
+    // The orders-side interface, not the products class that implements it: orders must
+    // compile without knowing the products module exists.
     private final ProductService productService;
     private final NotificationService notificationService;
     private final RoleHierarchy roleHierarchy;
@@ -61,11 +62,7 @@ public class OrderService {
         orderEntity.setCustomerId(currentUserId); // Set the current user's ID as the customer ID
         if (request.getItems() != null) {
             log.debug("requestId: {} - Processing {} items for orderNumber: {}", requestId, request.getItems().size(), request.getOrderNumber());
-            request.getItems().forEach(itemRequest -> {
-                productService.decrementStock(itemRequest.getProductId(), itemRequest.getQuantity());
-                OrderItem orderItem = orderItemMapper.toEntity(itemRequest);
-                orderEntity.addItem(orderItem);
-            });
+            addItems(orderEntity, request.getItems());
         }
         
         orderEntity.setTotalAmount(calculateTotalAmount(orderEntity));
@@ -132,9 +129,21 @@ public class OrderService {
         
         return orderRepository.findById(id)
                 .map(existingOrder -> {
+                    validateProductsExist(request.getItems());
+
+                    // Items are replaced before the status block, not after. A cancellation
+                    // credits back the stock of the items the order holds, so on a request
+                    // that both replaces items and cancels, the replacement has to have
+                    // settled first or the credit applies to the discarded items.
+                    if (request.getItems() != null) {
+                        log.debug("requestId: {} - Replacing items for order ID: {}. New item count: {}", requestId, id, request.getItems().size());
+                        removeAllItems(existingOrder);
+                        addItems(existingOrder, request.getItems());
+                    }
+
                     OrderStatus oldStatus = existingOrder.getStatus();
                     OrderStatus newStatus = request.getStatus();
-                    
+
                     if (newStatus != null && oldStatus != newStatus) {
                         existingOrder.transitionTo(newStatus);
                         handleStatusTransition(existingOrder, oldStatus, newStatus);
@@ -142,18 +151,10 @@ public class OrderService {
                         notificationService.sendOrderUpdateNotification(existingOrder);
                     }
 
-                    validateProductsExist(request.getItems());
-                    
+                    // Runs after transitionTo, never before: it copies the requested status
+                    // straight onto the entity, so ahead of the transition it would make
+                    // transitionTo see an unchanged status and skip the state machine.
                     orderMapper.updateEntityFromDto(request, existingOrder);
-                    
-                    if (request.getItems() != null) {
-                        log.debug("requestId: {} - Replacing items for order ID: {}. New item count: {}", requestId, id, request.getItems().size());
-                        existingOrder.getItems().clear();
-                        request.getItems().forEach(itemRequest -> {
-                            OrderItem orderItem = orderItemMapper.toEntity(itemRequest);
-                            existingOrder.addItem(orderItem);
-                        });
-                    }
 
                     existingOrder.setTotalAmount(calculateTotalAmount(existingOrder));
                     Order updatedOrder = orderRepository.save(existingOrder);
@@ -161,6 +162,44 @@ public class OrderService {
                             requestId, currentUserId, id, updatedOrder.getTotalAmount());
                     return orderMapper.toResponse(updatedOrder);
                 });
+    }
+
+    // Adds each requested item to the order, taking its stock and snapshotting the catalogue
+    // price onto the line. Shared by createOrder and updateOrder's replacement so the two
+    // paths cannot drift: an item joining an order always costs stock and is always priced
+    // by the server.
+    //
+    // OrderItemRequest.unitPrice is accepted - the API contract still declares it required -
+    // but deliberately never read. A client that sends a price is either out of date or
+    // tampering, and the request cannot tell you which.
+    private void addItems(Order order, List<OrderItemRequest> itemRequests) {
+        boolean moveStock = holdsStock(order);
+        itemRequests.forEach(itemRequest -> {
+            if (moveStock) {
+                productService.decrementStock(itemRequest.getProductId(), itemRequest.getQuantity());
+            }
+            OrderItem orderItem = orderItemMapper.toEntity(itemRequest);
+            orderItem.setUnitPrice(productService.getPrice(itemRequest.getProductId()));
+            order.addItem(orderItem);
+        });
+    }
+
+    // The mirror of addItems: an item leaving an order gives its stock back.
+    private void removeAllItems(Order order) {
+        if (holdsStock(order)) {
+            order.getItems().forEach(item ->
+                    productService.incrementStock(item.getProductId(), item.getQuantity())
+            );
+        }
+        order.getItems().clear();
+    }
+
+    // An order holds the stock of its items until it is cancelled, when handleStatusTransition
+    // credits every item back. Editing a cancelled order's items must therefore move no stock
+    // at all - crediting the old items a second time is exactly how stock gets minted.
+    // CANCELLED is terminal, so this answer cannot change midway through a replacement.
+    private boolean holdsStock(Order order) {
+        return order.getStatus() != OrderStatus.CANCELLED;
     }
 
     private void handleStatusTransition(Order order, OrderStatus oldStatus, OrderStatus newStatus) {
@@ -209,6 +248,8 @@ public class OrderService {
         }
     }
 
+    // Derived from the line items' stored unit prices, which addItems resolved from the
+    // catalogue - never from anything the client sent.
     private BigDecimal calculateTotalAmount(Order order) {
         if (order.getItems() == null || order.getItems().isEmpty()) {
             return BigDecimal.ZERO;

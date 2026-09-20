@@ -16,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Optional;
 
 @Service
@@ -80,6 +81,14 @@ public class ProductService implements com.enterprise.ordersuite.orders.applicat
     @Transactional(readOnly = true)
     public boolean productExists(Long productId) {
         return productRepository.existsById(productId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal getPrice(Long productId) {
+        return productRepository.findById(productId)
+                .map(Product::getPrice)
+                .orElseThrow(() -> new ProductNotFoundException(productId));
     }
 
     @Override
