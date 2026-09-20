@@ -1,8 +1,9 @@
 # .claude
 
-Project-scoped Claude Code configuration for enterprise-order-suite. This whole directory is
-gitignored — local-only, not shared via git. If that changes later, drop the `.claude/` entry
-from `.gitignore` and keep only `.claude/settings.local.json` ignored (personal overrides).
+Project-scoped Claude Code configuration for enterprise-order-suite. This directory is
+**versioned on purpose** — the skills, agents and hooks here are part of how this repository
+is worked on, so they belong to the repo rather than to one machine. Only
+`.claude/settings.local.json` is gitignored, for personal overrides.
 
 ## Layout
 

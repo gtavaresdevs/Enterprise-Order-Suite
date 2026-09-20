@@ -6,6 +6,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Enterprise-grade B2B order management backend: Java 17, Spring Boot 3, PostgreSQL (Flyway-migrated), JWT auth. Base package: `com.enterprise.ordersuite`. Built as a modular monolith — modules under `src/main/java/com/enterprise/ordersuite/` (`auth`, `identity`, `orders`, `products`, `profile`, `security`, `storage`, `notifications`, `common`, `api`) are isolated by dependency inversion (see Architecture below), not by physical service boundaries.
 
+## Working in this repository
+
+Project skills live in `.claude/skills/` and are versioned. Invoke them; do not re-derive
+the conventions.
+
+| Skill | Invoke before |
+|---|---|
+| `writing-backend-tests` | writing or changing any test |
+| `spring-security-changes` | touching `security/`, `auth/`, any `@PreAuthorize`, JWT or rate limiting |
+| `backend-module-development` | adding a module, endpoint, service, entity or DTO |
+| `flyway-migrations` | adding a migration or changing an entity's schema |
+| `api-contract-sync` | creating or changing any endpoint or payload shape |
+
+Agents in `.claude/agents/`: `spring-security-reviewer` (read-only audit),
+`backend-test-writer`, `backend-feature-builder`, `flyway-migration-author`.
+
+A `PreToolUse` hook warns before edits to security-sensitive files. It advises, never blocks.
+
+**Verification:** a full `./gradlew test` (Docker required) before claiming anything works.
+
+**Language:** ask the user questions in the language they are writing in; write all code,
+comments and documentation in English.
+
 ## Commands
 
 This project uses **Gradle**, not Maven — ignore the Maven instructions in README.md/HELP.md, they're stale.
@@ -52,11 +75,34 @@ Tests do **not** use `.env`/local Postgres — they spin up real containers via 
 
 **Authorization model**: Spring Security method security (`@PreAuthorize`) is the primary enforcement point, not just URL-level rules in `SecurityConfig`. Role hierarchy: `ROLE_SUPER_ADMIN > ROLE_ADMIN > ROLE_USER` (defined in `SecurityConfig.roleHierarchy()`). Resource-ownership checks (e.g. a user can only touch their own orders) are implemented as helper methods on the service itself referenced from the SpEL expression — see `OrderService.isOrderOwner` used via `@PreAuthorize("hasRole('ADMIN') or @orderService.isOrderOwner(#id, principal.id)")`. Follow this pattern for any new resource-scoped endpoint rather than filtering in the service body. Multi-tenant list/search endpoints (e.g. `OrderService.searchOrders`/`getAllOrders`) additionally force-filter by the current user's ID for non-admins at the query level.
 
+Authorization is **only** expressed in `@PreAuthorize`. A manual check inside a method body
+bypasses the role hierarchy — `RoleHierarchy` is applied by `methodSecurityExpressionHandler`,
+so it affects annotations and not a raw `getAuthorities()` call. `OrderController` currently
+violates this and is scheduled for correction; do not copy it.
+
 **Order domain**: `Order` has a state machine enforced on the entity itself (`Order.transitionTo`, throws `InvalidStatusTransitionException` for illegal transitions) — every status change must go through it, and `OrderService.updateOrder` records an `OrderHistory` row (previous status, new status, who, when) on every transition and triggers a notification. Creating/cancelling an order also mutates `Product` stock via `ProductService.decrementStock`/`incrementStock` — stock and order state are meant to stay consistent, so don't bypass `OrderService` to touch stock directly.
 
 **Auth**: JWT-based, stateless (`SessionCreationPolicy.STATELESS`), with refresh tokens (`RefreshToken`, `RefreshTokenService`, `RefreshTokenCleanupScheduler`), password reset flow with history tracking (`PasswordHistory` prevents password reuse), and per-endpoint rate limiting (`AuthRateLimitFilter` + `RateLimiter` implementations, configurable/toggleable via `security.rate-limit.*` properties, backed by `InMemoryBucketedSlidingWindowRateLimiter` or a `NoOpRateLimiter` when disabled).
 
 **Storage**: `storage.ObjectStorageService` abstracts S3-compatible object storage (AWS S3 in prod, MinIO in tests/local — see `ObjectStorageConfig`), currently used for profile avatars (`profile.application.service.AvatarImageProcessor`/`AvatarValidator`).
+
+## Product direction — read before adding features
+
+This backend is documented above as a B2B order suite. **It is becoming a restaurant
+operations system.** The frontend already runs that model on mock data and is waiting on it.
+
+- Contract snapshot: `docs/contracts/backend-integration-manifest.openapi.yaml`
+  (canonical copy lives in the frontend repo — see `docs/contracts/README.md`)
+- Design and migration phases:
+  `docs/superpowers/specs/2026-09-20-claude-tooling-and-restaurant-ops-migration-design.md`
+
+What this changes, in short: `OrderStatus` is renamed to `New/Preparing/Ready/Completed/
+Cancelled`; orders belong to **anonymous customers** (name + phone) rather than to a `User`,
+so `isOrderOwner` disappears and the back office becomes staff-only; `Product` grows into
+`MenuItem`; `Tables`, `MenuCategories`, `DeliveryZones` and `RestaurantSettings` are new; and
+an unauthenticated `/public/*` surface appears.
+
+Do not write new code in the legacy shape without checking the contract first.
 
 ## Testing
 
