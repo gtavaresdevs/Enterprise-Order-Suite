@@ -31,7 +31,9 @@ out/
 .vscode/
 
 # Claude Code
-.claude/
+# The .claude/ directory is versioned on purpose: skills, agents and hooks are
+# part of how this repository is worked on. Only personal overrides stay local.
+.claude/settings.local.json
 
 # NetBeans
 /nbproject/private/
