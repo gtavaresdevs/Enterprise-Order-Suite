@@ -48,7 +48,12 @@ public class AvatarValidator {
     try (InputStream inputStream = file.getInputStream()) {
       String detectedContentType = tika.detect(inputStream);
 
-      if (!ALLOWED_CONTENT_TYPES.contains(detectedContentType)) {
+      // The detected type must both be allowed AND match what the client declared.
+      // Checking the two independently lets a file sniffed as one allowed image type
+      // through while it is stored and later served as another - the declared type is
+      // what ends up on the object - so content-type spoofing passed both checks.
+      if (!ALLOWED_CONTENT_TYPES.contains(detectedContentType)
+        || !detectedContentType.equals(declaredContentType)) {
         throw new InvalidAvatarException(
           "Uploaded file is not a valid JPEG, PNG, or WebP image"
         );
