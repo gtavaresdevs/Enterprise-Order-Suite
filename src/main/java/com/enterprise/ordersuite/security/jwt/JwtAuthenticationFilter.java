@@ -60,21 +60,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 .collect(Collectors.toList()));
                     }
 
-                    // Map roles to scopes for PreAuthorize compatibility
-                    // This assumes that if a user has a certain role, they also have corresponding scopes.
-                    // In a real application, scopes might be managed separately.
-                    if (roles != null && roles.contains("ADMIN")) {
-                        authorities.add(new SimpleGrantedAuthority("SCOPE_order:write"));
-                        authorities.add(new SimpleGrantedAuthority("SCOPE_order:read"));
-                        authorities.add(new SimpleGrantedAuthority("SCOPE_order:delete"));
-                    } else if (roles != null && roles.contains("USER")) {
-                        authorities.add(new SimpleGrantedAuthority("SCOPE_order:read"));
-                        // A regular user might have write access to their own orders, but not all orders.
-                        // This is handled by @PostAuthorize or programmatic checks.
-                        authorities.add(new SimpleGrantedAuthority("SCOPE_order:write"));
-                    }
-
-
                     JwtUserPrincipal principal = new JwtUserPrincipal(userId, userEmail);
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(

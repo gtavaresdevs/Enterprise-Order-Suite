@@ -32,7 +32,7 @@ public class OrderController {
     private final CurrentUserService currentUserService;
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('SCOPE_order:write')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Create a new order", description = "Creates a new order in the system.")
     public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody OrderCreateRequest request) {
         String requestId = MDC.get("requestId");
@@ -42,7 +42,7 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('SCOPE_order:read')")
+    @PreAuthorize("isAuthenticated()")
     @PostAuthorize("hasRole('ADMIN') or returnObject.body.customerId == authentication.principal.id")
     @Operation(summary = "Get order by ID", description = "Retrieves a specific order by its ID. Users can only access their own orders unless they are an admin.")
     public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id) {
@@ -57,7 +57,7 @@ public class OrderController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('SCOPE_order:read')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get all orders", description = "Retrieves a paginated list of all orders. Non-admin users will only see their own orders.")
     public ResponseEntity<PagedResult<OrderResponse>> getAllOrders(Pageable pageable) {
         String requestId = MDC.get("requestId");
@@ -66,7 +66,7 @@ public class OrderController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('SCOPE_order:read')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Search orders", description = "Retrieves a paginated list of orders based on search criteria. Non-admin users will only see their own orders.")
     public ResponseEntity<PagedResult<OrderResponse>> searchOrders(
             @RequestParam(required = false) String orderNumber,
@@ -81,7 +81,7 @@ public class OrderController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('SCOPE_order:write')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Update an existing order", description = "Updates an existing order identified by its ID. Users can only update their own orders unless they are an admin.")
     public ResponseEntity<OrderResponse> updateOrder(@PathVariable Long id, @Valid @RequestBody OrderUpdateRequest request) {
         String requestId = MDC.get("requestId");
@@ -101,7 +101,7 @@ public class OrderController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('SCOPE_order:delete')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Delete an order", description = "Deletes an order identified by its ID. Users can only delete their own orders unless they are an admin.")
     public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
         String requestId = MDC.get("requestId");

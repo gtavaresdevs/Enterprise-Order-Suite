@@ -167,7 +167,10 @@ public class OrderService {
     }
 
     @Transactional
-    @PreAuthorize("hasRole('ADMIN') or @orderService.isOrderOwner(#id, principal.id)")
+    // Deleting an order is ADMIN-only. This was previously enforced by the
+    // controller withholding SCOPE_order:delete from regular users; stating it
+    // here keeps the permission identical once that scope is removed.
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteOrder(Long id) {
         String requestId = MDC.get("requestId");
         Long currentUserId = currentUserService.getUserId();
