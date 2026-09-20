@@ -13,6 +13,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.core.annotation.Order;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
@@ -21,6 +22,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 
+// Consulted before GlobalExceptionHandler, which is where an unmapped exception lands.
+// Spring picks the first advice with any matching method, so order decides which advice
+// sees an exception at all - it must be explicit, not left to bean resolution order.
+@Order(1)
 @ControllerAdvice
 public class AuthExceptionHandler {
 
@@ -112,16 +117,9 @@ public class AuthExceptionHandler {
     throw ex; // Let Spring Security filters handle AccessDeniedException natively
   }
 
-  // -------- Fallback (auth-safe) --------
-
-  @ExceptionHandler(RuntimeException.class)
-  public ResponseEntity<ApiErrorResponse> handleRuntime(RuntimeException ex) {
-    return build(
-      HttpStatus.INTERNAL_SERVER_ERROR,
-      "AUTH_ERROR",
-      "Authentication request failed"
-    );
-  }
+  // No RuntimeException fallback here on purpose. Because this advice is consulted
+  // first, a catch-all would match every RuntimeException and make GlobalExceptionHandler
+  // unreachable - including its domain handlers. The fallback belongs there.
 
   // -------- Helper --------
 

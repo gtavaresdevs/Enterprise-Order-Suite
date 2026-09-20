@@ -3,8 +3,10 @@ package com.enterprise.ordersuite.api.errors;
 import com.enterprise.ordersuite.orders.domain.exception.InvalidStatusTransitionException;
 import com.enterprise.ordersuite.orders.domain.exception.ProductNotFoundException;
 import com.enterprise.ordersuite.products.domain.exception.InsufficientStockException;
+import com.enterprise.ordersuite.profile.domain.exception.InvalidAvatarException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.TransactionSystemException;
@@ -17,6 +19,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.stream.Collectors;
 
+// Consulted after AuthExceptionHandler. This is the fallback advice: it owns the
+// RuntimeException catch-all, so anything the first advice does not name lands here.
+@Order(2)
 @ControllerAdvice
 @RequiredArgsConstructor
 @Slf4j
@@ -60,6 +65,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
+    @ExceptionHandler(InvalidAvatarException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidAvatar(InvalidAvatarException ex) {
+        log.warn("InvalidAvatarException: {}", ex.getMessage());
+        ApiErrorResponse body = new ApiErrorResponse(
+                "INVALID_AVATAR",
+                ex.getMessage(),
+                Instant.now(clock),
+                null
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidationException(MethodArgumentNotValidException ex) {
         String details = ex.getBindingResult().getFieldErrors().stream()
@@ -93,6 +110,10 @@ public class GlobalExceptionHandler {
         if (rootCause instanceof InvalidStatusTransitionException) {
             log.warn("Handling InvalidStatusTransitionException from root cause: {}", rootCause.getMessage());
             return handleInvalidStatusTransition((InvalidStatusTransitionException) rootCause);
+        }
+        if (rootCause instanceof InvalidAvatarException) {
+            log.warn("Handling InvalidAvatarException from root cause: {}", rootCause.getMessage());
+            return handleInvalidAvatar((InvalidAvatarException) rootCause);
         }
 
         // Fallback for other RuntimeExceptions
