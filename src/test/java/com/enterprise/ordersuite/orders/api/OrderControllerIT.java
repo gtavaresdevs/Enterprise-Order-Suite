@@ -465,6 +465,90 @@ class OrderControllerIT {
         .isNotEmpty());
   }
 
+  @Test
+  void updateOrder_asSuperAdmin_onAnotherUsersOrder_returns200() throws Exception {
+    Long orderId = createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-SAU-" + UUID.randomUUID()
+    );
+
+    OrderUpdateRequest request = OrderUpdateRequest.builder()
+      .status(OrderStatus.PROCESSING)
+      .build();
+
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + superAdminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.status").value("PROCESSING"));
+  }
+
+  @Test
+  void deleteOrder_asSuperAdmin_returns204() throws Exception {
+    Long orderId = createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-SAD-" + UUID.randomUUID()
+    );
+
+    mockMvc.perform(delete("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + superAdminToken))
+      .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void searchOrders_asRegularUser_cannotQueryAnotherCustomersOrders() throws Exception {
+    createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-SRO-" + UUID.randomUUID()
+    );
+    createOrderAsUser(
+      otherToken,
+      otherUser.getId(),
+      "ORD-FRZ-SRT-" + UUID.randomUUID()
+    );
+
+    // The client asks for another customer's orders; the service must force-filter
+    // the criteria back to the caller rather than honouring the parameter.
+    mockMvc.perform(get("/orders/search")
+        .param("customerId", String.valueOf(otherUser.getId()))
+        .param("size", "100")
+        .param("sort", "id,desc")
+        .header("Authorization", "Bearer " + userToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.items[?(@.customerId == " + regularUser.getId() + ")]")
+        .isNotEmpty())
+      .andExpect(jsonPath("$.items[?(@.customerId != " + regularUser.getId() + ")]")
+        .isEmpty());
+  }
+
+  @Test
+  void searchOrders_asSuperAdmin_seesOrdersFromEveryCustomer() throws Exception {
+    createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-SSA-" + UUID.randomUUID()
+    );
+    createOrderAsUser(
+      otherToken,
+      otherUser.getId(),
+      "ORD-FRZ-SSB-" + UUID.randomUUID()
+    );
+
+    mockMvc.perform(get("/orders/search")
+        .param("size", "100")
+        .param("sort", "id,desc")
+        .header("Authorization", "Bearer " + superAdminToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.items[?(@.customerId == " + regularUser.getId() + ")]")
+        .isNotEmpty())
+      .andExpect(jsonPath("$.items[?(@.customerId == " + otherUser.getId() + ")]")
+        .isNotEmpty());
+  }
+
   private User createTestUser(
     String roleName,
     String firstName,
