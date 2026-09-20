@@ -716,6 +716,79 @@ class OrderServiceTest {
   }
 
   @Test
+  void updateOrder_replacingItemsOnAShippedOrder_movesNoStock() {
+    assertReplacingItemsMovesNoStock(OrderStatus.SHIPPED);
+  }
+
+  @Test
+  void updateOrder_replacingItemsOnADeliveredOrder_movesNoStock() {
+    assertReplacingItemsMovesNoStock(OrderStatus.DELIVERED);
+  }
+
+  // A SHIPPED or DELIVERED order consumed its stock for good - no transition from either can
+  // ever credit it back, so an item replacement that credited the old lines would be handing
+  // out goods that physically left the building. Crediting is only correct while the order can
+  // still be cancelled.
+  private void assertReplacingItemsMovesNoStock(OrderStatus status) {
+    Long orderId = 1L;
+
+    OrderItem existingItem = OrderItem.builder()
+      .productId(101L)
+      .quantity(2)
+      .unitPrice(new BigDecimal("10.00"))
+      .build();
+
+    Order existingOrder = Order.builder()
+      .customerId(CURRENT_USER_ID)
+      .status(status)
+      .items(new ArrayList<>(List.of(existingItem)))
+      .build();
+
+    existingOrder.setId(orderId);
+
+    OrderItemRequest itemRequest = OrderItemRequest.builder()
+      .productId(101L)
+      .quantity(5)
+      .unitPrice(new BigDecimal("10.00"))
+      .build();
+
+    OrderUpdateRequest request = OrderUpdateRequest.builder()
+      .status(status)
+      .items(List.of(itemRequest))
+      .build();
+
+    when(orderRepository.findById(orderId))
+      .thenReturn(Optional.of(existingOrder));
+
+    when(productService.productExists(101L))
+      .thenReturn(true);
+
+    when(productService.getPrice(101L))
+      .thenReturn(new BigDecimal("10.00"));
+
+    when(orderItemMapper.toEntity(itemRequest))
+      .thenReturn(OrderItem.builder()
+        .productId(101L)
+        .quantity(5)
+        .unitPrice(new BigDecimal("10.00"))
+        .build());
+
+    when(orderRepository.save(existingOrder))
+      .thenReturn(existingOrder);
+
+    when(orderMapper.toResponse(existingOrder))
+      .thenReturn(new OrderResponse());
+
+    orderService.updateOrder(orderId, request);
+
+    verify(productService, never())
+      .incrementStock(anyLong(), anyInt());
+
+    verify(productService, never())
+      .decrementStock(anyLong(), anyInt());
+  }
+
+  @Test
   void updateOrder_replacingItemsOnACancelledOrder_movesNoStock() {
     Long orderId = 1L;
 

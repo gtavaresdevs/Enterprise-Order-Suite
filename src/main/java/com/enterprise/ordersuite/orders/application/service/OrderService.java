@@ -93,7 +93,13 @@ public class OrderService {
         if (isAdmin()) {
             return orderRepository.findAll(pageable).map(orderMapper::toResponse);
         } else {
-            Long currentUserId = currentUserService.getUserId();
+            // Asserted for the same reason as in searchOrders below. Spring Data rewrites a
+            // null parameter on a derived query into IS NULL, so this only returns nothing
+            // today because orders.customer_id is NOT NULL - the safety is in the schema,
+            // and the restaurant-ops migration is what makes that column nullable.
+            Long currentUserId = Objects.requireNonNull(
+                    currentUserService.getUserId(),
+                    "A non-admin list must be scoped to a customer id");
             return orderRepository.findByCustomerId(currentUserId, pageable).map(orderMapper::toResponse);
         }
     }
@@ -173,7 +179,7 @@ public class OrderService {
     // but deliberately never read. A client that sends a price is either out of date or
     // tampering, and the request cannot tell you which.
     private void addItems(Order order, List<OrderItemRequest> itemRequests) {
-        boolean moveStock = holdsStock(order);
+        boolean moveStock = holdsSettleableStock(order);
         itemRequests.forEach(itemRequest -> {
             if (moveStock) {
                 productService.decrementStock(itemRequest.getProductId(), itemRequest.getQuantity());
@@ -186,7 +192,7 @@ public class OrderService {
 
     // The mirror of addItems: an item leaving an order gives its stock back.
     private void removeAllItems(Order order) {
-        if (holdsStock(order)) {
+        if (holdsSettleableStock(order)) {
             order.getItems().forEach(item ->
                     productService.incrementStock(item.getProductId(), item.getQuantity())
             );
@@ -194,12 +200,16 @@ public class OrderService {
         order.getItems().clear();
     }
 
-    // An order holds the stock of its items until it is cancelled, when handleStatusTransition
-    // credits every item back. Editing a cancelled order's items must therefore move no stock
-    // at all - crediting the old items a second time is exactly how stock gets minted.
-    // CANCELLED is terminal, so this answer cannot change midway through a replacement.
-    private boolean holdsStock(Order order) {
-        return order.getStatus() != OrderStatus.CANCELLED;
+    // An order's claim on stock is settleable only while it can still be cancelled, because
+    // cancelling is the one thing that credits stock back. A CANCELLED order already gave its
+    // stock back; a SHIPPED or DELIVERED one consumed it for good and has no path that could
+    // ever return it. Replacing the items of any of those must move no stock at all -
+    // crediting goods that have shipped is exactly how stock gets minted.
+    //
+    // No status changes during a replacement, so this answer is stable across one.
+    private boolean holdsSettleableStock(Order order) {
+        OrderStatus status = order.getStatus();
+        return status == OrderStatus.PENDING || status == OrderStatus.PROCESSING;
     }
 
     private void handleStatusTransition(Order order, OrderStatus oldStatus, OrderStatus newStatus) {

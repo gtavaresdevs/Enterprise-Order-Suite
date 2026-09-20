@@ -17,8 +17,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     // Tenant-scoped listing for non-admins. Deliberately a derived query rather than
     // searchOrders(null, null, customerId, ...): searchOrders treats a null customerId as
-    // "no filter" and would return every order in the database. This one always compares
-    // against the column, so a null customer id yields nothing - it fails closed.
+    // "no filter" and would return every order in the database.
+    //
+    // This one cannot do that, but not because it binds the null: Spring Data rewrites a null
+    // SIMPLE_PROPERTY parameter into IS NULL. It returns nothing because orders.customer_id
+    // is NOT NULL (V10), so the guarantee rests on the schema. The restaurant-ops migration
+    // detaches orders from User, which is exactly the change that would make the column
+    // nullable - hence the Objects.requireNonNull on the calling side as well.
     Page<Order> findByCustomerId(Long customerId, Pageable pageable);
 
     // CAST(:orderNumber AS string) is required, not cosmetic: with a null orderNumber

@@ -12,6 +12,8 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
+
 /**
  * Seeds the root super admin from the environment.
  *
@@ -37,11 +39,18 @@ public class RootSuperAdminSeeder implements ApplicationRunner {
   @Transactional
   public void run(ApplicationArguments args) {
     if (!properties.isConfigured()) {
-      log.info("No root super admin configured (SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD_HASH unset) - skipping seed.");
+      // WARN, not INFO, and it names the consequence: an environment that ran the old V15
+      // still has that seeded account, and with no SUPER_ADMIN_EMAIL set the anti-lockout
+      // guard in UserAdminService now protects nothing. One SUPER_ADMIN can deactivate,
+      // demote or re-email another, including the original root, with no way back.
+      log.warn("No root super admin configured (SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD_HASH unset): "
+        + "nothing was seeded, and NO account is protected against deactivation, role change or email change.");
       return;
     }
 
-    if (userRepository.existsByEmailIgnoreCase(properties.email())) {
+    String email = normalize(properties.email());
+
+    if (userRepository.existsByEmailIgnoreCase(email)) {
       log.debug("Root super admin already present - nothing to seed.");
       return;
     }
@@ -53,7 +62,7 @@ public class RootSuperAdminSeeder implements ApplicationRunner {
     User user = new User();
     user.setFirstName(properties.firstName());
     user.setLastName(properties.lastName());
-    user.setEmail(properties.email());
+    user.setEmail(email);
     // Already a bcrypt hash: the environment supplies the encoded value, never a plaintext
     // password this would then have to encode and log its way around.
     user.setPassword(properties.passwordHash());
@@ -63,5 +72,12 @@ public class RootSuperAdminSeeder implements ApplicationRunner {
     userRepository.save(user);
 
     log.info("Seeded the root super admin account.");
+  }
+
+  // Login matches the address exactly (AuthenticationService uses findByEmail, not the
+  // ignore-case variant), so a SUPER_ADMIN_EMAIL carrying capitals or stray whitespace would
+  // seed an account nobody can log into. Normalized the same way UserAdminService does.
+  private String normalize(String email) {
+    return email.trim().toLowerCase(Locale.ROOT);
   }
 }

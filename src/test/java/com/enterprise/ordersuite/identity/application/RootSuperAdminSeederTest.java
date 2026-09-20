@@ -88,6 +88,28 @@ class RootSuperAdminSeederTest {
   }
 
   @Test
+  void run_normalizesTheConfiguredEmail() {
+    Role superAdmin = new Role();
+    superAdmin.setName("SUPER_ADMIN");
+
+    when(userRepository.existsByEmailIgnoreCase(ROOT_EMAIL))
+      .thenReturn(false);
+
+    when(roleRepository.findByName("SUPER_ADMIN"))
+      .thenReturn(Optional.of(superAdmin));
+
+    seeder(new RootSuperAdminProperties("  Root@Test.COM  ", ROOT_HASH, "Root", "Super Admin"))
+      .run(null);
+
+    ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(captor.capture());
+
+    assertThat(captor.getValue().getEmail())
+      .as("login matches the address exactly, so an unnormalized seed cannot log in")
+      .isEqualTo(ROOT_EMAIL);
+  }
+
+  @Test
   void run_whenTheSuperAdminRoleIsMissing_failsLoudly() {
     when(userRepository.existsByEmailIgnoreCase(ROOT_EMAIL))
       .thenReturn(false);

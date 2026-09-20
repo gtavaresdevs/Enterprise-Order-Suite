@@ -528,6 +528,33 @@ class OrderControllerIT {
   }
 
   @Test
+  void createOrder_asSuperAdmin_returns201() throws Exception {
+    OrderCreateRequest request = orderCreateRequestFor(
+      "ORD-FRZ-SAC-" + UUID.randomUUID(),
+      superAdminUser.getId()
+    );
+
+    mockMvc.perform(post("/orders")
+        .header("Authorization", "Bearer " + superAdminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isCreated());
+  }
+
+  @Test
+  void getOrderById_asSuperAdmin_onAnotherUsersOrder_returns200() throws Exception {
+    Long orderId = createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-SAG-" + UUID.randomUUID()
+    );
+
+    mockMvc.perform(get("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + superAdminToken))
+      .andExpect(status().isOk());
+  }
+
+  @Test
   void updateOrder_asNonOwner_returns403() throws Exception {
     Long orderId = createOrderAsUser(
       userToken,
