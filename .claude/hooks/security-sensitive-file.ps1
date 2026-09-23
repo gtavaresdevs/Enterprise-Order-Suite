@@ -1,7 +1,9 @@
 #Requires -Version 7
 # PreToolUse hook: warn before editing a security-sensitive file.
-# Reads the tool call as JSON on stdin; emits additionalContext when the path matches.
-# Always exits 0 - this hook advises, it never blocks.
+# Reads the tool call as JSON on stdin; when the path matches it asks for confirmation
+# (permissionDecision 'ask'), so the warning is shown BEFORE the edit is applied.
+# additionalContext carries the same checklist into the model's context once approved.
+# Always exits 0 - this hook advises and asks, it never denies.
 
 $ErrorActionPreference = 'Stop'
 
@@ -49,8 +51,10 @@ SECURITY-SENSITIVE FILE. Before making this edit:
 
 $out = [ordered]@{
     hookSpecificOutput = [ordered]@{
-        hookEventName     = 'PreToolUse'
-        additionalContext = $message
+        hookEventName            = 'PreToolUse'
+        permissionDecision       = 'ask'
+        permissionDecisionReason = $message
+        additionalContext        = $message
     }
 }
 
