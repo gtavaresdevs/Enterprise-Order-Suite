@@ -20,6 +20,13 @@ so `PUT {"status":"DELIVERED","items":[]}` on a delivered order wipes its lines 
 not. The fix has to name a set of statuses, and Phase 0 is where the status model is being
 settled, so it lands here rather than waiting for Phase 4's enum rename.
 
+A second addition arrived during the design review. Deciding that `createdAt` is a UTC instant
+exposed that `BaseEntity` declares it as `LocalDateTime` — a type that cannot express the
+decision — and that the same ambiguity already governs `RefreshToken`'s expiry comparison. The
+user chose on 2026-09-24 to correct it repository-wide here rather than phase by phase. That is
+what turns Phase 0 from a decisions phase into one that also carries a migration; the reasoning
+is in D15.
+
 ## Findings that shaped the decisions
 
 Established by reading both repositories on 2026-09-24, and worth recording because two of them
@@ -56,9 +63,10 @@ does not exist yet.
 
 | Deliverable | In Phase 0 |
 |---|---|
-| The five decisions, recorded with rationale | yes |
+| The decisions, recorded with rationale | yes |
 | Canonical manifest patched to 0.3.0; snapshot re-copied | yes |
 | Item-edit boundary enforced in `OrderService`, with tests | yes |
+| Repo-wide `LocalDateTime` → `Instant` conversion + `V20` migration (D15) | yes |
 | Refresh-cookie / CORS configuration | no — Phase 1 |
 | `MenuCategory` table, `MenuItem` | no — Phase 2 |
 | `RestaurantSettings`, `DeliveryZones`, `Tables` | no — Phase 3 |
@@ -73,7 +81,8 @@ D1–D8.
 |---|---|---|
 | D9 | `id-type`: the backend keeps `int64`; the frontend's four mock-backed types become `number` | 2–4 |
 | D10 | `created-at-format`: `createdAt` is a UTC instant; the server stamps a `businessDate` at creation | 4 |
-| D10a | The restaurant's timezone is admin-editable in `RestaurantSettings`; config is only its fallback | 3 |
+| D10a | The restaurant's timezone is admin-editable in `RestaurantSettings`; config is its only fallback, and an unset zone fails startup | 3 |
+| D15 | Every persisted timestamp is an `Instant` on a `timestamptz` column, converted repo-wide | **0** |
 | D11 | `category-identity`: normalized table with an FK, name-based wire contract | 2 |
 | D12 | `dev-cookie-secure`: env-bound cookie and CORS properties, production-safe defaults | 1 |
 | D13 | Item edits are accepted only while an order is open | **0** |
@@ -116,13 +125,21 @@ change to this phase's manifest patch, not a Phase 3 discovery.
 
 Because `RestaurantSettings` does not exist until Phase 3 while `businessDate` is not returned
 until Phase 4, the configuration property `restaurant.timezone` exists as the **fallback only**,
-resolved in this order: the settings row, then the property, then `ZoneId.systemDefault()`.
+resolved in this order: the settings row, then the property, then **startup fails**.
 
-Defaulting to the system zone rather than to a hardcoded `America/Sao_Paulo` keeps a
-single-country assumption out of the code, and is right on a developer machine. It is *not*
-right on a typical container or VPS, which reports UTC — so the resolved zone and **where it came
-from** are logged at startup, following the precedent set by the `SUPER_ADMIN_EMAIL` warning in
-the previous phase. A default that is wrong is tolerable; one that is wrong and silent is not.
+There is deliberately no `ZoneId.systemDefault()` at the end of that chain. The system zone is
+implicit configuration that varies by host: a developer machine reports Brasília and the average
+container reports UTC, so two identical deployments would file orders under different days, and
+nothing in the deployment would say so. That is unacceptable for the value the revenue reports
+key off. It also contradicts D12, which established that defaults are production-safe and that
+local development opts out *explicitly*, as a visible reviewable act. Local development sets
+`RESTAURANT_TIMEZONE` for itself, exactly as it sets `REFRESH_COOKIE_SECURE`.
+
+Failing at startup rather than at order creation puts the error at deploy time instead of in
+front of the first customer. Resolution goes through `ZoneId.of(...)`, so the same check also
+rejects a value that is not a real IANA identifier — `America/Brasilia`, for instance, which does
+not exist and was nearly written into this document. The resolved zone and its source are logged
+at startup regardless, following the precedent set by the `SUPER_ADMIN_EMAIL` warning.
 
 Keeping the zone in a settings row rather than in configuration is also what makes a future
 multi-tenant move cheap: the field moves to the tenant, and nothing else changes. That move is
@@ -196,6 +213,51 @@ Rejected: allowing edits everywhere but writing an audit row. It leaves a delive
 total rewritable to zero, which is the actual complaint, and expands `OrderHistory` beyond status
 transitions.
 
+### D15 — timestamps say what they mean (implemented in this phase)
+
+D10 calls `createdAt` a UTC instant. `BaseEntity` currently declares it as `LocalDateTime`, which
+is precisely the type that does not say that: a wall-clock reading with no zone, interpreted by
+whatever the JVM's default happens to be. The declaration has to carry the decision, or the
+decision is only a comment.
+
+The repository is already split three ways, which is the stronger reason to act:
+
+- `OrderHistory` uses `Instant`
+- `BaseEntity`, `PasswordHistory`, `PasswordResetToken` and `RefreshToken` use `LocalDateTime`
+- the migrations disagree with themselves — some columns are `TIMESTAMP WITHOUT TIME ZONE`,
+  others `TIMESTAMP WITH TIME ZONE`
+
+`RefreshToken.expiresAt`, `usedAt` and `revokedAt` are in the `LocalDateTime` group, so token
+expiry is compared in an unstated zone today. That is the same defect class as the order-date
+problem, sitting in security code, and it is the reason this is not deferred to the phase that
+happens to touch each entity.
+
+**Resolution.** Every persisted timestamp becomes an `Instant`, every column becomes
+`TIMESTAMP WITH TIME ZONE`, and the two are kept in agreement under `ddl-auto: validate`. Scope
+as measured on 2026-09-24: 18 main sources and 3 test sources mention `LocalDateTime`, across 32
+timestamp columns. One migration (`V20`) converts the columns; its `USING ... AT TIME ZONE`
+clause must name the zone the existing naive values were written in, which is a statement the
+migration makes explicitly rather than by omission.
+
+This is the decision that changes Phase 0's character: it was a decisions phase with one bug fix,
+and it is now also a repository-wide type migration. Accepted knowingly by the user on
+2026-09-24, on the grounds that the ambiguity is in security code and every later phase would
+otherwise inherit it.
+
+**It changes live responses, which makes it a contract change.** The response DTOs that expose
+these fields (`MeResponse`, `UserSummaryResponse`, `UserDetailResponse`, `ProfileResponse`,
+`OrderResponse`, `ProductResponse`, the admin ones) currently serialize as `2026-09-24T21:14:03`
+and will serialize as `2026-09-24T21:14:03Z`. The frontend parses both with `new Date(iso)`
+(`src/utils/format.ts`, `src/features/profile/hooks/useProfile.ts`), and JavaScript reads an ISO
+string **without** a zone as local time and one **with** `Z` as UTC. For a browser at UTC−3 a
+near-midnight timestamp therefore moves by a day on screen, on endpoints that are live today.
+The manifest patch records this and the frontend is told; it is not left to be discovered.
+
+Noted while checking: `src/utils/format.ts` already takes a `timezone` argument and carries its
+own `TIMEZONE_OFFSET_MINUTES` table. The frontend has been modelling a configurable restaurant
+timezone all along, which is independent support for D10a — and a table that will need to agree
+with the zone the backend stamps.
+
 ### D14 — one error-code convention
 
 The backend keeps `SCREAMING_SNAKE`, because that is what it already emits and what the frontend
@@ -230,6 +292,10 @@ Edits to the canonical file:
 - `MenuCategory`: description records that a stable id backs the name internally while the wire
   contract stays name-based.
 - `Error.code`: the three known values re-cased per D14.
+- The live baseline section and the affected live schemas: record that timestamp fields now
+  serialize with a `Z` suffix (D15), and that this changes how `new Date(...)` interprets them.
+  This is the only part of the patch that touches an `x-status: live` shape, so it carries the
+  loudest changelog note.
 - `info.version` to **0.3.0**, with an `x-changelog` entry at the top carrying an explicit
   `breaking:` line for the id-type change. This follows the file's own precedent — 0.2.0 recorded
   a breaking auth change under a minor bump.
@@ -242,7 +308,27 @@ committed there** — that repository is public, is on branch `Claude-Assisted-D
 carries unrelated uncommitted work. The owner reviews and commits it. The backend repository
 commits its own snapshot and this spec.
 
-## Implementation — the only code change
+## Implementation
+
+Two independent pieces of work. They touch different files and can be built and verified
+separately; the temporal conversion is the larger one and should land first, so the item-edit
+tests are written against the final types.
+
+### The temporal conversion (D15)
+
+- `BaseEntity.createdAt`/`updatedAt` and the auth entities that declare their own timestamps
+  (`RefreshToken`, `PasswordResetToken`, `PasswordHistory`) move from `LocalDateTime` to
+  `Instant`, along with the repositories and services that pass those values
+  (`RefreshTokenRepository`, `RefreshTokenService`, `RefreshTokenCleanupService`,
+  `PasswordResetService`) and the response DTOs that expose them.
+- `V20` converts the affected columns to `TIMESTAMP WITH TIME ZONE`, naming in its `USING`
+  clause the zone the existing naive values are assumed to have been written in.
+- `flyway-migrations` governs the migration; `spring-security-changes` governs the auth entities,
+  since `RefreshToken`'s expiry comparison is part of the refresh flow.
+- Services that read the clock keep taking the injected `Clock`, per the repository's existing
+  rule — the conversion changes the type, not where time comes from.
+
+### The item-edit boundary (D13)
 
 In `orders`:
 
@@ -262,8 +348,8 @@ In `api.errors`:
   ordering (`AuthExceptionHandler` `@Order(1)` with no catch-all, `GlobalExceptionHandler`
   `@Order(2)` owning the fallback) is not touched.
 
-No migration, no entity change, no endpoint or request-shape change. The response gains no field;
-one previously-accepted request now returns 409.
+This piece needs no migration and no entity change. The response gains no field; one
+previously-accepted request now returns 409.
 
 ## Testing
 
@@ -290,6 +376,20 @@ Tests are written before the fix and must fail before it, per the repository's c
 Existing `OrderControllerIT` item-replacement tests all operate on `PENDING` orders and must pass
 unchanged; that is the evidence the boundary was placed where intended.
 
+For the temporal conversion (D15), the suite is the safety net rather than new coverage —
+`RefreshTokenService`'s expiry tests, the rate-limit window tests and the token-cleanup tests all
+exercise the converted types through `MutableClock`, and they must pass without their assertions
+being loosened. Two additions are warranted:
+
+- a serialization test pinning that a timestamp field renders with a `Z` suffix, so the wire
+  format is asserted somewhere rather than assumed
+- an `@IntegrationTest` proving a refresh token issued and expired across the conversion still
+  compares correctly, since that comparison is the reason D15 is in this phase rather than a
+  later one
+
+A loosened assertion during this conversion would hide exactly the defect it exists to remove, so
+any test that needs changing is a finding to report, not a chore to absorb.
+
 ## Verification
 
 A full `./gradlew test` (Docker required), expected green at 213 plus the new cases. Per D5 of
@@ -300,10 +400,20 @@ the parent design, no completion is claimed on a partial run.
 - **The frontend is not yet aware of the 409.** Nothing in the frontend edits a delivered
   order's items today, so no screen breaks, but the manifest patch is what tells it. Recorded in
   the changelog rather than left to discovery.
-- **The fallback timezone follows the machine, which is UTC in most deployments.** Until an admin
-  sets the zone in `RestaurantSettings`, `businessDate` can be off by a day at the edges for a
-  restaurant whose server is elsewhere. The startup log naming the resolved zone and its source
-  is the mitigation; setting the zone is a first-run step, like `SUPER_ADMIN_EMAIL`.
+- **An unset timezone now stops the application from starting.** That is the intent — a wrong
+  business date is worse than a refused boot — but it makes `RESTAURANT_TIMEZONE` a required
+  first-run step for every environment, including a fresh clone. It belongs in `.env.example`
+  and in the startup error's own message, which should name the property and give a valid
+  example rather than merely reporting absence.
+- **D15 changes a live wire format.** Timestamps on `/me`, `/me/profile`, `/users` and `/admin/*`
+  gain a `Z`, and the frontend's `new Date(...)` reads them differently as a result. Nothing
+  crashes; dates shift near midnight. The frontend has to land its side, and the manifest patch
+  is what tells it — this is the one item in Phase 0 that requires coordination rather than
+  just notification.
+- **`V20` has to assume a zone for existing rows.** The naive timestamps already in the database
+  were written in whatever zone the JVM had at the time. The migration states its assumption
+  explicitly; for the current local database that assumption is Brasília, and it is recorded in
+  the migration rather than left to inference.
 - **Orders placed before the zone is corrected keep their stamped date.** That is the intended
   behaviour — dates do not move retroactively — but it means fixing the setting does not fix
   already-filed orders. Worth knowing during the first days of a deployment, when the volume of
