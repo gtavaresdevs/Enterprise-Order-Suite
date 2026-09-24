@@ -8,8 +8,11 @@
 --   America/Sao_Paulo - columns filled by Hibernate's @CreationTimestamp/@UpdateTimestamp
 --     (BaseEntity) or by a column default (NOW(), CURRENT_TIMESTAMP). Both follow the JVM's
 --     default zone: Hibernate directly, the defaults through the session TimeZone the JDBC
---     driver sets from it. Every environment that ran the pre-V20 code did so in Brasilia;
---     for the local environment the JVM default was checked before writing this file.
+--     driver sets from it. This assumes every environment that ran the pre-V20 code did so
+--     in Brasilia. What was checked before writing this file is the development machine's
+--     JVM default zone (America/Sao_Paulo), not the stored rows. Before applying this to a
+--     database, confirm on its refresh_tokens that
+--     (expires_at - interval '14 days') - created_at is 03:00:00.
 --
 --   UTC - columns the auth services filled from LocalDateTime.now(clock), where the Clock
 --     bean is Clock.systemUTC().
