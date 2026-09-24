@@ -431,6 +431,71 @@ class OrderControllerIT {
   }
 
   @Test
+  void updateOrder_replacingItemsOnADeliveredOrder_returns409AndLeavesTheOrderIntact() throws Exception {
+    Long productId = createProduct(
+      "Delivered Order Product",
+      "SKU-" + UUID.randomUUID(),
+      new BigDecimal("10.00"),
+      10
+    );
+
+    Long orderId = createDeliveredOrder(productId);
+
+    // The exact payload from the security audit: it used to wipe the lines and rewrite
+    // totalAmount to 0, with no history row.
+    OrderUpdateRequest wipeItems = OrderUpdateRequest.builder()
+      .status(OrderStatus.DELIVERED)
+      .items(List.of())
+      .build();
+
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(wipeItems)))
+      .andExpect(status().isConflict())
+      .andExpect(jsonPath("$.code").value("ORDER_NOT_EDITABLE"));
+
+    // A status-only assertion would not have caught the original defect. Re-read the order.
+    String body = mockMvc.perform(get("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + adminToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.items.length()").value(1))
+      .andReturn()
+      .getResponse()
+      .getContentAsString();
+
+    assertThat(new BigDecimal(objectMapper.readTree(body).get("totalAmount").asText()))
+      .as("the rejected request must not have touched the total")
+      .isEqualByComparingTo("20.00");
+
+    assertThat(getProductStock(productId))
+      .as("a delivered order's 2 units stay consumed")
+      .isEqualTo(8);
+  }
+
+  @Test
+  void updateOrder_statusOnlyOnADeliveredOrder_stillReturns200() throws Exception {
+    Long productId = createProduct(
+      "Delivered Status Product",
+      "SKU-" + UUID.randomUUID(),
+      new BigDecimal("10.00"),
+      10
+    );
+
+    Long orderId = createDeliveredOrder(productId);
+
+    // Proves the narrowing did not overreach: no items key, no rejection.
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(OrderUpdateRequest.builder()
+          .status(OrderStatus.DELIVERED)
+          .build())))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.status").value("DELIVERED"));
+  }
+
+  @Test
   void createOrder_withTamperedUnitPrice_pricesTheOrderFromTheCatalogue() throws Exception {
     Long productId = createProduct(
       "Tamper Test Product",
@@ -817,6 +882,49 @@ class OrderControllerIT {
     return objectMapper.readTree(response)
       .get("id")
       .asLong();
+  }
+
+  // Two units at 10.00, walked through every legal transition to DELIVERED.
+  private Long createDeliveredOrder(Long productId) throws Exception {
+    OrderCreateRequest createRequest = OrderCreateRequest.builder()
+      .orderNumber("ORD-DELIVERED-" + UUID.randomUUID())
+      .customerId(adminUser.getId())
+      .status(OrderStatus.PENDING)
+      .items(List.of(OrderItemRequest.builder()
+        .productId(productId)
+        .quantity(2)
+        .unitPrice(new BigDecimal("10.00"))
+        .build()))
+      .build();
+
+    String response = mockMvc.perform(post("/orders")
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(createRequest)))
+      .andExpect(status().isCreated())
+      .andReturn()
+      .getResponse()
+      .getContentAsString();
+
+    Long orderId = objectMapper.readTree(response)
+      .get("id")
+      .asLong();
+
+    moveTo(orderId, OrderStatus.PROCESSING);
+    moveTo(orderId, OrderStatus.SHIPPED);
+    moveTo(orderId, OrderStatus.DELIVERED);
+
+    return orderId;
+  }
+
+  private void moveTo(Long orderId, OrderStatus target) throws Exception {
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(OrderUpdateRequest.builder()
+          .status(target)
+          .build())))
+      .andExpect(status().isOk());
   }
 
   private Long createProduct(

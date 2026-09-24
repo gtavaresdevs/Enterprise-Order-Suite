@@ -12,6 +12,7 @@ import com.enterprise.ordersuite.orders.domain.Order;
 import com.enterprise.ordersuite.orders.domain.OrderHistory;
 import com.enterprise.ordersuite.orders.domain.OrderItem;
 import com.enterprise.ordersuite.orders.domain.OrderStatus;
+import com.enterprise.ordersuite.orders.domain.exception.OrderNotEditableException;
 import com.enterprise.ordersuite.orders.domain.exception.ProductNotFoundException;
 import com.enterprise.ordersuite.orders.persistence.OrderHistoryRepository;
 import com.enterprise.ordersuite.orders.persistence.OrderRepository;
@@ -135,6 +136,13 @@ public class OrderService {
         
         return orderRepository.findById(id)
                 .map(existingOrder -> {
+                    // Judged on the order as it stands before this request, and before any
+                    // product is looked up: a closed order answers 409 whatever the items say.
+                    // A request with no items key is a status-only update and is untouched.
+                    if (request.getItems() != null && !isOpen(existingOrder)) {
+                        throw new OrderNotEditableException(id, existingOrder.getStatus());
+                    }
+
                     validateProductsExist(request.getItems());
 
                     // Items are replaced before the status block, not after. A cancellation
@@ -179,7 +187,7 @@ public class OrderService {
     // but deliberately never read. A client that sends a price is either out of date or
     // tampering, and the request cannot tell you which.
     private void addItems(Order order, List<OrderItemRequest> itemRequests) {
-        boolean moveStock = holdsSettleableStock(order);
+        boolean moveStock = isOpen(order);
         itemRequests.forEach(itemRequest -> {
             if (moveStock) {
                 productService.decrementStock(itemRequest.getProductId(), itemRequest.getQuantity());
@@ -192,7 +200,7 @@ public class OrderService {
 
     // The mirror of addItems: an item leaving an order gives its stock back.
     private void removeAllItems(Order order) {
-        if (holdsSettleableStock(order)) {
+        if (isOpen(order)) {
             order.getItems().forEach(item ->
                     productService.incrementStock(item.getProductId(), item.getQuantity())
             );
@@ -200,14 +208,23 @@ public class OrderService {
         order.getItems().clear();
     }
 
-    // An order's claim on stock is settleable only while it can still be cancelled, because
-    // cancelling is the one thing that credits stock back. A CANCELLED order already gave its
-    // stock back; a SHIPPED or DELIVERED one consumed it for good and has no path that could
-    // ever return it. Replacing the items of any of those must move no stock at all -
-    // crediting goods that have shipped is exactly how stock gets minted.
+    // Whether the order is still open: PENDING or PROCESSING. This is the single notion of
+    // an open order in this service, and it has two consequences.
     //
-    // No status changes during a replacement, so this answer is stable across one.
-    private boolean holdsSettleableStock(Order order) {
+    // Stock: an open order's claim on stock is settleable, because it can still be cancelled
+    // and cancelling is what credits stock back. A CANCELLED order already gave its stock
+    // back; a SHIPPED or DELIVERED one consumed it for good. Moving stock for either would
+    // mint it.
+    //
+    // Editability: only an open order accepts an item payload (D13). A closed order is a
+    // record - replacing its lines used to rewrite totalAmount, to zero for an empty list,
+    // with no history row. updateOrder refuses before reaching addItems/removeAllItems, so
+    // on that path the stock check above is now a second line of defence.
+    //
+    // No status changes during a replacement, so this answer is stable across one. The
+    // restaurant-ops rename keeps the boundary: New and Preparing stay open; Ready,
+    // Completed and Cancelled do not.
+    private boolean isOpen(Order order) {
         OrderStatus status = order.getStatus();
         return status == OrderStatus.PENDING || status == OrderStatus.PROCESSING;
     }

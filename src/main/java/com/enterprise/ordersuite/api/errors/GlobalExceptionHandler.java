@@ -1,6 +1,7 @@
 package com.enterprise.ordersuite.api.errors;
 
 import com.enterprise.ordersuite.orders.domain.exception.InvalidStatusTransitionException;
+import com.enterprise.ordersuite.orders.domain.exception.OrderNotEditableException;
 import com.enterprise.ordersuite.orders.domain.exception.ProductNotFoundException;
 import com.enterprise.ordersuite.products.domain.exception.InsufficientStockException;
 import com.enterprise.ordersuite.profile.domain.exception.InvalidAvatarException;
@@ -65,6 +66,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
+    // 409, not 400: the payload is well-formed. It is the order's state that refuses it.
+    @ExceptionHandler(OrderNotEditableException.class)
+    public ResponseEntity<ApiErrorResponse> handleOrderNotEditable(OrderNotEditableException ex) {
+        log.warn("OrderNotEditableException: {}", ex.getMessage());
+        ApiErrorResponse body = new ApiErrorResponse(
+                "ORDER_NOT_EDITABLE",
+                ex.getMessage(),
+                Instant.now(clock),
+                null
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
     @ExceptionHandler(InvalidAvatarException.class)
     public ResponseEntity<ApiErrorResponse> handleInvalidAvatar(InvalidAvatarException ex) {
         log.warn("InvalidAvatarException: {}", ex.getMessage());
@@ -110,6 +124,10 @@ public class GlobalExceptionHandler {
         if (rootCause instanceof InvalidStatusTransitionException) {
             log.warn("Handling InvalidStatusTransitionException from root cause: {}", rootCause.getMessage());
             return handleInvalidStatusTransition((InvalidStatusTransitionException) rootCause);
+        }
+        if (rootCause instanceof OrderNotEditableException) {
+            log.warn("Handling OrderNotEditableException from root cause: {}", rootCause.getMessage());
+            return handleOrderNotEditable((OrderNotEditableException) rootCause);
         }
         if (rootCause instanceof InvalidAvatarException) {
             log.warn("Handling InvalidAvatarException from root cause: {}", rootCause.getMessage());
