@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
@@ -19,8 +19,8 @@ public class RefreshTokenCleanupService {
     private final Duration usedRevokedRetention = Duration.ofDays(7);
 
     public CleanupResult cleanupNow() {
-        LocalDateTime now = LocalDateTime.now(clock);
-        LocalDateTime cutoff = now.minus(usedRevokedRetention);
+        Instant now = Instant.now(clock);
+        Instant cutoff = now.minus(usedRevokedRetention);
 
         int expiredDeleted = refreshTokenRepository.deleteExpired(now);
         int usedRevokedDeleted = refreshTokenRepository.deleteUsedOrRevokedBefore(cutoff);

@@ -7,7 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "refresh_tokens")
@@ -24,15 +24,15 @@ public class RefreshToken extends BaseEntity {
     private String tokenHash;
 
     @Column(name = "expires_at", nullable = false)
-    private LocalDateTime expiresAt;
+    private Instant expiresAt;
 
     @Column(name = "used_at")
-    private LocalDateTime usedAt;
+    private Instant usedAt;
 
     @Column(name = "revoked_at")
-    private LocalDateTime revokedAt;
+    private Instant revokedAt;
 
-    public boolean isExpired(LocalDateTime now) {
+    public boolean isExpired(Instant now) {
         return now.isAfter(expiresAt);
     }
 
@@ -44,7 +44,7 @@ public class RefreshToken extends BaseEntity {
         return usedAt != null;
     }
 
-    public boolean isActive(LocalDateTime now) {
+    public boolean isActive(Instant now) {
         return !isExpired(now) && !isRevoked() && !isUsed();
     }
 }

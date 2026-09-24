@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import java.util.Optional;
 
@@ -19,7 +19,7 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
             delete from RefreshToken rt
             where rt.expiresAt < :now
             """)
-    int deleteExpired(LocalDateTime now);
+    int deleteExpired(Instant now);
 
     @Modifying
     @Transactional
@@ -28,6 +28,6 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
             where (rt.usedAt is not null and rt.usedAt < :cutoff)
                or (rt.revokedAt is not null and rt.revokedAt < :cutoff)
             """)
-    int deleteUsedOrRevokedBefore(LocalDateTime cutoff);
+    int deleteUsedOrRevokedBefore(Instant cutoff);
 
 }

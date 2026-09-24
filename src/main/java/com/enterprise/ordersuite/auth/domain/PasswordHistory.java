@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Entity
 @Table(name = "password_history")
@@ -26,9 +26,9 @@ public class PasswordHistory {
   private String passwordHash;
 
   @Column(name = "created_at", nullable = false, updatable = false)
-  private LocalDateTime createdAt;
+  private Instant createdAt;
 
-  public PasswordHistory(User user, String passwordHash, LocalDateTime createdAt) {
+  public PasswordHistory(User user, String passwordHash, Instant createdAt) {
     this.user = user;
     this.passwordHash = passwordHash;
     this.createdAt = createdAt;

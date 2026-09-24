@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
@@ -26,7 +26,7 @@ public class RefreshTokenService {
         String raw = refreshTokenGenerator.generate();
         String hash = TokenHashing.sha256Hex(raw);
 
-        LocalDateTime now = LocalDateTime.now(clock);
+        Instant now = Instant.now(clock);
 
         RefreshToken token = new RefreshToken();
         token.setUser(user);
@@ -46,7 +46,7 @@ public class RefreshTokenService {
         }
 
         String hash = TokenHashing.sha256Hex(rawRefreshToken);
-        LocalDateTime now = LocalDateTime.now(clock);
+        Instant now = Instant.now(clock);
 
         return refreshTokenRepository.findByTokenHash(hash)
                 .filter(t -> t.isActive(now))
@@ -54,12 +54,12 @@ public class RefreshTokenService {
     }
 
     public void markUsed(RefreshToken token) {
-        token.setUsedAt(LocalDateTime.now(clock));
+        token.setUsedAt(Instant.now(clock));
         refreshTokenRepository.save(token);
     }
 
     public void revoke(RefreshToken token) {
-        token.setRevokedAt(LocalDateTime.now(clock));
+        token.setRevokedAt(Instant.now(clock));
         refreshTokenRepository.save(token);
     }
 
@@ -79,5 +79,5 @@ public class RefreshTokenService {
         return refreshTokenRepository.findByTokenHash(hash).orElse(null);
     }
 
-    public record IssuedRefreshToken(String rawToken, LocalDateTime expiresAt) {}
+    public record IssuedRefreshToken(String rawToken, Instant expiresAt) {}
 }

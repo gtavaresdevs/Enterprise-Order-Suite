@@ -16,8 +16,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
@@ -103,8 +103,8 @@ class PasswordResetServiceTest {
     assertThat(saved.getTokenHash()).isNotEqualTo(rawToken);
     assertThat(saved.getTokenHash()).hasSize(64); // SHA-256 hex
 
-    LocalDateTime expectedNow = LocalDateTime.now(clock);
-    assertThat(saved.getExpiresAt()).isEqualTo(expectedNow.plusMinutes(15));
+    Instant expectedNow = Instant.now(clock);
+    assertThat(saved.getExpiresAt()).isEqualTo(expectedNow.plus(Duration.ofMinutes(15)));
     assertThat(saved.getUser()).isSameAs(user);
 
     verify(linkBuilder).build(eq(rawToken));
@@ -135,7 +135,7 @@ class PasswordResetServiceTest {
   @Test
   void resetPassword_whenTokenUsed_throwsGenericInvalidToken() {
     PasswordResetToken prt = mock(PasswordResetToken.class);
-    when(prt.getUsedAt()).thenReturn(LocalDateTime.now(clock));
+    when(prt.getUsedAt()).thenReturn(Instant.now(clock));
 
     when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.of(prt));
 
@@ -150,7 +150,7 @@ class PasswordResetServiceTest {
   void resetPassword_whenTokenExpired_throwsGenericInvalidToken() {
     PasswordResetToken prt = mock(PasswordResetToken.class);
     when(prt.getUsedAt()).thenReturn(null);
-    when(prt.getExpiresAt()).thenReturn(LocalDateTime.now(clock).minusMinutes(1));
+    when(prt.getExpiresAt()).thenReturn(Instant.now(clock).minus(Duration.ofMinutes(1)));
 
     when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.of(prt));
 
@@ -170,7 +170,7 @@ class PasswordResetServiceTest {
 
     PasswordResetToken prt = mock(PasswordResetToken.class);
     when(prt.getUsedAt()).thenReturn(null);
-    when(prt.getExpiresAt()).thenReturn(LocalDateTime.now(clock).plusMinutes(10));
+    when(prt.getExpiresAt()).thenReturn(Instant.now(clock).plus(Duration.ofMinutes(10)));
     when(prt.getUser()).thenReturn(user);
 
     when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.of(prt));
@@ -193,10 +193,10 @@ class PasswordResetServiceTest {
 
     PasswordResetToken prt = mock(PasswordResetToken.class);
     when(prt.getUsedAt()).thenReturn(null);
-    when(prt.getExpiresAt()).thenReturn(LocalDateTime.now(clock).plusMinutes(10));
+    when(prt.getExpiresAt()).thenReturn(Instant.now(clock).plus(Duration.ofMinutes(10)));
     when(prt.getUser()).thenReturn(user);
 
-    PasswordHistory historicalEntry = new PasswordHistory(user, "hashed_old_password", LocalDateTime.now(clock).minusDays(2));
+    PasswordHistory historicalEntry = new PasswordHistory(user, "hashed_old_password", Instant.now(clock).minus(Duration.ofDays(2)));
 
     when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.of(prt));
     when(passwordEncoder.matches("OldPassword123!", "hashed_current_password")).thenReturn(false);
@@ -222,7 +222,7 @@ class PasswordResetServiceTest {
 
     PasswordResetToken prt = mock(PasswordResetToken.class);
     when(prt.getUsedAt()).thenReturn(null);
-    when(prt.getExpiresAt()).thenReturn(LocalDateTime.now(clock).plusMinutes(10));
+    when(prt.getExpiresAt()).thenReturn(Instant.now(clock).plus(Duration.ofMinutes(10)));
     when(prt.getUser()).thenReturn(user);
 
     when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.of(prt));
@@ -239,7 +239,7 @@ class PasswordResetServiceTest {
     assertThat(historyCaptor.getValue().getPasswordHash()).isEqualTo("hashed_old_active_password");
 
     verify(userRepository).save(user);
-    verify(prt).setUsedAt(LocalDateTime.now(clock));
+    verify(prt).setUsedAt(Instant.now(clock));
     verify(tokenRepository).save(prt);
 
     // Fixed Parameter Evaluation Check to expect a primitive/object 'long'
@@ -271,7 +271,7 @@ class PasswordResetServiceTest {
 
     PasswordResetToken prt = mock(PasswordResetToken.class);
     when(prt.getUsedAt()).thenReturn(null);
-    when(prt.getExpiresAt()).thenReturn(LocalDateTime.now(clock).plusMinutes(10));
+    when(prt.getExpiresAt()).thenReturn(Instant.now(clock).plus(Duration.ofMinutes(10)));
     when(prt.getUser()).thenReturn(user);
 
     when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.of(prt));

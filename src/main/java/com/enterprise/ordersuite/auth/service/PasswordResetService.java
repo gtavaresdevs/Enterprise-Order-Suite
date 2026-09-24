@@ -19,7 +19,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Clock;
-import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
@@ -125,7 +126,7 @@ public class PasswordResetService {
     PasswordResetToken prt = passwordResetTokenRepository.findByTokenHash(tokenHash)
       .orElseThrow(InvalidPasswordResetTokenException::generic);
 
-    LocalDateTime now = LocalDateTime.now(clock);
+    Instant now = Instant.now(clock);
 
     // Enforce singular execution logic requirements (Replay protection)
     if (prt.getUsedAt() != null) {
@@ -205,8 +206,8 @@ public class PasswordResetService {
     String rawToken = generateRawToken();
     String tokenHash = sha256Hex(rawToken);
 
-    LocalDateTime now = LocalDateTime.now(clock);
-    LocalDateTime expiresAt = now.plusMinutes(EXPIRY_MINUTES);
+    Instant now = Instant.now(clock);
+    Instant expiresAt = now.plus(Duration.ofMinutes(EXPIRY_MINUTES));
 
     // Create the token mapping entity context
     PasswordResetToken entity = new PasswordResetToken(user, tokenHash, expiresAt);

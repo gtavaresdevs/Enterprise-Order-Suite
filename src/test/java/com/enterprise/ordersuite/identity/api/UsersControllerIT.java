@@ -17,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.endsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -106,8 +107,10 @@ class UsersControllerIT {
       .andExpect(jsonPath("$.active").value(true))
       .andExpect(jsonPath("$.firstName").value("Target"))
       .andExpect(jsonPath("$.lastName").value("User"))
-      .andExpect(jsonPath("$.createdAt").exists())
-      .andExpect(jsonPath("$.updatedAt").exists())
+      // D15: an instant, serialized in UTC. The frontend's new Date(...) reads a string
+      // without a zone as browser-local time, so the suffix is the contract.
+      .andExpect(jsonPath("$.createdAt").value(endsWith("Z")))
+      .andExpect(jsonPath("$.updatedAt").value(endsWith("Z")))
       .andExpect(jsonPath("$.password").doesNotExist());
   }
 

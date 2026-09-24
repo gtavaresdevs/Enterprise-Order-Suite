@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.endsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -127,7 +128,8 @@ class OrderControllerIT {
     mockMvc.perform(get("/orders/{id}", orderId)
         .header("Authorization", "Bearer " + userToken))
       .andExpect(status().isOk())
-      .andExpect(jsonPath("$.orderNumber").value(orderNumber));
+      .andExpect(jsonPath("$.orderNumber").value(orderNumber))
+      .andExpect(jsonPath("$.createdAt").value(endsWith("Z")));
   }
 
   @Test

@@ -9,7 +9,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,11 +44,11 @@ class RefreshTokenCleanupServiceTest {
     assertThat(result.expiredDeleted()).isEqualTo(3);
     assertThat(result.usedRevokedDeleted()).isEqualTo(5);
 
-    // Verify exact dates were calculated and passed to the repository.
-    // We use explicit expected values rather than recalculating `LocalDateTime.now(clock)`
+    // Verify exact instants were calculated and passed to the repository.
+    // We use explicit expected values rather than recalculating `Instant.now(clock)`
     // in the test, ensuring the math in the service is actually verified.
-    LocalDateTime expectedNow = LocalDateTime.of(2026, 1, 29, 12, 0, 0);
-    LocalDateTime expectedCutoff = LocalDateTime.of(2026, 1, 22, 12, 0, 0); // 7 days prior
+    Instant expectedNow = Instant.parse("2026-01-29T12:00:00Z");
+    Instant expectedCutoff = Instant.parse("2026-01-22T12:00:00Z"); // 7 days prior
 
     verify(repo).deleteExpired(expectedNow);
     verify(repo).deleteUsedOrRevokedBefore(expectedCutoff);

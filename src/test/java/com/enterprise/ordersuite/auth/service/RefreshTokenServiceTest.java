@@ -39,7 +39,7 @@ class RefreshTokenServiceTest {
         when(generator.generate()).thenReturn("raw-refresh-token");
         when(repo.save(any(RefreshToken.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        LocalDateTime now = LocalDateTime.now(clock);
+        Instant now = Instant.now(clock);
 
         var issued = service.issueFor(user);
 
