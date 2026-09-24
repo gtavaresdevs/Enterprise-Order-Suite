@@ -5,7 +5,7 @@
 
 ## Status
 
-**COMPLETE** — both phases. `./gradlew test` is **208 tests, 0 failures, 0 errors**.
+**COMPLETE** — both phases plus the post-audit fixes. `./gradlew test` is **213 tests, 0 failures, 0 errors** (verified 2026-09-24).
 
 | Task | Commit | Notes |
 |---|---|---|
@@ -80,17 +80,23 @@ it, so one SUPER_ADMIN can deactivate/demote/re-email another with no recovery p
 correct for a fresh clone and wrong for an existing one; the startup WARN is the mitigation,
 and setting `SUPER_ADMIN_EMAIL` is a deploy step for every existing environment.
 
-**Not fixed, left for the user to decide** — a delivered order's items can still be wiped and
-its `totalAmount` rewritten to 0 with no history row. Pre-existing (Task 8 only added the
-stock side, now removed), and the correct fix — rejecting item edits outside `PENDING` — is a
-behaviour narrowing the frontend could notice, so it needs the user's call.
+**Not fixed here — carried into the restaurant-ops migration** — a delivered order's items can
+still be wiped and its `totalAmount` rewritten to 0 with no history row. Pre-existing (Task 8
+only added the stock side, now removed), and the correct fix — rejecting item edits once the
+order has left its editable state — is a behaviour narrowing the frontend could notice.
+**User's decision (2026-09-24): fix it, as part of Phase 0** of the restaurant-ops migration,
+where the status enum it has to name is being decided anyway.
 
-### Outstanding for the user
+### Outstanding for the user — all three resolved 2026-09-24
 
-- **`./gradlew flywayRepair`** (or drop the local schema) before the next `bootRun` — editing
-  V15 changed its checksum and the existing local database will fail Flyway validation.
-- **Rotate the exposed super admin password.** The old hash is in git history regardless of
-  this change, so rotation is the step that actually remediates it.
+- ~~**`./gradlew flywayRepair`** (or drop the local schema) before the next `bootRun`~~ —
+  **done.** V15's checksum change is settled locally.
+- ~~**Rotate the exposed super admin password.**~~ — **waived by the user.** The account is a
+  local development seed; the hash in git history is accepted as-is. Revisit before any
+  deployment that uses a real credential.
+- **Item edits on a non-editable order** — **accepted, scheduled into Phase 0** of the
+  restaurant-ops migration (see the paragraph above and
+  `../specs/2026-09-20-claude-tooling-and-restaurant-ops-migration-design.md`).
 
 **Goal:** Clear the five long-standing test failures on `feature/ai-agent` by fixing their
 root causes, then action the four follow-ups raised by the `spring-security-reviewer` audit of
