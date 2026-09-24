@@ -1,7 +1,7 @@
 # Restaurant-ops migration, Phase 0 — Foundation design
 
 Date: 2026-09-24
-Status: approved (design); implementation plan to follow
+Status: implemented — see `../plans/2026-09-24-restaurant-ops-phase-0-foundation.md`
 
 ## Problem
 

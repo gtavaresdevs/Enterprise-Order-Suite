@@ -7,8 +7,8 @@
 | | |
 |---|---|
 | Canonical location | `order-ui/docs/superpowers/specs/2026-09-14-backend-integration-manifest.openapi.yaml` in the **frontend** repository |
-| Snapshot of version | 0.2.0 (dated 2026-09-19) |
-| Taken on | 2026-09-20 |
+| Snapshot of version | 0.3.0 (dated 2026-09-24) |
+| Taken on | 2026-09-24 |
 | Owner | the frontend repository |
 
 The copy is kept **byte-identical** to the canonical file so re-syncing is a clean diff.

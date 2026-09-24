@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Restaurant Ops — Backend Integration Manifest
-  version: "0.2.0"
+  version: "0.3.0"
   description: |
     Contract the frontend needs from the backend to finish the restaurant-ops
     redesign. Generated from the CURRENT frontend mock services/types under
@@ -59,9 +59,17 @@ info:
         list endpoints are paginated (PagedResultOrderResponse / PagedResultProductResponse);
         `GET /orders/search` takes orderNumber/status/customerId. Products require `sku`.
         The Order/MenuItem schemas below are the TARGET that REPLACES these (breaking; see
-        OrderStatus). Ids are int64 live but `string` in the frontend types — see x-open-decisions.
+        OrderStatus). Ids are int64 live and stay int64 in the target (0.3.0, x-open-decisions id-type).
       - Auth (`/auth/*`), `/me`, `/me/profile`, `/users`, `/roles`, `/admin/*` are live; only Auth
         has a pending change (tag `Auth`).
+      - Timestamps (0.3.0): every live timestamp (`createdAt`/`updatedAt` on /me, /me/profile,
+        /users, /admin/*, /orders, /products) now serializes as a UTC instant with a `Z` suffix,
+        e.g. `2026-09-24T21:14:03.120Z`. It used to be a zone-less local datetime. `new Date(...)`
+        reads the old form as browser-local time and the new one as UTC, so a date shown near
+        midnight can move by a day. FRONTEND ACTION REQUIRED.
+      - Legacy `PUT /orders/{id}` (0.3.0): a payload carrying `items` on a SHIPPED, DELIVERED or
+        CANCELLED order returns 409 with code ORDER_NOT_EDITABLE instead of being applied.
+        Status-only updates are unaffected.
 
     KEEPING THIS FILE CURRENT — see `x-maintenance` at the bottom. Short version: patch only what a
     decision touches, bump `info.version`, add an `x-changelog` entry, never rewrite untouched parts.
@@ -102,7 +110,7 @@ components:
           type: string
         code:
           type: string
-          description: 'Machine-readable error code the frontend maps to translated copy (additive in 0.2.0). Known: categoryNameRequired, categoryNameTaken, categoryInUse.'
+          description: 'Machine-readable error code the frontend maps to translated copy (additive in 0.2.0). Known: CATEGORY_NAME_REQUIRED, CATEGORY_NAME_TAKEN, CATEGORY_IN_USE.'
         details:
           type: object
           additionalProperties: true
@@ -137,7 +145,7 @@ components:
         no separate ingredient-level inventory model.
       required: [id, name, description, category, price, image, stockQuantity, available]
       properties:
-        id: { type: string }
+        id: { type: integer, format: int64 }
         name: { type: string }
         description: { type: string }
         category:
@@ -170,7 +178,7 @@ components:
       type: object
       required: [id, name, qrCodeUrl]
       properties:
-        id: { type: string }
+        id: { type: integer, format: int64 }
         name:
           type: string
           description: e.g. "Table 4", "Patio 2". No occupancy/status tracking in this pass (explicitly out of scope per design spec).
@@ -224,7 +232,8 @@ components:
       required: [menuItemId, name, quantity, unitPrice]
       properties:
         menuItemId:
-          type: string
+          type: integer
+          format: int64
           description: Must reference an existing MenuItem id. `name`/`unitPrice` are captured at order time (price snapshot) — not re-derived from the live MenuItem, so later menu price/name edits don't retroactively change past orders.
         name: { type: string }
         quantity: { type: integer, minimum: 1 }
@@ -243,14 +252,19 @@ components:
       required: [id, channel, customerName, customerPhone, items, status, paymentStatus, createdAt, total]
       properties:
         id:
+          type: integer
+          format: int64
+          description: 'Server-assigned numeric primary key (0.3.0, x-open-decisions id-type). The mock''s `{PREFIX}-{year}-{random}` string was serving as a display and lookup key; that role is now orderNumber.'
+        orderNumber:
           type: string
-          description: 'Currently client-generated in the mock as `{PREFIX}-{year}-{random}` (DEL/DIN/PHN per channel) — server-side generation is expected once wired to a real backend; frontend does not need a specific format, just a stable unique id.'
+          description: 'Human-readable unique key (e.g. DEL-2026-8123): what staff and customers see, and what the public /track-order lookup takes. Added in 0.3.0; already present on the live OrderResponse.'
         channel: { $ref: '#/components/schemas/OrderChannel' }
         fulfillment:
           allOf: [{ $ref: '#/components/schemas/Fulfillment' }]
           description: Present only when channel is Online or Phone.
         table:
-          type: string
+          type: integer
+          format: int64
           description: Table id reference, present only when channel is Dine-in.
         customerName:
           type: string
@@ -281,7 +295,13 @@ components:
           description: Promised ETA captured at order time. Delivery = the zone's etaMinutes; Pickup = the restaurant's pickup ETA (a frontend constant today, PICKUP_ETA_MINUTES).
         createdAt:
           type: string
-          description: 'Date-only in the current mock fixture (not a full timestamp) — confirm whether the real backend should capture full datetime; several derived views (Analytics revenue-over-time, Home "today" snapshot) currently key off exact date-string equality, so a format change is a breaking change for those consumers, not just this schema. Home earnings (today / last 7 days / this month plus deltas vs the previous period) compare this value as a `YYYY-MM-DD` string (`===`, `>`, `startsWith(YYYY-MM)`); a full datetime breaks the equality check. Open decision: keep it date-only, or send a datetime and let the frontend derive the restaurant-local date (needs the restaurant timezone).'
+          format: date-time
+          description: 'UTC instant the order was placed, serialized with a Z suffix (0.3.0, x-open-decisions created-at-format). Kept as an instant for the KDS, prep-time measurement and same-day ordering. Do NOT compare it as a date string - Home earnings and Analytics compare businessDate.'
+        businessDate:
+          type: string
+          format: date
+          readOnly: true
+          description: 'The YYYY-MM-DD restaurant-local date the order belongs to. Stamped by the server once, at creation, in RestaurantSettings.timezone, and never recomputed: editing the timezone affects later orders only. Home earnings and Analytics compare THIS field (===, >, startsWith(YYYY-MM)), not createdAt. Never computed client-side. Added in 0.3.0.'
         total:
           type: number
           format: double
@@ -311,7 +331,7 @@ components:
       description: 'x-status proposed. Today lives in browser localStorage (Preferences > Delivery zones) and is consumed by the storefront checkout and staff order creation.'
       required: [id, neighborhood, feeAmount, etaMinutes, active]
       properties:
-        id: { type: string }
+        id: { type: integer, format: int64 }
         neighborhood: { type: string, description: 'Shown to the customer and copied into Order.deliveryZone at order time.' }
         feeAmount: { type: number, format: double, minimum: 0 }
         etaMinutes: { type: integer, minimum: 1 }
@@ -334,6 +354,9 @@ components:
         coverUrl: { type: string, format: uri, nullable: true }
         brandColor: { type: string, description: 'Hex color, e.g. #0f172a.' }
         whatsappNumber: { type: string, description: 'Number the storefront and status notifications use, digits with country code.' }
+        timezone:
+          type: string
+          description: 'IANA zone identifier, e.g. America/Sao_Paulo. Admin-editable. Each order''s businessDate is stamped in this zone at creation, so editing it changes FUTURE orders only. Until it is set, the server falls back to its restaurant.timezone configuration, and it refuses to start if neither is set. Added in 0.3.0.'
 
     PublicRestaurantSettings:
       type: object
@@ -349,6 +372,7 @@ components:
 
     MenuCategory:
       type: object
+      description: 'Addressed by NAME on the wire - in the /menu-categories/{name} path and in MenuItem.category. Backed internally by a stable id with a foreign key from each menu item (0.3.0, x-open-decisions category-identity), so a rename is a single-row update and CATEGORY_IN_USE is the foreign key refusing a delete. The id is never exposed.'
       required: [name]
       properties:
         name: { type: string, description: 'Trimmed, non-empty, unique case-insensitively.' }
@@ -513,7 +537,7 @@ paths:
       - name: id
         in: path
         required: true
-        schema: { type: string }
+        schema: { type: integer, format: int64 }
     patch:
       tags: [Menu]
       summary: Update menu item (including the 86-toggle via `available`)
@@ -573,7 +597,7 @@ paths:
       - name: id
         in: path
         required: true
-        schema: { type: string }
+        schema: { type: integer, format: int64 }
     delete:
       tags: [Tables]
       summary: Delete table
@@ -646,7 +670,7 @@ paths:
       - name: id
         in: path
         required: true
-        schema: { type: string }
+        schema: { type: integer, format: int64 }
     patch:
       tags: [Orders]
       summary: Update order status
@@ -699,8 +723,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MenuCategory' }
-        '400': { description: Blank name (code categoryNameRequired), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-        '409': { description: Name already exists, case-insensitive (code categoryNameTaken), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '400': { description: Blank name (code CATEGORY_NAME_REQUIRED), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: 'Name already exists, case-insensitive (code CATEGORY_NAME_TAKEN)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /menu-categories/{name}:
     parameters:
@@ -725,18 +749,18 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MenuCategory' }
-        '400': { description: Blank name (categoryNameRequired), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '400': { description: Blank name (CATEGORY_NAME_REQUIRED), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-        '409': { description: Name already taken by another category (categoryNameTaken), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: Name already taken by another category (CATEGORY_NAME_TAKEN), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     delete:
       tags: [Menu Categories]
       x-status: proposed
       summary: Delete category
-      description: 'Blocked while any MenuItem still uses it — the UI expects a 409 with code categoryInUse and never cascades or reassigns items.'
+      description: 'Blocked while any MenuItem still uses it — the UI expects a 409 with code CATEGORY_IN_USE and never cascades or reassigns items.'
       responses:
         '204': { description: Deleted }
         '404': { description: Not found, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-        '409': { description: Category still in use (categoryInUse), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: Category still in use (CATEGORY_IN_USE), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   /delivery-zones:
     get:
@@ -772,7 +796,7 @@ paths:
       - name: id
         in: path
         required: true
-        schema: { type: string }
+        schema: { type: integer, format: int64 }
     patch:
       tags: [Restaurant Settings]
       x-status: proposed
@@ -845,7 +869,7 @@ paths:
       - name: id
         in: path
         required: true
-        schema: { type: string }
+        schema: { type: integer, format: int64 }
     get:
       tags: [Public Storefront]
       summary: Look up one table by id, for the QR-scanned table-name banner
@@ -913,6 +937,7 @@ paths:
         in: path
         required: true
         schema: { type: string }
+        description: 'The order''s orderNumber (e.g. DEL-2026-8123), not its numeric id - see Order.orderNumber (0.3.0).'
       - name: phone
         in: query
         required: true
@@ -946,14 +971,17 @@ x-open-decisions:
     status: decided-2026-09-19
     text: 'Base path is /api (no /v1), matching the live backend and the frontend axios baseURL. Reopen only if the backend chooses to introduce versioning; then every path here and the frontend baseURL change together.'
   - id: id-type
-    status: open
+    status: decided-2026-09-24
     text: 'Live ids are int64; frontend types use string ids (mock ids like DEL-2026-8123 and slugs). Decide: backend keeps int64 and the frontend types become number, or the API exposes string ids. Order.id may stay a human-readable orderNumber string either way.'
+    resolution: 'Backend keeps int64. MenuItem, Table, DeliveryZone and Order expose numeric ids, and references to them (OrderLine.menuItemId, Order.table, the {id} path parameters) follow. The four mock-backed frontend types (menu, orders, tables, settings) change id: string to id: number when their services are wired. Order also exposes orderNumber as its human-readable display and tracking key, which /public/orders/{id} takes. Rejected: opaque public ids - the /public/* defence is phone-scoping, not id opacity.'
   - id: category-identity
-    status: open
+    status: decided-2026-09-24
     text: 'Categories are addressed by NAME in the path and in MenuItem.category. Rename cascades to items; names with slashes or special characters need URL-encoding. Consider adding a stable id later (additive: MenuCategory {id, name}).'
+    resolution: 'Normalized: menu_categories(id, name UNIQUE) with a foreign key from each menu item. The wire contract stays name-based (path and MenuItem.category) and the id is never exposed. A rename is a single-row update, and CATEGORY_IN_USE is the foreign key.'
   - id: created-at-format
-    status: open
+    status: decided-2026-09-24
     text: 'Order.createdAt is date-only in the mock; Home earnings compare it as a YYYY-MM-DD string. Keep date-only or send a datetime plus the restaurant timezone (see the Order.createdAt note).'
+    resolution: 'Order.createdAt is a UTC instant (date-time). The server also returns Order.businessDate (YYYY-MM-DD), stamped once at creation in RestaurantSettings.timezone and never recomputed; Home and Analytics compare businessDate. The zone falls back to the restaurant.timezone configuration while unset, and the server refuses to start if neither is set - never the host''s system zone.'
   - id: payment-sequencing
     status: open
     text: 'Mock marks PIX/Card orders Paid immediately. Real sequencing (pay-then-create vs create-then-pay, webhook to flip Pending -> Paid) depends on the processor, which is TBD.'
@@ -961,8 +989,9 @@ x-open-decisions:
     status: open
     text: 'Storefront logo/cover are data URLs in localStorage. Needs an upload endpoint (like POST /me/profile/avatar) before /restaurant-settings can return real URLs.'
   - id: dev-cookie-secure
-    status: open
+    status: decided-2026-09-24
     text: 'HttpOnly refresh cookie needs Secure in production; in local HTTP dev it must be configurable. localhost:3000 (frontend) and localhost:8080 (API) are the same SITE for SameSite, but CORS still needs the exact origin http://localhost:3000. If production serves front and API from different registrable domains, SameSite=None; Secure plus an anti-CSRF token become mandatory.'
+    resolution: 'Env-bound, production-safe defaults: security.refresh-cookie.secure ${REFRESH_COOKIE_SECURE:true}, security.refresh-cookie.same-site ${REFRESH_COOKIE_SAME_SITE:Lax}, security.cors.allowed-origins ${CORS_ALLOWED_ORIGINS:http://localhost:3000}. Local development opts out of Secure explicitly. Not derived from the Spring profile. Built in backend Phase 1.'
 
 x-maintenance:
   canonical-copy: 'order-ui/docs/superpowers/specs/2026-09-14-backend-integration-manifest.openapi.yaml in the frontend repo. Any copy saved in the backend repo is a snapshot: re-copy it when the version changes, and if the backend changes something here, report it back so the canonical copy is patched.'
@@ -977,6 +1006,19 @@ x-maintenance:
     - 'Keep the file valid OpenAPI 3.0.3 YAML; validate after editing.'
 
 x-changelog:
+  - version: "0.3.0"
+    date: 2026-09-24
+    changes:
+      - 'Decided id-type, category-identity, created-at-format and dev-cookie-secure (x-open-decisions, each with a resolution).'
+      - 'Ids: MenuItem.id, Table.id, DeliveryZone.id and Order.id, the references OrderLine.menuItemId and Order.table, and the {id} path parameters of /menu-items, /tables, /orders/{id}/status, /delivery-zones and /public/tables are integer (int64). /public/orders/{id} takes the orderNumber.'
+      - 'Order: orderNumber added; createdAt is a date-time instant; businessDate added (read-only, server-stamped, what Home and Analytics compare).'
+      - 'RestaurantSettings.timezone added (IANA identifier, admin-editable, affects future orders only).'
+      - 'MenuCategory: documented the internal stable id behind the name-based contract.'
+      - 'Error codes are SCREAMING_SNAKE, matching what the live backend already emits: categoryNameRequired, categoryNameTaken and categoryInUse became CATEGORY_NAME_REQUIRED, CATEGORY_NAME_TAKEN and CATEGORY_IN_USE.'
+      - 'Fixed an invalid line: the POST /menu-categories 409 description contained an unquoted comma, which YAML read as a second key (the file failed OpenAPI validation since 0.2.0). Quoted; wording unchanged.'
+      - 'LIVE: every live timestamp now carries a Z suffix, and legacy PUT /orders/{id} rejects item edits on a closed order with 409 ORDER_NOT_EDITABLE (see the live baseline in info.description).'
+    why: 'Backend migration Phase 0 (enterprise-order-suite docs/superpowers/specs/2026-09-24-restaurant-ops-phase-0-foundation-design.md, decisions D9-D15). Every later phase''s schema depends on these four decisions.'
+    breaking: 'Ids on MenuItem, Table, DeliveryZone and Order change from string to integer. They are mock-backed today, so the frontend types change when each service is wired. Live timestamps gain a Z suffix, which changes how new Date() reads them on endpoints the frontend calls TODAY - this one needs a coordinated frontend change.'
   - version: "0.2.0"
     date: 2026-09-19
     changes:
