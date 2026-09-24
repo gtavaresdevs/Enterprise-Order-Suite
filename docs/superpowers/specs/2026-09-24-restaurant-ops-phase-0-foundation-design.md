@@ -72,7 +72,8 @@ D1–D8.
 | # | Decision | Lands in |
 |---|---|---|
 | D9 | `id-type`: the backend keeps `int64`; the frontend's four mock-backed types become `number` | 2–4 |
-| D10 | `created-at-format`: `createdAt` is a UTC instant; the server also returns `businessDate` | 4 |
+| D10 | `created-at-format`: `createdAt` is a UTC instant; the server stamps a `businessDate` at creation | 4 |
+| D10a | The restaurant's timezone is admin-editable in `RestaurantSettings`; config is only its fallback | 3 |
 | D11 | `category-identity`: normalized table with an FK, name-based wire contract | 2 |
 | D12 | `dev-cookie-secure`: env-bound cookie and CORS properties, production-safe defaults | 1 |
 | D13 | Item edits are accepted only while an order is open | **0** |
@@ -107,12 +108,35 @@ are otherwise unchanged. Deriving the date on the server rather than in the brow
 — a browser in a different timezone from the restaurant would otherwise attribute late-evening
 orders to the wrong day, silently.
 
-**Timezone source, and its ordering problem.** `businessDate` needs a timezone, but
-`RestaurantSettings` is not built until Phase 3 and `businessDate` is not returned until Phase 4.
-So the timezone starts as the configuration property `restaurant.timezone`, defaulting to
-`America/Sao_Paulo` — the IANA identifier for Brasília time; there is no `America/Brasilia`
-zone. In Phase 3 the settings row becomes the authoritative source and the property becomes its
-fallback. No phase computes the business date client-side.
+**The timezone is a setting the admin owns, not a deployment detail.** It belongs in
+`RestaurantSettings` next to `brandColor` and `whatsappNumber`, and is editable from the back
+office — the restaurant may not be where the server is, and the business may open somewhere
+else later. Phase 3 builds that field; `RestaurantSettings.timezone` is therefore an additive
+change to this phase's manifest patch, not a Phase 3 discovery.
+
+Because `RestaurantSettings` does not exist until Phase 3 while `businessDate` is not returned
+until Phase 4, the configuration property `restaurant.timezone` exists as the **fallback only**,
+resolved in this order: the settings row, then the property, then `ZoneId.systemDefault()`.
+
+Defaulting to the system zone rather than to a hardcoded `America/Sao_Paulo` keeps a
+single-country assumption out of the code, and is right on a developer machine. It is *not*
+right on a typical container or VPS, which reports UTC — so the resolved zone and **where it came
+from** are logged at startup, following the precedent set by the `SUPER_ADMIN_EMAIL` warning in
+the previous phase. A default that is wrong is tolerable; one that is wrong and silent is not.
+
+Keeping the zone in a settings row rather than in configuration is also what makes a future
+multi-tenant move cheap: the field moves to the tenant, and nothing else changes. That move is
+not designed for here — the parent design's model is one restaurant.
+
+**An order's business date is stamped when the order is placed.** `business_date` is a stored,
+indexed column, computed once at creation from the timezone then in force, and never recomputed.
+Changing the setting affects orders placed afterwards and leaves earlier ones alone, so a day
+whose totals were already reported does not move. This is how the order already treats every
+other value that can change underneath it — `OrderLine.unitPrice` and `Order.deliveryZone` are
+both captured at order time. Deriving the date on each read would have been simpler, but it
+re-dates an order placed near midnight whenever the setting changes, retroactively.
+
+No phase computes the business date client-side.
 
 ### D11 — `category-identity`: id in the database, name on the wire
 
@@ -199,7 +223,10 @@ Edits to the canonical file:
 - `Order.createdAt`: `type: string, format: date-time`, its open-decision prose replaced by the
   resolution.
 - `Order.businessDate`: added, `type: string, format: date`, carrying the note that Home and
-  Analytics compare **this** field, not `createdAt`.
+  Analytics compare **this** field, not `createdAt`, and that it is fixed at creation.
+- `RestaurantSettings.timezone`: added, `type: string`, an IANA zone identifier, admin-editable.
+  Described as the zone each order's `businessDate` is stamped in, so a reader understands that
+  editing it changes future orders only.
 - `MenuCategory`: description records that a stable id backs the name internally while the wire
   contract stays name-based.
 - `Error.code`: the three known values re-cased per D14.
@@ -273,10 +300,14 @@ the parent design, no completion is claimed on a partial run.
 - **The frontend is not yet aware of the 409.** Nothing in the frontend edits a delivered
   order's items today, so no screen breaks, but the manifest patch is what tells it. Recorded in
   the changelog rather than left to discovery.
-- **`restaurant.timezone` is a default, not a confirmed operational fact.** If the restaurant is
-  not on Brasília time, `businessDate` is wrong by up to a day at the edges from Phase 4 onward.
-  The property exists precisely so this is a one-line correction, and Phase 3 moves it to
-  `RestaurantSettings` where it belongs.
+- **The fallback timezone follows the machine, which is UTC in most deployments.** Until an admin
+  sets the zone in `RestaurantSettings`, `businessDate` can be off by a day at the edges for a
+  restaurant whose server is elsewhere. The startup log naming the resolved zone and its source
+  is the mitigation; setting the zone is a first-run step, like `SUPER_ADMIN_EMAIL`.
+- **Orders placed before the zone is corrected keep their stamped date.** That is the intended
+  behaviour — dates do not move retroactively — but it means fixing the setting does not fix
+  already-filed orders. Worth knowing during the first days of a deployment, when the volume of
+  wrongly-stamped orders is small and a manual correction is still cheap.
 - **0.3.0 carries a breaking id-type change under a minor bump.** Defensible by the file's own
   precedent, and the affected consumers are all still mock-backed, but it means the version
   number alone does not warn a reader. The `breaking:` line in the changelog entry does.
