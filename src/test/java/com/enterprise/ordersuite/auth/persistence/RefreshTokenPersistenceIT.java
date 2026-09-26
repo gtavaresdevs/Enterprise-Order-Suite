@@ -1,6 +1,7 @@
 package com.enterprise.ordersuite.auth.persistence;
 
 import com.enterprise.ordersuite.auth.domain.RefreshToken;
+import com.enterprise.ordersuite.auth.service.RefreshTokenCleanupService;
 import com.enterprise.ordersuite.auth.service.RefreshTokenService;
 import com.enterprise.ordersuite.auth.service.tokens.TokenHashing;
 import com.enterprise.ordersuite.identity.domain.User;
@@ -42,6 +43,9 @@ class RefreshTokenPersistenceIT {
 
   @Autowired
   private Clock clock;
+
+  @Autowired
+  private RefreshTokenCleanupService refreshTokenCleanupService;
 
   @Test
   void save_storesExpiresAtAsTheInstantItWasGiven() {
@@ -86,6 +90,19 @@ class RefreshTokenPersistenceIT {
     assertThat(refreshTokenService.isExpired(reload(justExpired)))
       .as("a token that expired five minutes ago is not")
       .isTrue();
+  }
+
+  @Test
+  void cleanupNow_keepsAUsedTokenUntilItsOwnExpiry() {
+    RefreshToken token = saveToken("raw-" + UUID.randomUUID(), clock.instant().plus(Duration.ofDays(13)));
+    token.setUsedAt(clock.instant().minus(Duration.ofDays(8)));
+    refreshTokenRepository.save(token);
+
+    refreshTokenCleanupService.cleanupNow();
+
+    assertThat(refreshTokenRepository.findById(token.getId()))
+      .as("a replay of this token must still be recognised as reuse, so it must still exist")
+      .isPresent();
   }
 
   private RefreshToken reload(String rawToken) {

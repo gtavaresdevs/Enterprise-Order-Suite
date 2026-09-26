@@ -48,13 +48,4 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
             """)
     int deleteExpired(Instant now);
 
-    @Modifying
-    @Transactional
-    @Query("""
-            delete from RefreshToken rt
-            where (rt.usedAt is not null and rt.usedAt < :cutoff)
-               or (rt.revokedAt is not null and rt.revokedAt < :cutoff)
-            """)
-    int deleteUsedOrRevokedBefore(Instant cutoff);
-
 }

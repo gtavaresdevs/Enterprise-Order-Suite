@@ -32,44 +32,20 @@ class RefreshTokenCleanupServiceTest {
   }
 
   @Test
-  void cleanupNow_ShouldTriggerDeletions_WithCorrectCalculatedTimestamps() {
-    // Arrange
+  void cleanupNow_deletesOnlyExpiredTokens() {
     when(repo.deleteExpired(any())).thenReturn(3);
-    when(repo.deleteUsedOrRevokedBefore(any())).thenReturn(5);
 
-    // Act
     var result = service.cleanupNow();
 
-    // Assert
     assertThat(result.expiredDeleted()).isEqualTo(3);
-    assertThat(result.usedRevokedDeleted()).isEqualTo(5);
-
-    // Verify exact instants were calculated and passed to the repository.
-    // We use explicit expected values rather than recalculating `Instant.now(clock)`
-    // in the test, ensuring the math in the service is actually verified.
-    Instant expectedNow = Instant.parse("2026-01-29T12:00:00Z");
-    Instant expectedCutoff = Instant.parse("2026-01-22T12:00:00Z"); // 7 days prior
-
-    verify(repo).deleteExpired(expectedNow);
-    verify(repo).deleteUsedOrRevokedBefore(expectedCutoff);
+    verify(repo).deleteExpired(Instant.parse("2026-01-29T12:00:00Z"));
     verifyNoMoreInteractions(repo);
   }
 
   @Test
-  void cleanupNow_WhenNoTokensMatch_ShouldReturnZeroCounts() {
-    // Arrange
+  void cleanupNow_whenNothingExpired_returnsZero() {
     when(repo.deleteExpired(any())).thenReturn(0);
-    when(repo.deleteUsedOrRevokedBefore(any())).thenReturn(0);
 
-    // Act
-    var result = service.cleanupNow();
-
-    // Assert
-    assertThat(result.expiredDeleted()).isZero();
-    assertThat(result.usedRevokedDeleted()).isZero();
-
-    verify(repo).deleteExpired(any());
-    verify(repo).deleteUsedOrRevokedBefore(any());
-    verifyNoMoreInteractions(repo);
+    assertThat(service.cleanupNow().expiredDeleted()).isZero();
   }
 }

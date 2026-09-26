@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 
 @Service
@@ -15,18 +14,11 @@ public class RefreshTokenCleanupService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final Clock clock;
 
-    // keep used/revoked tokens for 7 days (for troubleshooting/audit)
-    private final Duration usedRevokedRetention = Duration.ofDays(7);
-
+    // Used and revoked tokens stay until their own expiry: a replayed token must still be
+    // found to be recognised as reuse (D24). deleteExpired removes every token past expiry.
     public CleanupResult cleanupNow() {
-        Instant now = Instant.now(clock);
-        Instant cutoff = now.minus(usedRevokedRetention);
-
-        int expiredDeleted = refreshTokenRepository.deleteExpired(now);
-        int usedRevokedDeleted = refreshTokenRepository.deleteUsedOrRevokedBefore(cutoff);
-
-        return new CleanupResult(expiredDeleted, usedRevokedDeleted);
+        return new CleanupResult(refreshTokenRepository.deleteExpired(Instant.now(clock)));
     }
 
-    public record CleanupResult(int expiredDeleted, int usedRevokedDeleted) {}
+    public record CleanupResult(int expiredDeleted) {}
 }
