@@ -1,7 +1,7 @@
 # Restaurant-ops migration, Phase 1 — Auth target design
 
 Date: 2026-09-25
-Status: approved design — implementation plan pending
+Status: approved design, amended 2026-09-25 after a risk review (D22–D24) — plan: `../plans/2026-09-25-restaurant-ops-phase-1-auth.md`
 
 ## Problem
 
@@ -33,8 +33,30 @@ The target is the manifest's `Auth` tag (`docs/contracts/backend-integration-man
   is env-bound (`application.yml`), so the cookie path must be derived from it, not hardcoded.
 - **A password reset does not revoke refresh tokens.** A stolen refresh token keeps working for
   up to 14 days after the victim resets their password.
-- `/auth/refresh` and `/auth/logout` are already rate-limited per IP (`AuthRateLimitFilter`);
-  nothing to add.
+- **Auth rate limiting has never fired outside the tests** (found in the risk review, confirmed
+  2026-09-25). `AuthRateLimitFilter` matches `request.getRequestURI()` against `"/auth/login"`
+  and friends. `getRequestURI()` includes the context path, so a real deployment sees
+  `/api/auth/login`, matches nothing, and skips every request. MockMvc sends no context path,
+  which is why the rate-limit ITs pass. A throwaway MockMvc run with rate limiting forced on,
+  seven bad logins each:
+
+  ```
+  without context path: [401, 401, 401, 401, 401, 429, 429]
+  with /api context path: [401, 401, 401, 401, 401, 401, 401]
+  ```
+
+  The running local app (`POST http://localhost:8080/api/auth/login`, seven bad logins) also
+  answered 401 seven times. The Phase 1 `Origin` filter has to match the same two paths, so it
+  would have inherited the defect.
+- **Fixing that turns rate limiting on in production for the first time**, and the limiter keys
+  on `getRemoteAddr()`. Its comment says X-Forwarded-For parsing is delegated to Tomcat, but
+  `server.forward-headers-strategy` is not configured, so nothing does. Behind a reverse proxy
+  every user would share the proxy's IP and one bucket (5 logins per window, site-wide); trusting
+  the header unconditionally would let any client forge its IP. Not deployed yet (Gabriel,
+  2026-09-25), so this is decided now rather than discovered at launch.
+- **Reuse detection has a 7-day horizon.** `RefreshTokenCleanupService` deletes used and revoked
+  tokens 7 days after use. A replay after that finds nothing, answers a plain 401 and revokes no
+  family, so a thief who rotated first keeps the session if the user returns after a week.
 
 ## Scope
 
@@ -49,6 +71,9 @@ The target is the manifest's `Auth` tag (`docs/contracts/backend-integration-man
 | `firstName`, `lastName`, `email` JWT claims | yes |
 | Invalid refresh → 401 | yes |
 | Password reset revokes all of the user's refresh tokens | yes (user's decision, 2026-09-25) |
+| Rate limiting matches paths under the context path (D22) | yes — first task, own commit |
+| Client-IP trust made explicit and env-bound (D23) | yes |
+| Used/revoked tokens retained until their own expiry (D24) | yes |
 | Dropping `refreshToken` from the response body | **no — Phase 6**, coordinated with the frontend |
 | Making the `Origin` check unconditional | **no — Phase 6**, once the body path is gone |
 
@@ -128,6 +153,51 @@ A successful `PasswordResetService.resetPassword` revokes all of the user's non-
 tokens in the same transaction. A reset is the user's statement that their credentials may be
 compromised; leaving refresh tokens alive defeats it.
 
+### D22 — filters match the path within the application
+
+Every filter that matches on a path uses the request URI minus the context path (one helper,
+`RequestPaths.withinApplication`), never the raw `getRequestURI()`. `AuthRateLimitFilter` is
+corrected to it, and `RefreshOriginFilter` (D19) is born using it. Regression tests run with
+`contextPath("/api")`, because a filter that passes every context-free test while switching
+off in production is exactly the defect found.
+
+The raw URI is not normalized, so matching on it relies on Spring Security's
+`StrictHttpFirewall` (it runs before the filter chain and rejects `;`, `//`, encoded slashes and
+dot segments) and on Spring MVC 6 not matching trailing slashes. Both are framework defaults;
+nothing here disables them.
+
+This lands as its own commit, first, because it is a production security fix independent of
+the cookie work (Gabriel, 2026-09-25).
+
+Rejected: fixing only the Origin filter and deferring the rate limiter — it leaves a known
+brute-force exposure on `/auth/login` and `/auth/forgot-password` in place.
+
+### D23 — client-IP trust is explicit, env-bound and off by default
+
+`server.forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:none}`. With `none` the
+client IP is the socket address — correct locally and when exposed directly, and the only safe
+default, because honoring `X-Forwarded-For` from anyone lets a client forge its IP and walk
+around every rate limit. A deployment behind a reverse proxy or load balancer sets `native`:
+Tomcat's `RemoteIpValve` then takes the client IP from `X-Forwarded-For` only when the
+connection comes from a trusted proxy (`server.tomcat.remoteip.internal-proxies`, private
+ranges by default; a proxy on a public address has to be added there).
+
+Rejected: leaving it unset. Spring Boot then enables forward headers on some detected cloud
+platforms and not others — a security property decided by where the jar happens to run, the
+same reasoning D12 used to reject profile-derived cookie flags.
+
+Not tested automatically: MockMvc does not run Tomcat valves, so an IT would pass whatever the
+setting. Verified by hand instead (see Verification).
+
+### D24 — used and revoked tokens are kept until their own expiry
+
+Cleanup deletes only tokens past `expires_at`; the separate 7-day purge of used and revoked
+tokens goes. Reuse is then detected for a token's whole 14-day life. `refresh()` checks
+used/revoked **before** expired, so replaying a used token that has also expired still revokes
+its family. Cost: one extra row per rotation, gone at most 14 days later.
+
+Rejected: keeping 7 days and documenting the blind spot.
+
 ### Unchanged decisions this phase implements
 
 - **D12** — `security.refresh-cookie.secure ${REFRESH_COOKIE_SECURE:true}`,
@@ -200,8 +270,19 @@ CREATE INDEX idx_refresh_tokens_family_id ON refresh_tokens(family_id);
 - `RefreshOriginFilter` implements D19, emitting `ApiErrorResponse` for the 403.
 - `SecurityConfig.corsConfigurationSource` reads `CorsProperties`.
 - `.env.example` gains `REFRESH_COOKIE_SECURE`, `REFRESH_COOKIE_SAME_SITE`,
-  `CORS_ALLOWED_ORIGINS`; the three keys are bound in `application.yml`. The test profile keeps
+  `CORS_ALLOWED_ORIGINS` (noting that Swagger UI used in a browser sends the cookie from the
+  API's own origin, so a developer who uses it adds `http://localhost:8080` locally); the three keys are bound in `application.yml`. The test profile keeps
   the production default `secure: true` (MockMvc does not enforce it), so tests assert what ships.
+
+### Rate limiting and client IP — `RequestPaths`, `AuthRateLimitFilter`, `application.yml`
+
+- `security.web.RequestPaths.withinApplication(HttpServletRequest)` returns
+  `getRequestURI()` minus `getContextPath()`. `AuthRateLimitFilter.shouldNotFilter` and
+  `doFilterInternal` use it; `RefreshOriginFilter` uses it.
+- `server.forward-headers-strategy` bound per D23; `SERVER_FORWARD_HEADERS_STRATEGY` documented
+  in the env template; the misleading comment in `AuthRateLimitFilter` corrected.
+- `RefreshTokenCleanupService.cleanupNow()` calls only `deleteExpired`; the repository's
+  `deleteUsedOrRevokedBefore` and `CleanupResult.usedRevokedDeleted` are removed (D24).
 
 ### Claims — `JwtService`
 
@@ -221,7 +302,14 @@ Unit:
   cookie mirrors the issuing one;
 - `JwtService`: the three claims are present.
 
+Unit (added by D22–D24):
+- `RequestPaths`: `/api` context path stripped; empty context path unchanged;
+- cleanup calls only `deleteExpired`.
+
 Integration (`@IntegrationTest`, real login):
+- login rate limiting fires with `contextPath("/api")` and without it (D22 — the first run
+  fails, reproducing the finding);
+- a used token whose own expiry is still ahead survives cleanup (D24);
 - login and register set the cookie with `HttpOnly`, `SameSite=Lax`, `Path`, `Max-Age`, `Secure`;
 - refresh via cookie rotates and sets a new cookie; refresh via body still works (backward
   compatibility);
@@ -240,8 +328,14 @@ The rest of the suite passes as written — that is the backward-compatibility p
 ## Verification
 
 Full `./gradlew test` green, then a `spring-security-reviewer` audit of the diff before the
-phase is called done. Manual: log in from the running frontend origin and confirm the cookie
-in the browser's devtools with `REFRESH_COOKIE_SECURE=false` locally.
+phase is called done. Manual, against the restarted local app:
+- log in from the running frontend origin and confirm the cookie in devtools (HttpOnly,
+  `Path=/api/auth`) with `REFRESH_COOKIE_SECURE=false` locally;
+- seven bad logins to `http://localhost:8080/api/auth/login` answer 429 from the sixth on
+  (requires `RATE_LIMIT_ENABLED` not set to `false` locally) — the D22 fix in the real
+  container, which no MockMvc test can show;
+- the same seven, each with a different forged `X-Forwarded-For`, still hit 429 on the sixth —
+  D23's default ignores the header.
 
 ## Risks
 
@@ -256,6 +350,21 @@ in the browser's devtools with `REFRESH_COOKIE_SECURE=false` locally.
 - **Rollback of the reuse branch.** If the family revocation rolls back with the 401, reuse
   detection silently does nothing. The integration test that presents B after A's reuse is the
   guard against exactly this.
+
+- **A lost refresh response logs the user out (D17, accepted).** If the server rotates and the
+  response never arrives (network drop, timeout), the client retries with the old token, which
+  is reuse, and the family is revoked. That is the known price of strict rotation without a
+  grace window; the user logs in again.
+- **Launch gate, not a deploy-order problem.** The frontend is not live (Gabriel, 2026-09-25),
+  so strict reuse and the 400→401 change affect no real user today. The four frontend
+  follow-ups (see "Contract work") must land before any launch: without single-flight, two tabs
+  refreshing at once log the user out; without the no-retry rule, a 401 from `/auth/refresh`
+  can loop.
+- **Rate limits start firing locally.** After D22, rapid manual logins against the local app get
+  429s where they never did — expected; `RATE_LIMIT_ENABLED=false` is the local escape hatch.
+- **The rate limiter is in-memory, per instance.** Correct for the single instance that exists;
+  horizontal scaling would divide the effective limit by the instance count. Out of scope until
+  there is more than one instance.
 
 ## Out of scope, carried forward
 

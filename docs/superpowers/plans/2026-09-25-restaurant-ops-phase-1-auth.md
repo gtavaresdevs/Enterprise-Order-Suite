@@ -2,17 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Move the refresh token into an HttpOnly cookie with rotation, family revocation on reuse, `Origin` validation and identity claims in the JWT — without breaking any client that still sends the token in the body.
+**Goal:** Make auth rate limiting actually fire under the production context path, then move the refresh token into an HttpOnly cookie with rotation, family revocation on reuse, `Origin` validation and identity claims in the JWT — without breaking any client that still sends the token in the body.
 
-**Architecture:** `refresh_tokens` gains a `family_id`; `RefreshTokenService` owns issue/rotate/revoke by family; `AuthenticationService.refresh` runs in one transaction with a row lock and commits the family revocation even when it answers 401. The web layer resolves the token from cookie-then-body, emits `Set-Cookie` via a `RefreshCookieFactory`, and a `RefreshOriginFilter` (ahead of `CorsFilter`) rejects cookie-borne requests from unlisted origins.
+**Architecture:** Tasks 1–2 fix the rate limiter first, in their own commits: path matching goes through one `RequestPaths.withinApplication` helper (context path stripped), and client-IP trust becomes an explicit env setting. Then `refresh_tokens` gains a `family_id`; `RefreshTokenService` owns issue/rotate/revoke by family; `AuthenticationService.refresh` runs in one transaction with a row lock and commits the family revocation even when it answers 401. The web layer resolves the token from cookie-then-body, emits `Set-Cookie` via a `RefreshCookieFactory`, and a `RefreshOriginFilter` (ahead of `CorsFilter`) rejects cookie-borne requests from unlisted origins.
 
 **Tech Stack:** Java 17, Spring Boot 3, Spring Security, Spring Data JPA / Hibernate 6, Flyway, PostgreSQL 16 (Testcontainers), JJWT, JUnit 5, Mockito, AssertJ, MockMvc.
 
-**Spec:** `docs/superpowers/specs/2026-09-25-restaurant-ops-phase-1-auth-design.md` (decisions D16–D21; D12 and D14 from the Phase 0 spec).
+**Spec:** `docs/superpowers/specs/2026-09-25-restaurant-ops-phase-1-auth-design.md` (decisions D16–D24; D12 and D14 from the Phase 0 spec).
 
 ## Global Constraints
 
-- Invoke the project skills before the matching work: `flyway-migrations` (Task 1), `spring-security-changes` (Tasks 3, 6, 7), `writing-backend-tests` (every task), `api-contract-sync` (Task 6).
+- Invoke the project skills before the matching work: `flyway-migrations` (Task 3), `spring-security-changes` (Tasks 1, 2, 5, 6, 9, 10), `writing-backend-tests` (every task), `api-contract-sync` (Task 9).
 - Config keys and defaults, verbatim (D12): `security.refresh-cookie.secure ${REFRESH_COOKIE_SECURE:true}`, `security.refresh-cookie.same-site ${REFRESH_COOKIE_SAME_SITE:Lax}`, `security.cors.allowed-origins ${CORS_ALLOWED_ORIGINS:http://localhost:3000}`. Never derive them from the Spring profile.
 - Cookie name `refreshToken`; attributes `HttpOnly`, `Secure`/`SameSite` from properties, `Path=<context-path>/auth`, `Max-Age` = 14 days (1209600 s).
 - Error codes are `SCREAMING_SNAKE` (D14): invalid refresh → **401** `INVALID_REFRESH_TOKEN`; bad origin → **403** `ORIGIN_NOT_ALLOWED`. Error body is `ApiErrorResponse`.
@@ -25,15 +25,269 @@
 
 ## Review Focus
 
-1. **A developer's local `.env` sets `REFRESH_COOKIE_SECURE=false`** (Task 8 tells them to) and spring-dotenv loads it in tests — cookie ITs must pin `security.refresh-cookie.*` and `security.cors.allowed-origins` with `@TestPropertySource`, or they pass or fail depending on the machine. (Task 6, Task 7.)
-2. **Production context path `/api`.** MockMvc runs with an empty context path, so ITs never see `/api`. The filter's path match and the cookie `Path` must be computed from `request.getContextPath()`; unit tests pin the `/api` case. (Task 6 `RefreshCookieFactoryTest`, Task 7 `RefreshOriginFilterTest`.)
-3. **`POST /auth/refresh` with `Content-Type: application/json` and an empty body** — what the target frontend sends when it has no cookie. Must answer 401 `INVALID_REFRESH_TOKEN`, not 400. (Task 6 IT.)
-4. **The reuse revocation rolled back along with the 401.** If `noRollbackFor` is missing, reuse detection silently does nothing. Guarded by presenting the successor after a reuse. (Task 3 IT.)
-5. **Near-miss origins** — `http://localhost:3000/` (trailing slash), `http://localhost:3001`, `null` (sandboxed iframes send the literal string `null`). Exact match only; all must be 403. (Task 7 unit test.)
+1. **A developer's local `.env` sets `REFRESH_COOKIE_SECURE=false`** (Task 11 tells them to) and spring-dotenv loads it in tests — cookie ITs must pin `security.refresh-cookie.*` and `security.cors.allowed-origins` with `@TestPropertySource`, or they pass or fail depending on the machine. (Task 9, Task 10.)
+2. **Production context path `/api`.** MockMvc runs with an empty context path, so ITs never see `/api` unless told to — this is how the rate limiter shipped switched off. Every path match goes through `RequestPaths.withinApplication`, and the cookie `Path` is built from `request.getContextPath()`. Pinned by an IT that runs with `contextPath("/api")` (Task 1) and unit tests for the `/api` case (Task 1 `RequestPathsTest`, Task 9 `RefreshCookieFactoryTest`, Task 10 `RefreshOriginFilterTest`).
+3. **`POST /auth/refresh` with `Content-Type: application/json` and an empty body** — what the target frontend sends when it has no cookie. Must answer 401 `INVALID_REFRESH_TOKEN`, not 400. (Task 9 IT.)
+4. **The reuse revocation rolled back along with the 401.** If `noRollbackFor` is missing, reuse detection silently does nothing. Guarded by presenting the successor after a reuse. (Task 5 IT.)
+5. **Near-miss origins** — `http://localhost:3000/` (trailing slash), `http://localhost:3001`, `null` (sandboxed iframes send the literal string `null`). Exact match only; all must be 403. (Task 10 unit test.)
 
 ---
 
-### Task 1: Token families in the schema (V21)
+### Task 1: Rate limiting fires under the context path (D22)
+
+**Files:**
+- Create: `src/main/java/com/enterprise/ordersuite/security/web/RequestPaths.java`
+- Modify: `src/main/java/com/enterprise/ordersuite/security/web/AuthRateLimitFilter.java:68` and `:96`
+- Test: `src/test/java/com/enterprise/ordersuite/security/web/RequestPathsTest.java`, `src/test/java/com/enterprise/ordersuite/security/ratelimit/ContextPathRateLimitIT.java`
+
+**Interfaces:**
+- Produces: `public static String RequestPaths.withinApplication(HttpServletRequest request)` — the request URI minus the context path. Task 10's `RefreshOriginFilter` uses it.
+
+Background: `AuthRateLimitFilter` compares `getRequestURI()` (which includes the context path) with `"/auth/login"` etc. Under `SERVER_CONTEXT_PATH=/api` nothing matches and the limiter skips every request. MockMvc sends no context path, so the existing rate-limit ITs pass. Confirmed on 2026-09-25 (spec, "Findings").
+
+- [ ] **Step 1: Invoke the `spring-security-changes` skill.** This is a defect fix that narrows nothing and widens nothing: the limits were always meant to apply.
+
+- [ ] **Step 2: Write the failing regression IT**
+
+`src/test/java/com/enterprise/ordersuite/security/ratelimit/ContextPathRateLimitIT.java`:
+
+```java
+package com.enterprise.ordersuite.security.ratelimit;
+
+import com.enterprise.ordersuite.support.IntegrationTest;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+
+// Every other rate-limit IT sends requests without a context path, which is how the limiter
+// shipped switched off: production serves under SERVER_CONTEXT_PATH=/api, and the filter
+// compared the raw request URI (/api/auth/login) with "/auth/login".
+@IntegrationTest
+@AutoConfigureMockMvc
+@TestPropertySource(properties = {
+  "security.rate-limit.enabled=true",
+  "security.rate-limit.login.capacity=5",
+  "security.rate-limit.login.refill-seconds=60"
+})
+class ContextPathRateLimitIT {
+
+  @Autowired
+  private MockMvc mockMvc;
+
+  @Test
+  @DisplayName("Should rate limit login when the application is served under the /api context path")
+  void login_underTheApiContextPath_isRateLimited() throws Exception {
+    List<Integer> statuses = sixFailedLogins("/api", "10.20.30.1");
+
+    assertThat(statuses.subList(0, 5))
+      .as("the first five attempts are within capacity")
+      .doesNotContain(429);
+    assertThat(statuses.get(5))
+      .as("the sixth attempt exceeds capacity - before the fix every attempt here was 401")
+      .isEqualTo(429);
+  }
+
+  @Test
+  @DisplayName("Should still rate limit login when there is no context path")
+  void login_withoutAContextPath_isStillRateLimited() throws Exception {
+    assertThat(sixFailedLogins("", "10.20.30.2").get(5)).isEqualTo(429);
+  }
+
+  private List<Integer> sixFailedLogins(String contextPath, String ip) throws Exception {
+    String body = "{\"email\":\"ctx-" + UUID.randomUUID() + "@test.com\",\"password\":\"wrong\"}";
+    List<Integer> statuses = new ArrayList<>();
+    for (int attempt = 0; attempt < 6; attempt++) {
+      statuses.add(mockMvc.perform(post(contextPath + "/auth/login")
+          .contextPath(contextPath)
+          .with(request -> {
+            request.setRemoteAddr(ip);
+            return request;
+          })
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(body))
+        .andReturn().getResponse().getStatus());
+    }
+    return statuses;
+  }
+}
+```
+
+And the helper's unit test, `src/test/java/com/enterprise/ordersuite/security/web/RequestPathsTest.java`:
+
+```java
+package com.enterprise.ordersuite.security.web;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class RequestPathsTest {
+
+  @Test
+  void withinApplication_stripsTheContextPath() {
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/login");
+    request.setContextPath("/api");
+
+    assertThat(RequestPaths.withinApplication(request)).isEqualTo("/auth/login");
+  }
+
+  @Test
+  void withinApplication_withoutAContextPath_returnsTheUri() {
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/auth/login");
+
+    assertThat(RequestPaths.withinApplication(request)).isEqualTo("/auth/login");
+  }
+}
+```
+
+- [ ] **Step 3: Run to verify the IT fails the way the finding says**
+
+Run: `./gradlew test --tests "com.enterprise.ordersuite.security.ratelimit.ContextPathRateLimitIT"`
+Expected: `login_underTheApiContextPath_isRateLimited` FAILS (the sixth status is 401, not 429); `login_withoutAContextPath_isStillRateLimited` PASSES. Keep this output — it is the proof the test is wired to the defect. (`RequestPathsTest` does not compile yet; that is expected.)
+
+- [ ] **Step 4: Implement the helper**
+
+`src/main/java/com/enterprise/ordersuite/security/web/RequestPaths.java`:
+
+```java
+package com.enterprise.ordersuite.security.web;
+
+import jakarta.servlet.http.HttpServletRequest;
+
+public final class RequestPaths {
+
+    private RequestPaths() {
+    }
+
+    /**
+     * The request path without the context path. getRequestURI() includes the context path
+     * (SERVER_CONTEXT_PATH, /api in every real deployment) while MockMvc sends none, so a
+     * filter matching the raw URI passes every test and switches off in production.
+     * The URI is not normalized; StrictHttpFirewall has already rejected ';', '//', encoded
+     * slashes and dot segments before any filter in the security chain runs.
+     */
+    public static String withinApplication(HttpServletRequest request) {
+        return request.getRequestURI().substring(request.getContextPath().length());
+    }
+}
+```
+
+- [ ] **Step 5: Use it in `AuthRateLimitFilter`**
+
+In `shouldNotFilter`, replace `String path = request.getRequestURI();` with:
+
+```java
+    String path = RequestPaths.withinApplication(request);
+```
+
+In `doFilterInternal`, replace `String path = wrappedRequest.getRequestURI();` with:
+
+```java
+    String path = RequestPaths.withinApplication(wrappedRequest);
+```
+
+(`RequestPaths` is in the same package; no import.) Confirm no raw match remains:
+
+Run: `grep -rn "getRequestURI" src/main/java`
+Expected: only `RequestPaths.java`.
+
+- [ ] **Step 6: Run the rate-limit suite**
+
+Run: `./gradlew test --tests "com.enterprise.ordersuite.security.*"`
+Expected: PASS — `ContextPathRateLimitIT` (2), `RequestPathsTest` (2), and every existing `*RateLimitIT` unchanged.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/main/java/com/enterprise/ordersuite/security/web/RequestPaths.java src/main/java/com/enterprise/ordersuite/security/web/AuthRateLimitFilter.java src/test/java/com/enterprise/ordersuite/security/web/RequestPathsTest.java src/test/java/com/enterprise/ordersuite/security/ratelimit/ContextPathRateLimitIT.java
+git commit -m "fix(security): match rate-limited auth paths under the servlet context path
+
+getRequestURI() includes the context path, so under SERVER_CONTEXT_PATH=/api the
+filter compared /api/auth/login with /auth/login and skipped every request. The
+rate-limit ITs passed because MockMvc sends no context path.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 2: Client-IP trust is explicit and off by default (D23)
+
+**Files:**
+- Modify: `src/main/resources/application.yml` (`server:` block)
+- Modify: the env template `.env.example` (append)
+- Modify: `src/main/java/com/enterprise/ordersuite/security/web/AuthRateLimitFilter.java:116` (comment only)
+
+**Interfaces:** none. Configuration only.
+
+Background: once Task 1 lands, rate limiting is live for the first time, keyed on `getRemoteAddr()`. The filter's comment claims Tomcat parses `X-Forwarded-For`, but nothing enables that. The decision (spec D23): bind `server.forward-headers-strategy` from the environment, default `none`.
+
+- [ ] **Step 1: Bind the setting**
+
+In `application.yml`, inside `server:` after the `servlet:` block:
+
+```yaml
+  # D23. Whether X-Forwarded-For / X-Forwarded-Proto are trusted. "none": the client IP is the
+  # socket address - right locally and when exposed directly, and the only safe default (a
+  # client could otherwise forge its IP and dodge every rate limit). Behind a reverse proxy or
+  # load balancer set "native": Tomcat's RemoteIpValve then trusts the headers only from
+  # server.tomcat.remoteip.internal-proxies (private ranges by default).
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:none}
+```
+
+- [ ] **Step 2: Document it in the env template**
+
+Append to `.env.example`:
+
+```
+# Client-IP trust for rate limiting (D23). Leave at none unless a reverse proxy or load
+# balancer sits in front; then set native, and add the proxy to
+# server.tomcat.remoteip.internal-proxies if its address is not a private range.
+SERVER_FORWARD_HEADERS_STRATEGY=none
+```
+
+- [ ] **Step 3: Correct the misleading comment**
+
+In `AuthRateLimitFilter`, replace the line
+`// 4. Relying on remote address (delegating X-Forwarded-For parsing security to Tomcat RemoteIpFilter)`
+with:
+
+```java
+    // 4. The client IP. With server.forward-headers-strategy=native (behind a trusted proxy),
+    // Tomcat's RemoteIpValve has already replaced it with the X-Forwarded-For client;
+    // with the default none it is the socket address and forwarded headers are ignored (D23).
+```
+
+- [ ] **Step 4: Verify the property binds and nothing regressed**
+
+Run: `./gradlew test --tests "com.enterprise.ordersuite.security.*"`
+Expected: PASS. (An invalid enum value would fail context startup, so a green run proves the binding.) There is no automated test of the header behaviour: MockMvc does not run Tomcat valves, so such a test would pass regardless. The manual check is in Task 11.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/main/resources/application.yml .env.example src/main/java/com/enterprise/ordersuite/security/web/AuthRateLimitFilter.java
+git status --short   # the real env file must NOT appear
+git commit -m "fix(security): make client-IP trust for rate limiting explicit, off by default
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 3: Token families in the schema (V21)
 
 **Files:**
 - Create: `src/main/resources/db/migration/V21__Refresh_Token_Families.sql`
@@ -180,7 +434,7 @@ In `RefreshTokenPersistenceIT.saveToken`, before `return refreshTokenRepository.
 - [ ] **Step 7: Run the migration test and the persistence IT**
 
 Run: `./gradlew test --tests "com.enterprise.ordersuite.migration.V21RefreshTokenFamiliesIT" --tests "com.enterprise.ordersuite.auth.persistence.RefreshTokenPersistenceIT"`
-Expected: PASS. (`RefreshTokenService.issueFor` does not set the family yet — Task 2 does; ITs that log in would fail on NOT NULL until then, so do not run the full suite between Tasks 1 and 2.)
+Expected: PASS. (`RefreshTokenService.issueFor` does not set the family yet — Task 4 does; ITs that log in would fail on NOT NULL until then, so do not run the full suite between Tasks 3 and 4.)
 
 - [ ] **Step 8: Commit**
 
@@ -193,7 +447,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 2: Family-aware `RefreshTokenService`
+### Task 4: Family-aware `RefreshTokenService`
 
 **Files:**
 - Modify: `src/main/java/com/enterprise/ordersuite/auth/persistence/RefreshTokenRepository.java`
@@ -201,7 +455,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Test: `src/test/java/com/enterprise/ordersuite/auth/service/RefreshTokenServiceTest.java`
 
 **Interfaces:**
-- Consumes: `RefreshToken.familyId` (Task 1).
+- Consumes: `RefreshToken.familyId` (Task 3).
 - Produces (all on `RefreshTokenService`):
   - `public static final Duration REFRESH_TTL` (14 days)
   - `IssuedRefreshToken issueFor(User user)` — new family
@@ -213,7 +467,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - existing `hash(String)`, `findByHashOrNull(String)` unchanged
 - Produces on `RefreshTokenRepository`: `findByTokenHashForUpdate(String)`, `revokeFamily(UUID, Instant)`, `revokeAllForUser(Long, Instant)`.
 
-The old `getActiveTokenOrNull`, `markUsed`, `revoke` stay in this task (AuthenticationService still calls them) and are removed in Task 3.
+The old `getActiveTokenOrNull`, `markUsed`, `revoke` stay in this task (AuthenticationService still calls them) and are removed in Task 5.
 
 - [ ] **Step 1: Write the failing unit tests**
 
@@ -465,7 +719,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 3: Rotation with reuse detection, and 401 for an invalid refresh (D16, D17, D20)
+### Task 5: Rotation with reuse detection, and 401 for an invalid refresh (D16, D17, D20)
 
 **Files:**
 - Modify: `src/main/java/com/enterprise/ordersuite/auth/service/AuthenticationService.java:86-118`
@@ -477,7 +731,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Test: `src/test/java/com/enterprise/ordersuite/auth/service/RefreshTokenConcurrencyIT.java`
 
 **Interfaces:**
-- Consumes: Task 2's `RefreshTokenService` API.
+- Consumes: Task 4's `RefreshTokenService` API.
 - Produces: `AuthenticationService.refresh(String rawRefreshToken) : AuthResponse` and `AuthenticationService.logout(String rawRefreshToken) : void` (the `RefreshRequest`/`LogoutRequest` overloads are gone). A null/blank/unknown/expired/used/revoked token throws `InvalidRefreshTokenException`, mapped to 401.
 
 - [ ] **Step 1: Invoke the `spring-security-changes` skill.** The questions it requires were answered on 2026-09-25 and are recorded in the spec (D16–D21); do not re-ask.
@@ -757,7 +1011,7 @@ Remove the imports of `RefreshRequest` and `LogoutRequest`. Replace `refresh(...
 
 - [ ] **Step 6: Point the controller at the new signatures**
 
-In `AuthenticationController`, change only the two call sites (the cookie work is Task 6):
+In `AuthenticationController`, change only the two call sites (the cookie work is Task 9):
 
 ```java
         AuthResponse response = authenticationService.refresh(request.refreshToken());
@@ -821,7 +1075,102 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 4: Password reset revokes every refresh token of the user (D21)
+### Task 6: Keep used and revoked tokens until their own expiry (D24)
+
+**Files:**
+- Modify: `src/main/java/com/enterprise/ordersuite/auth/service/RefreshTokenCleanupService.java`
+- Modify: `src/main/java/com/enterprise/ordersuite/auth/persistence/RefreshTokenRepository.java` (remove `deleteUsedOrRevokedBefore`)
+- Modify: `src/test/java/com/enterprise/ordersuite/auth/service/RefreshTokenCleanupServiceTest.java`
+- Modify: `src/test/java/com/enterprise/ordersuite/auth/persistence/RefreshTokenPersistenceIT.java`
+
+**Interfaces:**
+- Consumes: Task 5's reuse detection (it checks used/revoked before expired).
+- Produces: `RefreshTokenCleanupService.cleanupNow() : CleanupResult` with `record CleanupResult(int expiredDeleted)` — `usedRevokedDeleted` is gone. `RefreshTokenCleanupScheduler` ignores the result, so it needs no change.
+
+Background: cleanup deletes used/revoked tokens 7 days after use; a replay after that is "unknown", answers a plain 401 and revokes nothing. Reuse must be detectable for a token's whole 14-day life.
+
+- [ ] **Step 1: Write the failing tests**
+
+Replace the body of `RefreshTokenCleanupServiceTest` (keep its imports, `@ExtendWith`, `@Mock` and `setUp`) with:
+
+```java
+  @Test
+  void cleanupNow_deletesOnlyExpiredTokens() {
+    when(repo.deleteExpired(any())).thenReturn(3);
+
+    var result = service.cleanupNow();
+
+    assertThat(result.expiredDeleted()).isEqualTo(3);
+    verify(repo).deleteExpired(Instant.parse("2026-01-29T12:00:00Z"));
+    verifyNoMoreInteractions(repo);
+  }
+
+  @Test
+  void cleanupNow_whenNothingExpired_returnsZero() {
+    when(repo.deleteExpired(any())).thenReturn(0);
+
+    assertThat(service.cleanupNow().expiredDeleted()).isZero();
+  }
+```
+
+In `RefreshTokenPersistenceIT`, add `@Autowired private RefreshTokenCleanupService refreshTokenCleanupService;` (import `com.enterprise.ordersuite.auth.service.RefreshTokenCleanupService`) and:
+
+```java
+  @Test
+  void cleanupNow_keepsAUsedTokenUntilItsOwnExpiry() {
+    RefreshToken token = saveToken("raw-" + UUID.randomUUID(), clock.instant().plus(Duration.ofDays(13)));
+    token.setUsedAt(clock.instant().minus(Duration.ofDays(8)));
+    refreshTokenRepository.save(token);
+
+    refreshTokenCleanupService.cleanupNow();
+
+    assertThat(refreshTokenRepository.findById(token.getId()))
+      .as("a replay of this token must still be recognised as reuse, so it must still exist")
+      .isPresent();
+  }
+```
+
+- [ ] **Step 2: Run to verify they fail**
+
+Run: `./gradlew test --tests "com.enterprise.ordersuite.auth.service.RefreshTokenCleanupServiceTest" --tests "com.enterprise.ordersuite.auth.persistence.RefreshTokenPersistenceIT"`
+Expected: FAIL — the unit test sees the extra `deleteUsedOrRevokedBefore` interaction; the IT finds the token deleted (used 8 days ago, past the 7-day cutoff).
+
+- [ ] **Step 3: Implement**
+
+`RefreshTokenCleanupService` — remove the `usedRevokedRetention` field and replace `cleanupNow` and the record:
+
+```java
+    // Used and revoked tokens stay until their own expiry: a replayed token must still be
+    // found to be recognised as reuse (D24). deleteExpired removes every token past expiry.
+    public CleanupResult cleanupNow() {
+        return new CleanupResult(refreshTokenRepository.deleteExpired(Instant.now(clock)));
+    }
+
+    public record CleanupResult(int expiredDeleted) {}
+```
+
+Remove the now-unused `java.time.Duration` import. In `RefreshTokenRepository`, delete `deleteUsedOrRevokedBefore` and its annotations. Confirm:
+
+Run: `grep -rn "deleteUsedOrRevokedBefore\|usedRevokedDeleted" src`
+Expected: no output.
+
+- [ ] **Step 4: Run to verify they pass**
+
+Run: `./gradlew test --tests "com.enterprise.ordersuite.auth.*"`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/main/java/com/enterprise/ordersuite/auth/service/RefreshTokenCleanupService.java src/main/java/com/enterprise/ordersuite/auth/persistence/RefreshTokenRepository.java src/test/java/com/enterprise/ordersuite/auth/service/RefreshTokenCleanupServiceTest.java src/test/java/com/enterprise/ordersuite/auth/persistence/RefreshTokenPersistenceIT.java
+git commit -m "fix(auth): keep used refresh tokens until expiry so reuse stays detectable
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 7: Password reset revokes every refresh token of the user (D21)
 
 **Files:**
 - Modify: `src/main/java/com/enterprise/ordersuite/auth/service/PasswordResetService.java` (constructor; `resetPassword` after `userRepository.save(user)`)
@@ -829,7 +1178,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Modify: `src/test/java/com/enterprise/ordersuite/auth/controllers/AuthenticationControllerIT.java`
 
 **Interfaces:**
-- Consumes: `RefreshTokenService.revokeAllFor(User)` (Task 2).
+- Consumes: `RefreshTokenService.revokeAllFor(User)` (Task 4).
 - Produces: `PasswordResetService` constructor gains a final parameter `RefreshTokenService refreshTokenService` (after `linkBuilder`).
 
 - [ ] **Step 1: Write the failing unit assertions**
@@ -935,7 +1284,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 5: Identity claims in the access token
+### Task 8: Identity claims in the access token
 
 **Files:**
 - Modify: `src/main/java/com/enterprise/ordersuite/security/jwt/JwtService.java:27-32`
@@ -1025,7 +1374,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 6: The refresh cookie (D12, D18)
+### Task 9: The refresh cookie (D12, D18)
 
 **Files:**
 - Create: `src/main/java/com/enterprise/ordersuite/security/config/RefreshCookieProperties.java`
@@ -1038,7 +1387,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Test: `src/test/java/com/enterprise/ordersuite/auth/controllers/RefreshCookieFactoryTest.java`, `RefreshTokenSourceTest.java`, `RefreshCookieIT.java`
 
 **Interfaces:**
-- Consumes: `RefreshTokenService.REFRESH_TTL`, `AuthenticationService.refresh(String)` / `logout(String)` (Task 3).
+- Consumes: `RefreshTokenService.REFRESH_TTL`, `AuthenticationService.refresh(String)` / `logout(String)` (Task 5).
 - Produces:
   - `record RefreshCookieProperties(boolean secure, String sameSite)` with `public static final String COOKIE_NAME = "refreshToken"`
   - `RefreshCookieFactory.issue(String rawToken, String contextPath) : ResponseCookie`, `RefreshCookieFactory.clear(String contextPath) : ResponseCookie`
@@ -1418,7 +1767,7 @@ class RefreshCookieIT {
 }
 ```
 
-(`security.cors.allowed-origins` is not bound until Task 7; pinning it now keeps this class unchanged later. `RegisterRequest.getEmail()` exists — it is a Lombok `@Getter` DTO, used via `setEmail` in `RefreshTokenFlowIT`.)
+(`security.cors.allowed-origins` is not bound until Task 10; pinning it now keeps this class unchanged later. `RegisterRequest.getEmail()` exists — it is a Lombok `@Getter` DTO, used via `setEmail` in `RefreshTokenFlowIT`.)
 
 - [ ] **Step 7: Run to verify it fails**
 
@@ -1503,7 +1852,9 @@ Append to `.env.example`:
 ```
 # Refresh cookie and CORS (D12). Defaults are production-safe. Local HTTP development must
 # set REFRESH_COOKIE_SECURE=false, or the browser drops the cookie on http://localhost.
-# CORS_ALLOWED_ORIGINS is comma-separated and must match the frontend origin exactly.
+# CORS_ALLOWED_ORIGINS is comma-separated and must match the frontend origin exactly. It is
+# also the Origin allow-list for cookie-borne /auth/refresh and /auth/logout: if you use
+# Swagger UI in a browser locally, add http://localhost:8080 or its cookie calls get 403.
 REFRESH_COOKIE_SECURE=true
 REFRESH_COOKIE_SAME_SITE=Lax
 CORS_ALLOWED_ORIGINS=http://localhost:3000
@@ -1526,7 +1877,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 7: `Origin` validation and configurable CORS (D12, D19)
+### Task 10: `Origin` validation and configurable CORS (D12, D19)
 
 **Files:**
 - Create: `src/main/java/com/enterprise/ordersuite/security/config/CorsProperties.java`
@@ -1535,7 +1886,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Test: `src/test/java/com/enterprise/ordersuite/security/web/RefreshOriginFilterTest.java`, `src/test/java/com/enterprise/ordersuite/security/RefreshOriginIT.java`
 
 **Interfaces:**
-- Consumes: `RefreshCookieProperties.COOKIE_NAME` (Task 6), `ApiErrorResponse(String code, String message, Instant timestamp)`.
+- Consumes: `RefreshCookieProperties.COOKIE_NAME` (Task 9), `RequestPaths.withinApplication(HttpServletRequest)` (Task 1, same package — no import), `ApiErrorResponse(String code, String message, Instant timestamp)`.
 - Produces: `record CorsProperties(List<String> allowedOrigins)`; `RefreshOriginFilter(List<String> allowedOrigins, ObjectMapper objectMapper, Clock clock)` — not a Spring bean (a `@Component`/`@Bean` filter would also be auto-registered in the servlet chain); instantiated inside `securityFilterChain`.
 
 - [ ] **Step 1: Write the failing filter unit test**
@@ -1706,7 +2057,7 @@ public class RefreshOriginFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !GUARDED_PATHS.contains(pathWithinApplication(request)) || !hasRefreshCookie(request);
+        return !GUARDED_PATHS.contains(RequestPaths.withinApplication(request)) || !hasRefreshCookie(request);
     }
 
     @Override
@@ -1721,11 +2072,6 @@ public class RefreshOriginFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getOutputStream(),
                 new ApiErrorResponse("ORIGIN_NOT_ALLOWED", "Origin not allowed", Instant.now(clock)));
-    }
-
-    // getRequestURI includes the context path (/api in production); strip it before matching.
-    private static String pathWithinApplication(HttpServletRequest request) {
-        return request.getRequestURI().substring(request.getContextPath().length());
     }
 
     private static boolean hasRefreshCookie(HttpServletRequest request) {
@@ -1912,7 +2258,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 8: Verification, review and records
+### Task 11: Verification, review and records
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-09-25-restaurant-ops-phase-1-auth-design.md` (Status line)
@@ -1921,15 +2267,27 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - [ ] **Step 1: Full suite**
 
 Run: `./gradlew test` (Docker running).
-Expected: 0 failures. Record the total (Phase 0 ended at 223; this plan adds roughly 45). If anything fails, stop and use `superpowers:systematic-debugging` — do not adjust assertions to match.
+Expected: 0 failures. Record the total (Phase 0 ended at 223; this plan adds roughly 50). If anything fails, stop and use `superpowers:systematic-debugging` — do not adjust assertions to match.
 
 - [ ] **Step 2: Security review**
 
-Dispatch the `spring-security-reviewer` agent on the diff `e611751..HEAD`, asking specifically about: the `noRollbackFor` reuse path, the `PESSIMISTIC_WRITE` lookup, `RefreshOriginFilter` ordering relative to `CorsFilter`, cookie attributes, and that nothing sensitive entered the JWT. Fix every confirmed finding in its own commit, re-running `./gradlew test`.
+Dispatch the `spring-security-reviewer` agent on the diff `e611751..HEAD`, asking specifically about: `RequestPaths` and every remaining path match (no raw `getRequestURI()` comparisons), the `server.forward-headers-strategy` default, the `noRollbackFor` reuse path, cleanup no longer deleting used tokens early, the `PESSIMISTIC_WRITE` lookup, `RefreshOriginFilter` ordering relative to `CorsFilter`, cookie attributes, and that nothing sensitive entered the JWT. Fix every confirmed finding in its own commit, re-running `./gradlew test`.
 
 - [ ] **Step 3: Update the security skill's target section**
 
-In `.claude/skills/spring-security-changes/SKILL.md`, under "Target model — not yet built", mark the refresh cookie, rotation with family revocation, the Origin check and the three JWT claims as **built in Phase 1 (backward-compatible)**, and state what remains for Phase 6: drop `refreshToken` from `AuthResponse`, remove the body fallback, making the Origin check universal. Update the filter-chain line in "The map" to include `RefreshOriginFilter` (before `CorsFilter`). Keep the `/public/*` bullet unchanged.
+In `.claude/skills/spring-security-changes/SKILL.md`, under "Target model — not yet built", mark the refresh cookie, rotation with family revocation, the Origin check and the three JWT claims as **built in Phase 1 (backward-compatible)**, and state what remains for Phase 6: drop `refreshToken` from `AuthResponse`, remove the body fallback, making the Origin check universal. Update the filter-chain line in "The map" to include `RefreshOriginFilter` (before `CorsFilter`). Keep the `/public/*` bullet unchanged. Add a hard rule so the rate-limit defect cannot recur:
+
+```markdown
+### 7. Filters match the path within the application, and are tested under `/api`.
+
+`getRequestURI()` includes the context path (`SERVER_CONTEXT_PATH`, `/api` in every real
+deployment); MockMvc sends none. A filter comparing the raw URI passes every test and is
+switched off in production — `AuthRateLimitFilter` shipped that way until Phase 1. Match with
+`security.web.RequestPaths.withinApplication(request)`, and give every path-matching filter
+at least one test that sets `contextPath("/api")`.
+```
+
+In `.claude/skills/writing-backend-tests/SKILL.md`, under "Conventions", add one bullet: `**Context path.** MockMvc sends no context path; production serves under /api. A test of anything that matches on the request path (filters, cookie paths) must include a case with .contextPath("/api") — see security/ratelimit/ContextPathRateLimitIT.java.` Add that file to this step's `git add`.
 
 - [ ] **Step 4: Update the spec status**
 
@@ -1938,7 +2296,7 @@ Change the spec's `Status:` line to `implemented — see ../plans/2026-09-25-res
 - [ ] **Step 5: Commit**
 
 ```bash
-git add .claude/skills/spring-security-changes/SKILL.md docs/superpowers/specs/2026-09-25-restaurant-ops-phase-1-auth-design.md
+git add .claude/skills/spring-security-changes/SKILL.md .claude/skills/writing-backend-tests/SKILL.md docs/superpowers/specs/2026-09-25-restaurant-ops-phase-1-auth-design.md
 git commit -m "docs: record Phase 1 auth as implemented
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -1947,5 +2305,11 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - [ ] **Step 6: Hand-offs for Gabriel (report, do not do)**
 
 - Add `REFRESH_COOKIE_SECURE=false` (and optionally the other two keys) to the local `.env` — it is not read or edited by the agent.
-- Manual check with the app running: log in from `http://localhost:3000` and confirm the `refreshToken` cookie in devtools (HttpOnly, `Path=/api/auth`).
+- Restart the local app (it is running the pre-Phase 1 build), then three manual checks — the first two are the only proof of D22/D23 inside a real Tomcat, which MockMvc cannot give:
+  1. Seven bad logins answer 429 from the sixth on (needs `RATE_LIMIT_ENABLED` not `false` locally):
+     `for i in 1 2 3 4 5 6 7; do curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:8080/api/auth/login -H "Content-Type: application/json" -d '{"email":"probe@nowhere.test","password":"wrong"}'; done`
+  2. Wait a minute for the window to refill, then repeat with a different forged header each time — still 429 on the sixth:
+     `for i in 1 2 3 4 5 6 7; do curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:8080/api/auth/login -H "X-Forwarded-For: 203.0.113.$i" -H "Content-Type: application/json" -d '{"email":"probe2@nowhere.test","password":"wrong"}'; done`
+  3. Log in from `http://localhost:3000` and confirm the `refreshToken` cookie in devtools (HttpOnly, `Path=/api/auth`).
+- Before any production deployment: set `SERVER_FORWARD_HEADERS_STRATEGY=native` if a reverse proxy or load balancer sits in front (spec D23).
 - Frontend follow-ups (spec, "Contract work"): `credentials: 'include'` on `/auth/*`; single-flight `/auth/refresh` across tabs; never retry a 401 from `/auth/refresh`; read `firstName`/`lastName`/`email` from the token.
