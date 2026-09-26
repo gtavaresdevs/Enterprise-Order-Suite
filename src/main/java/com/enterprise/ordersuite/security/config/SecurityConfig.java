@@ -41,7 +41,7 @@ import java.util.Optional;
 @EnableWebSecurity
 @EnableMethodSecurity
 @RequiredArgsConstructor
-@EnableConfigurationProperties(RateLimitProperties.class)
+@EnableConfigurationProperties({RateLimitProperties.class, RefreshCookieProperties.class})
 public class SecurityConfig {
 
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
