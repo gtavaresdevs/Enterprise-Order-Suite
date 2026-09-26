@@ -28,6 +28,10 @@ public class JwtService {
     Map<String, Object> claims = new HashMap<>();
     claims.put("userId", user.getId());
     claims.put("roles", List.of(user.getRole().getName()));
+    // Display data only - a JWT payload is base64, not encrypted. Never phone or address.
+    claims.put("firstName", user.getFirstName());
+    claims.put("lastName", user.getLastName());
+    claims.put("email", user.getEmail());
     return buildToken(claims, user.getEmail());
   }
 
