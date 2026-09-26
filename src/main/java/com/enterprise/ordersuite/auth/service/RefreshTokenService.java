@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -20,20 +21,49 @@ public class RefreshTokenService {
     private final RefreshTokenGenerator refreshTokenGenerator;
     private final Clock clock;
 
-    private final Duration refreshTtl = Duration.ofDays(14);
+    public static final Duration REFRESH_TTL = Duration.ofDays(14);
 
     public IssuedRefreshToken issueFor(User user) {
-        String raw = refreshTokenGenerator.generate();
-        String hash = TokenHashing.sha256Hex(raw);
+        return issue(user, UUID.randomUUID());
+    }
 
-        Instant now = Instant.now(clock);
+    public IssuedRefreshToken rotate(RefreshToken current) {
+        current.setUsedAt(Instant.now(clock));
+        refreshTokenRepository.save(current);
+        return issue(current.getUser(), current.getFamilyId());
+    }
+
+    // Returns the token in any state - used, revoked or expired - so the caller can tell
+    // reuse apart from an unknown token. Must run inside a transaction (row lock).
+    public RefreshToken findForRotationOrNull(String rawRefreshToken) {
+        if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
+            return null;
+        }
+        return refreshTokenRepository.findByTokenHashForUpdate(TokenHashing.sha256Hex(rawRefreshToken))
+                .orElse(null);
+    }
+
+    public boolean isExpired(RefreshToken token) {
+        return token.isExpired(Instant.now(clock));
+    }
+
+    public void revokeFamily(RefreshToken token) {
+        refreshTokenRepository.revokeFamily(token.getFamilyId(), Instant.now(clock));
+    }
+
+    public void revokeAllFor(User user) {
+        refreshTokenRepository.revokeAllForUser(user.getId(), Instant.now(clock));
+    }
+
+    private IssuedRefreshToken issue(User user, UUID familyId) {
+        String raw = refreshTokenGenerator.generate();
 
         RefreshToken token = new RefreshToken();
         token.setUser(user);
-        token.setTokenHash(hash);
-
+        token.setTokenHash(TokenHashing.sha256Hex(raw));
+        token.setFamilyId(familyId);
         // BaseEntity handles createdAt
-        token.setExpiresAt(now.plus(refreshTtl));
+        token.setExpiresAt(Instant.now(clock).plus(REFRESH_TTL));
 
         refreshTokenRepository.save(token);
 
