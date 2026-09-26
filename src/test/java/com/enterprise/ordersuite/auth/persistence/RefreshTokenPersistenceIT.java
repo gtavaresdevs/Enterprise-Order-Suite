@@ -73,19 +73,23 @@ class RefreshTokenPersistenceIT {
   // The reason D15 is in Phase 0: expiry was compared in an unstated zone. Around the
   // boundary, a 3-hour disagreement between writer and reader decides the answer.
   @Test
-  void getActiveTokenOrNull_honoursExpiryWithinMinutes_notHours() {
+  void isExpired_honoursExpiryWithinMinutes_notHours() {
     Instant now = clock.instant();
     String expiringSoon = "raw-" + UUID.randomUUID();
     String justExpired = "raw-" + UUID.randomUUID();
     saveToken(expiringSoon, now.plus(Duration.ofMinutes(5)));
     saveToken(justExpired, now.minus(Duration.ofMinutes(5)));
 
-    assertThat(refreshTokenService.getActiveTokenOrNull(expiringSoon))
-      .as("a token with five minutes left is active")
-      .isNotNull();
-    assertThat(refreshTokenService.getActiveTokenOrNull(justExpired))
+    assertThat(refreshTokenService.isExpired(reload(expiringSoon)))
+      .as("a token with five minutes left is live")
+      .isFalse();
+    assertThat(refreshTokenService.isExpired(reload(justExpired)))
       .as("a token that expired five minutes ago is not")
-      .isNull();
+      .isTrue();
+  }
+
+  private RefreshToken reload(String rawToken) {
+    return refreshTokenRepository.findByTokenHash(TokenHashing.sha256Hex(rawToken)).orElseThrow();
   }
 
   private RefreshToken saveToken(String rawToken, Instant expiresAt) {

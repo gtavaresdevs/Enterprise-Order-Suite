@@ -80,7 +80,7 @@ public class AuthExceptionHandler {
 
   @ExceptionHandler(InvalidRefreshTokenException.class)
   public ResponseEntity<ApiErrorResponse> handleInvalidRefreshToken(InvalidRefreshTokenException ex) {
-    return build(HttpStatus.BAD_REQUEST, "INVALID_REFRESH_TOKEN", "Invalid refresh token");
+    return build(HttpStatus.UNAUTHORIZED, "INVALID_REFRESH_TOKEN", "Invalid refresh token");
   }
 
   // -------- Validation / bad input --------

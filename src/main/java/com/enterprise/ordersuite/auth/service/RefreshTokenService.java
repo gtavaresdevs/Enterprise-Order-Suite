@@ -70,29 +70,6 @@ public class RefreshTokenService {
         return new IssuedRefreshToken(raw, token.getExpiresAt());
     }
 
-    public RefreshToken getActiveTokenOrNull(String rawRefreshToken) {
-        if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
-            return null;
-        }
-
-        String hash = TokenHashing.sha256Hex(rawRefreshToken);
-        Instant now = Instant.now(clock);
-
-        return refreshTokenRepository.findByTokenHash(hash)
-                .filter(t -> t.isActive(now))
-                .orElse(null);
-    }
-
-    public void markUsed(RefreshToken token) {
-        token.setUsedAt(Instant.now(clock));
-        refreshTokenRepository.save(token);
-    }
-
-    public void revoke(RefreshToken token) {
-        token.setRevokedAt(Instant.now(clock));
-        refreshTokenRepository.save(token);
-    }
-
     // ---------- Helpers for refresh/logout flows ----------
 
     public String hash(String rawRefreshToken) {

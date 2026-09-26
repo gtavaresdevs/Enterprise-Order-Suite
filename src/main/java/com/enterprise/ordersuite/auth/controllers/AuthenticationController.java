@@ -44,14 +44,14 @@ public class AuthenticationController {
     @Operation(summary = "Rotate refresh token and issue a new access token")
     @PostMapping(value = "/refresh", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
-        AuthResponse response = authenticationService.refresh(request);
+        AuthResponse response = authenticationService.refresh(request.refreshToken());
         return ResponseEntity.ok(response);
     }
 
     @Operation(summary = "Logout by revoking refresh token (idempotent)")
     @PostMapping(value = "/logout", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Void> logout(@Valid @RequestBody LogoutRequest request) {
-        authenticationService.logout(request);
+        authenticationService.logout(request.refreshToken());
         return ResponseEntity.ok().build();
     }
 
