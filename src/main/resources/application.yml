@@ -2,6 +2,12 @@ server:
   port: ${SERVER_PORT:8080}
   servlet:
     context-path: ${SERVER_CONTEXT_PATH}
+  # D23. Whether X-Forwarded-For / X-Forwarded-Proto are trusted. "none": the client IP is the
+  # socket address - right locally and when exposed directly, and the only safe default (a
+  # client could otherwise forge its IP and dodge every rate limit). Behind a reverse proxy or
+  # load balancer set "native": Tomcat's RemoteIpValve then trusts the headers only from
+  # server.tomcat.remoteip.internal-proxies (private ranges by default).
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:none}
 
 spring:
   datasource:

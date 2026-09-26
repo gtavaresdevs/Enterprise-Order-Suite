@@ -113,7 +113,9 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
       }
     }
 
-    // 4. Relying on remote address (delegating X-Forwarded-For parsing security to Tomcat RemoteIpFilter)
+    // 4. The client IP. With server.forward-headers-strategy=native (behind a trusted proxy),
+    // Tomcat's RemoteIpValve has already replaced it with the X-Forwarded-For client;
+    // with the default none it is the socket address and forwarded headers are ignored (D23).
     String ip = wrappedRequest.getRemoteAddr();
 
     // 5. Check and apply dual-key rate limit configurations
