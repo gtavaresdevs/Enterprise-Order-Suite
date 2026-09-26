@@ -39,6 +39,7 @@ class PasswordResetServiceTest {
 
   private EmailService emailService;
   private PasswordResetLinkBuilder linkBuilder;
+  private RefreshTokenService refreshTokenService;
 
   private PasswordResetService service;
 
@@ -50,6 +51,7 @@ class PasswordResetServiceTest {
     passwordEncoder = mock(PasswordEncoder.class);
     emailService = mock(EmailService.class);
     linkBuilder = mock(PasswordResetLinkBuilder.class);
+    refreshTokenService = mock(RefreshTokenService.class);
 
     clock = Clock.fixed(Instant.parse("2026-01-19T12:00:00Z"), ZoneOffset.UTC);
 
@@ -62,7 +64,8 @@ class PasswordResetServiceTest {
       passwordEncoder,
       clock,
       emailService,
-      linkBuilder
+      linkBuilder,
+      refreshTokenService
     );
   }
 
@@ -181,6 +184,7 @@ class PasswordResetServiceTest {
 
     verify(userRepository, never()).save(any());
     verify(passwordHistoryRepository, never()).save(any());
+    verifyNoInteractions(refreshTokenService);
   }
 
   @Test
@@ -244,6 +248,7 @@ class PasswordResetServiceTest {
 
     // Fixed Parameter Evaluation Check to expect a primitive/object 'long'
     verify(passwordHistoryRepository).pruneOldEntries(eq(1L), eq(5L));
+    verify(refreshTokenService).revokeAllFor(user);
   }
 
   @Test
@@ -282,5 +287,6 @@ class PasswordResetServiceTest {
     verify(userRepository, never()).save(any());
     verify(tokenRepository, never()).save(any(PasswordResetToken.class));
     verify(prt, never()).setUsedAt(any());
+    verifyNoInteractions(refreshTokenService);
   }
 }

@@ -45,6 +45,7 @@ public class PasswordResetService {
   private final Clock clock;
   private final EmailService emailService;
   private final PasswordResetLinkBuilder linkBuilder;
+  private final RefreshTokenService refreshTokenService;
 
   public PasswordResetService(
     UserRepository userRepository,
@@ -53,7 +54,8 @@ public class PasswordResetService {
     PasswordEncoder passwordEncoder,
     Clock clock,
     EmailService emailService,
-    PasswordResetLinkBuilder linkBuilder
+    PasswordResetLinkBuilder linkBuilder,
+    RefreshTokenService refreshTokenService
   ) {
     this.userRepository = userRepository;
     this.passwordResetTokenRepository = passwordResetTokenRepository;
@@ -62,6 +64,7 @@ public class PasswordResetService {
     this.clock = clock;
     this.emailService = emailService;
     this.linkBuilder = linkBuilder;
+    this.refreshTokenService = refreshTokenService;
   }
 
   /**
@@ -184,6 +187,9 @@ public class PasswordResetService {
     }
 
     userRepository.save(user);
+
+    // D21: a reset says the credentials may be compromised - end every existing session.
+    refreshTokenService.revokeAllFor(user);
 
     // Consume token to guarantee it can never be used again
     prt.setUsedAt(now);

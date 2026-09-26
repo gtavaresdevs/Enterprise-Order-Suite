@@ -1,7 +1,9 @@
 package com.enterprise.ordersuite.auth.controllers;
 
 import com.enterprise.ordersuite.auth.domain.PasswordResetToken;
+import com.enterprise.ordersuite.auth.dtos.AuthRequest;
 import com.enterprise.ordersuite.auth.dtos.ForgotPasswordRequest;
+import com.enterprise.ordersuite.auth.dtos.RefreshRequest;
 import com.enterprise.ordersuite.auth.dtos.RegisterRequest;
 import com.enterprise.ordersuite.auth.dtos.ResetPasswordRequest;
 import com.enterprise.ordersuite.auth.persistence.PasswordResetTokenRepository;
@@ -247,5 +249,56 @@ class AuthenticationControllerIT {
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(request)))
       .andExpect(status().is4xxClientError());
+  }
+
+  @Test
+  void resetPassword_revokesEveryRefreshTokenOfThatUser_andNoOneElses() throws Exception {
+    String victim = saveActiveUser("OldPass123!");
+    String bystander = saveActiveUser("OldPass123!");
+    String victimPhone = loginForRefreshToken(victim, "OldPass123!");
+    String victimLaptop = loginForRefreshToken(victim, "OldPass123!");
+    String bystanderToken = loginForRefreshToken(bystander, "OldPass123!");
+
+    String rawToken = passwordResetService.requestPasswordReset(victim).orElseThrow();
+    ResetPasswordRequest request = new ResetPasswordRequest();
+    request.setToken(rawToken);
+    request.setNewPassword("NewEnterprisePass!@#");
+    mockMvc.perform(post("/auth/reset-password")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isOk());
+
+    assertThat(refreshStatus(victimPhone)).as("a reset must end every existing session").isEqualTo(401);
+    assertThat(refreshStatus(victimLaptop)).as("a reset must end every existing session").isEqualTo(401);
+    assertThat(refreshStatus(bystanderToken)).as("another user's session is untouched").isEqualTo(200);
+  }
+
+  private String saveActiveUser(String rawPassword) {
+    String email = "reset-" + UUID.randomUUID() + "@test.com";
+    User user = new User();
+    user.setEmail(email);
+    user.setPassword(passwordEncoder.encode(rawPassword));
+    user.setRole(userRole);
+    user.setActive(true);
+    user.setFirstName("Reset");
+    user.setLastName("User");
+    userRepository.save(user);
+    return email;
+  }
+
+  private String loginForRefreshToken(String email, String rawPassword) throws Exception {
+    String body = mockMvc.perform(post("/auth/login")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(new AuthRequest(email, rawPassword))))
+      .andExpect(status().isOk())
+      .andReturn().getResponse().getContentAsString();
+    return objectMapper.readTree(body).get("refreshToken").asText();
+  }
+
+  private int refreshStatus(String refreshToken) throws Exception {
+    return mockMvc.perform(post("/auth/refresh")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(new RefreshRequest(refreshToken))))
+      .andReturn().getResponse().getStatus();
   }
 }
