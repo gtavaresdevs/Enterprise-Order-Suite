@@ -102,6 +102,7 @@ class RefreshTokenPersistenceIT {
     token.setUser(user);
     token.setTokenHash(TokenHashing.sha256Hex(rawToken));
     token.setExpiresAt(expiresAt);
+    token.setFamilyId(UUID.randomUUID());
     return refreshTokenRepository.save(token);
   }
 }
