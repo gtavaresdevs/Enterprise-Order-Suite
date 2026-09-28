@@ -115,7 +115,9 @@ public class AuthenticationService {
 
   @Transactional
   public void logout(String rawRefreshToken) {
-    RefreshToken token = refreshTokenService.findByHashOrNull(refreshTokenService.hash(rawRefreshToken));
+    // Locked lookup: serializes with a concurrent rotation of this token, so revokeFamily
+    // below also revokes the successor that rotation inserted.
+    RefreshToken token = refreshTokenService.findForRotationOrNull(rawRefreshToken);
 
     if (token == null) {
       return;

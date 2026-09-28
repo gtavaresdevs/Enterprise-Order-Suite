@@ -7,6 +7,7 @@ import com.enterprise.ordersuite.auth.service.tokens.TokenHashing;
 import com.enterprise.ordersuite.identity.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -34,7 +35,9 @@ public class RefreshTokenService {
     }
 
     // Returns the token in any state - used, revoked or expired - so the caller can tell
-    // reuse apart from an unknown token. Must run inside a transaction (row lock).
+    // reuse apart from an unknown token. Must run inside a transaction (row lock). Used by
+    // logout too: the lock waits for a concurrent rotation of this token to commit, so the
+    // family revocation that follows also sees the successor that rotation inserted.
     public RefreshToken findForRotationOrNull(String rawRefreshToken) {
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
             return null;
@@ -51,7 +54,12 @@ public class RefreshTokenService {
         refreshTokenRepository.revokeFamily(token.getFamilyId(), Instant.now(clock));
     }
 
+    // Lock first, then revoke in a separate statement. Under READ COMMITTED the bulk update
+    // alone would miss a successor that a concurrent rotation inserted but had not committed;
+    // the lock waits for that commit and the update's fresh snapshot then includes it.
+    @Transactional
     public void revokeAllFor(User user) {
+        refreshTokenRepository.findUnrevokedByUserIdForUpdate(user.getId());
         refreshTokenRepository.revokeAllForUser(user.getId(), Instant.now(clock));
     }
 
@@ -68,22 +76,6 @@ public class RefreshTokenService {
         refreshTokenRepository.save(token);
 
         return new IssuedRefreshToken(raw, token.getExpiresAt());
-    }
-
-    // ---------- Helpers for refresh/logout flows ----------
-
-    public String hash(String rawRefreshToken) {
-        if (rawRefreshToken == null) {
-            return null;
-        }
-        return TokenHashing.sha256Hex(rawRefreshToken);
-    }
-
-    public RefreshToken findByHashOrNull(String hash) {
-        if (hash == null || hash.isBlank()) {
-            return null;
-        }
-        return refreshTokenRepository.findByTokenHash(hash).orElse(null);
     }
 
     public record IssuedRefreshToken(String rawToken, Instant expiresAt) {}

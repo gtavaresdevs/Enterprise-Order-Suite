@@ -7,6 +7,7 @@ import com.enterprise.ordersuite.identity.domain.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -127,5 +128,17 @@ class RefreshTokenServiceTest {
         service.revokeAllFor(user);
 
         verify(repo).revokeAllForUser(42L, NOW);
+    }
+
+    @Test
+    void revokeAllFor_locksTheUsersLiveTokens_beforeTheBulkUpdate() {
+        User user = new User();
+        user.setId(42L);
+
+        service.revokeAllFor(user);
+
+        InOrder order = inOrder(repo);
+        order.verify(repo).findUnrevokedByUserIdForUpdate(42L);
+        order.verify(repo).revokeAllForUser(42L, NOW);
     }
 }

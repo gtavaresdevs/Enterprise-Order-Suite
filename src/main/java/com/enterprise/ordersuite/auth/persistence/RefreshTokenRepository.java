@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,6 +31,12 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
             where rt.familyId = :familyId and rt.revokedAt is null
             """)
     int revokeFamily(UUID familyId, Instant now);
+
+    // Taken before revokeAllForUser: waits for any in-flight rotation of these tokens to
+    // commit, so the bulk update that follows sees the successor it inserted.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select rt from RefreshToken rt where rt.user.id = :userId and rt.revokedAt is null")
+    List<RefreshToken> findUnrevokedByUserIdForUpdate(Long userId);
 
     @Modifying
     @Transactional
