@@ -70,6 +70,20 @@ class RefreshOriginFilterTest {
       .isEqualTo(403);
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"/api/auth/%72efresh", "/api/auth/%6cogout"})
+  void guardedPath_isMatchedWhenPercentEncoded(String uri) throws Exception {
+    MockHttpServletRequest request = request(uri, true, "https://evil.example");
+    request.setContextPath("/api");
+
+    MockHttpServletResponse response = run(request);
+
+    assertThat(response.getStatus())
+      .as("'%s' routes to a guarded endpoint once decoded; the guard must not be bypassed", uri)
+      .isEqualTo(403);
+    assertThat(response.getContentAsString()).contains("\"code\":\"ORIGIN_NOT_ALLOWED\"");
+  }
+
   private MockHttpServletRequest request(String uri, boolean withCookie, String origin) {
     MockHttpServletRequest request = new MockHttpServletRequest("POST", uri);
     if (withCookie) {

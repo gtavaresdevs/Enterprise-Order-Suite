@@ -21,4 +21,14 @@ class RequestPathsTest {
 
     assertThat(RequestPaths.withinApplication(request)).isEqualTo("/auth/login");
   }
+
+  @Test
+  void withinApplication_decodesPercentEncodedCharacters() {
+    MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/%6cogin");
+    request.setContextPath("/api");
+
+    assertThat(RequestPaths.withinApplication(request))
+      .as("Spring MVC routes on the decoded path; filters must match the same path")
+      .isEqualTo("/auth/login");
+  }
 }

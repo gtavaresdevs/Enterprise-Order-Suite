@@ -15,6 +15,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.net.URI;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
@@ -25,7 +26,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @IntegrationTest
 @AutoConfigureMockMvc
-@TestPropertySource(properties = "security.cors.allowed-origins=http://localhost:3000")
+@TestPropertySource(properties = {
+  "security.refresh-cookie.secure=true",
+  "security.refresh-cookie.same-site=Lax",
+  "security.cors.allowed-origins=http://localhost:3000"
+})
 class RefreshOriginIT {
 
   private static final String FRONTEND = "http://localhost:3000";
@@ -71,6 +76,22 @@ class RefreshOriginIT {
         .header(HttpHeaders.ORIGIN, EVIL)
         .contentType(MediaType.APPLICATION_JSON))
       .andExpect(status().isForbidden());
+
+    mockMvc.perform(cookieRefresh(token).header(HttpHeaders.ORIGIN, FRONTEND))
+      .andExpect(status().isOk());
+  }
+
+  @Test
+  void refresh_percentEncodedPathWithCookieFromAForeignOrigin_returns403_andDoesNotConsumeTheToken() throws Exception {
+    String token = loginForRefreshToken();
+
+    mockMvc.perform(post(URI.create("/api/auth/%72efresh"))
+        .contextPath("/api")
+        .cookie(new Cookie("refreshToken", token))
+        .header(HttpHeaders.ORIGIN, EVIL)
+        .contentType(MediaType.APPLICATION_JSON))
+      .andExpect(status().isForbidden())
+      .andExpect(jsonPath("$.code").value("ORIGIN_NOT_ALLOWED"));
 
     mockMvc.perform(cookieRefresh(token).header(HttpHeaders.ORIGIN, FRONTEND))
       .andExpect(status().isOk());
