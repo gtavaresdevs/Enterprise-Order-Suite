@@ -14,8 +14,10 @@ public final class RequestPaths {
      * filter matching the raw URI passes every test and switches off in production.
      * The path is percent-decoded because Spring MVC routes on decoded segments: matching the raw
      * URI let /auth/%6cogin reach the login endpoint while every filter skipped it.
-     * StrictHttpFirewall has already rejected ';', '//', encoded slashes, encoded '%' and dot
-     * segments before any filter in the security chain runs, so decoding cannot produce them.
+     * The firewall/Tomcat reject ';', '//', encoded slashes, encoded '%' and dot segments before
+     * the request reaches Spring MVC, so no request is ever routed on a path containing them —
+     * but AuthRateLimitFilter is registered as a servlet filter and sees the raw request before
+     * Spring MVC's dispatch, so decoding here can only make filters match more, never less.
      */
     public static String withinApplication(HttpServletRequest request) {
         return UrlPathHelper.defaultInstance.getPathWithinApplication(request);

@@ -117,6 +117,11 @@ The request body becomes optional on both endpoints. `Content-Type: application/
 required by the existing `consumes` mapping (415 otherwise), which the manifest asks for as part
 of the CSRF defense.
 
+**Correction (final review):** the "(415 otherwise)" claim above does not hold for body-less
+requests — `@RequestBody(required = false)` makes `ConsumesRequestCondition` match even with no
+body present, so a body-less POST to `/auth/refresh` or `/auth/logout` is never rejected for a
+missing/wrong `Content-Type`. Only the `Origin` check (D19) enforces the CSRF defense today.
+
 When both are present the cookie wins: it is the target source, and preferring it means a
 stale `localStorage` value in a half-migrated frontend cannot override a fresh cookie.
 

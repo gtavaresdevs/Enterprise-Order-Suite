@@ -26,18 +26,18 @@ Ask in the language the user is writing in. Implement in English.
 
 ## The map
 
-- **Filter chain** (`security/config/SecurityConfig.java:164-188`): `RequestIdFilter` →
+- **Filter chain** (`security/config/SecurityConfig.java:167-190`): `RequestIdFilter` →
   `AuthRateLimitFilter` → `JwtAuthenticationFilter`, all registered before
   `UsernamePasswordAuthenticationFilter`; `RefreshOriginFilter` before `CorsFilter`. Sessions
   are `STATELESS`. CSRF is disabled because authentication is a bearer header — that reasoning
   stops holding the moment a cookie appears (see Target below).
-- **Public paths** (`SecurityConfig.java:169`): `/error`, `/auth/**`, `/actuator/health/**`,
+- **Public paths** (`SecurityConfig.java:172`): `/error`, `/auth/**`, `/actuator/health/**`,
   Swagger (`/swagger-ui/**`, `/v3/api-docs/**`, `/swagger-ui.html`), `/webjars/**`,
   `/logo.png`. `/actuator/info`, `/actuator/metrics/**`, `/admin/users/**` and
   `/admin/identity-audit/**` require `SUPER_ADMIN`; `/admin/**` and `/roles` require `ADMIN`.
   Everything else is `authenticated()`.
-- **Role hierarchy** (`SecurityConfig.java:53-55`): `ROLE_SUPER_ADMIN > ROLE_ADMIN >
-  ROLE_USER`, wired into `methodSecurityExpressionHandler` (line 58). **This is the single
+- **Role hierarchy** (`SecurityConfig.java:56-58`): `ROLE_SUPER_ADMIN > ROLE_ADMIN >
+  ROLE_USER`, wired into `methodSecurityExpressionHandler` (line 61). **This is the single
   most important fact in this file** — see the worked example below.
 - **JWT** (`security/jwt/`): `JwtService` issues and validates; `JwtAuthenticationFilter`
   maps roles onto `ROLE_*` authorities.
@@ -110,7 +110,7 @@ at least one test that sets `contextPath("/api")`. It returns the decoded path, 
 Spring MVC routes on — comparing the raw URI also let percent-encoded paths such as
 `/auth/%6cogin` skip the rate limiter.
 
-## Target model — not yet built
+## Target model (Phase 1 built / Phase 6 pending)
 
 Mark anything you write against this section as target state. Source:
 `docs/contracts/backend-integration-manifest.openapi.yaml`.
@@ -122,8 +122,11 @@ Mark anything you write against this section as target state. Source:
   **entire token family**, not just the replayed token. **Built in Phase 1
   (backward-compatible).**
 - `/auth/refresh` and `/auth/logout` become the only cookie-dependent endpoints, and
-  therefore the **only CSRF surface**. The defence is `Origin` validation plus requiring
-  `Content-Type: application/json`. Everything else authenticates by header and is unaffected.
+  therefore the **only CSRF surface**. Only the `Origin` check is built: `Content-Type:
+  application/json` is not enforced for body-less requests, since `@RequestBody(required =
+  false)` makes `ConsumesRequestCondition` match with no body at all — a body-less POST to
+  either endpoint skips the check entirely. Origin validation plus `SameSite=Lax` and
+  `CorsFilter` cover it today; enforcing `Content-Type` on body-less requests is deferred.
   **Built in Phase 1 (backward-compatible).**
 - The access token gains `firstName`, `lastName`, `email` claims. **A JWT payload is base64,
   not encrypted** — display data only. Never a phone number, address, or anything else
