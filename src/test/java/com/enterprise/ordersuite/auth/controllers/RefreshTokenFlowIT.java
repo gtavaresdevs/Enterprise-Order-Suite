@@ -99,6 +99,20 @@ class RefreshTokenFlowIT {
   }
 
   @Test
+  void logout_presentingAnAlreadyRotatedToken_revokesTheWholeFamily() throws Exception {
+    String first = login();
+    String second = refreshToken(refresh(first).andExpect(status().isOk()));
+
+    // "first" was already rotated away (used) by the refresh above; logout still resolves it
+    // by hash and must revoke the whole family, killing "second" too, not just "first".
+    logout(first).andExpect(status().isOk());
+
+    refresh(second)
+      .andExpect(status().isUnauthorized())
+      .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+  }
+
+  @Test
   void refresh_unknownToken_returns401() throws Exception {
     refresh("not-a-real-token")
       .andExpect(status().isUnauthorized())

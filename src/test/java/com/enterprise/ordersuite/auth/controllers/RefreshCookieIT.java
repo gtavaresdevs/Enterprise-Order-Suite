@@ -15,6 +15,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.net.URI;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,6 +53,27 @@ class RefreshCookieIT {
       .startsWith("refreshToken=")
       .contains("Path=/auth", "Max-Age=1209600", "HttpOnly", "Secure", "SameSite=Lax");
     assertThat(cookieValue(result)).isEqualTo(bodyRefreshToken(result));
+  }
+
+  @Test
+  void login_underApiContextPath_setsTheRefreshCookieScopedToApiAuth() throws Exception {
+    RegisterRequest request = registerRequest();
+    mockMvc.perform(post(URI.create("/api/auth/register")).contextPath("/api")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isOk());
+
+    MvcResult result = mockMvc.perform(post(URI.create("/api/auth/login")).contextPath("/api")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(new AuthRequest(request.getEmail(), PASSWORD))))
+      .andExpect(status().isOk())
+      .andReturn();
+
+    String setCookie = result.getResponse().getHeader(HttpHeaders.SET_COOKIE);
+    assertThat(setCookie)
+      .as("cookie path must include the deployed context path so it is only sent to /api/auth/*")
+      .startsWith("refreshToken=")
+      .contains("Path=/api/auth");
   }
 
   @Test
