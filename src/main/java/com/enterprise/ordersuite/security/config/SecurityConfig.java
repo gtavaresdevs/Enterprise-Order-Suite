@@ -6,6 +6,7 @@ import com.enterprise.ordersuite.security.ratelimit.InMemoryBucketedSlidingWindo
 import com.enterprise.ordersuite.security.ratelimit.NoOpRateLimiter;
 import com.enterprise.ordersuite.security.ratelimit.RateLimiter;
 import com.enterprise.ordersuite.security.web.AuthRateLimitFilter;
+import com.enterprise.ordersuite.security.web.RefreshOriginFilter;
 import com.enterprise.ordersuite.security.web.RequestIdFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -31,6 +32,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -41,13 +43,14 @@ import java.util.Optional;
 @EnableWebSecurity
 @EnableMethodSecurity
 @RequiredArgsConstructor
-@EnableConfigurationProperties({RateLimitProperties.class, RefreshCookieProperties.class})
+@EnableConfigurationProperties({RateLimitProperties.class, RefreshCookieProperties.class, CorsProperties.class})
 public class SecurityConfig {
 
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
   private final ObjectMapper objectMapper;
   private final Clock clock;
   private final RateLimitProperties properties;
+  private final CorsProperties corsProperties;
 
   @Bean
   public RoleHierarchy roleHierarchy() {
@@ -64,7 +67,7 @@ public class SecurityConfig {
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
-    configuration.setAllowedOrigins(List.of("http://localhost:3000"));
+    configuration.setAllowedOrigins(corsProperties.allowedOrigins());
     configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     configuration.setAllowedHeaders(List.of("Authorization", "Cache-Control", "Content-Type"));
     configuration.setAllowCredentials(true);
@@ -176,6 +179,13 @@ public class SecurityConfig {
       .addFilterBefore(requestIdFilter, UsernamePasswordAuthenticationFilter.class)
       .addFilterBefore(authRateLimitFilter.orElse(null), UsernamePasswordAuthenticationFilter.class)
       .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+    // Ahead of CorsFilter, so a foreign origin gets the standard ApiErrorResponse (403
+    // ORIGIN_NOT_ALLOWED) rather than the CORS processor's plain-text rejection. Not a bean:
+    // a Filter bean would also be auto-registered in the servlet chain.
+    http.addFilterBefore(
+      new RefreshOriginFilter(corsProperties.allowedOrigins(), objectMapper, clock),
+      CorsFilter.class);
 
     return http.build();
   }
