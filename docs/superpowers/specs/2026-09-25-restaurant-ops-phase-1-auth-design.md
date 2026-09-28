@@ -1,7 +1,7 @@
 # Restaurant-ops migration, Phase 1 — Auth target design
 
 Date: 2026-09-25
-Status: approved design, amended 2026-09-25 after a risk review (D22–D24) — plan: `../plans/2026-09-25-restaurant-ops-phase-1-auth.md`
+Status: implemented — see ../plans/2026-09-25-restaurant-ops-phase-1-auth.md
 
 ## Problem
 

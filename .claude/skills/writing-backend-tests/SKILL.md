@@ -56,6 +56,9 @@ the JWT filter. Existing precedent: `security/ActuatorSecurityIT.java:63`.
 - **Property overrides** go on the class via `@TestPropertySource`
   (`LoginRateLimitIT.java:23-27`).
 - **Indentation is 2 spaces** in `src/test`. (`src/main` is 4 — do not carry one into the other.)
+- **Context path.** MockMvc sends no context path; production serves under /api. A test of
+  anything that matches on the request path (filters, cookie paths) must include a case with
+  .contextPath("/api") — see security/ratelimit/ContextPathRateLimitIT.java.
 
 ## Mandatory coverage
 

@@ -26,11 +26,11 @@ Ask in the language the user is writing in. Implement in English.
 
 ## The map
 
-- **Filter chain** (`security/config/SecurityConfig.java:164-181`): `RequestIdFilter` →
+- **Filter chain** (`security/config/SecurityConfig.java:164-188`): `RequestIdFilter` →
   `AuthRateLimitFilter` → `JwtAuthenticationFilter`, all registered before
-  `UsernamePasswordAuthenticationFilter`. Sessions are `STATELESS`. CSRF is disabled because
-  authentication is a bearer header — that reasoning stops holding the moment a cookie
-  appears (see Target below).
+  `UsernamePasswordAuthenticationFilter`; `RefreshOriginFilter` before `CorsFilter`. Sessions
+  are `STATELESS`. CSRF is disabled because authentication is a bearer header — that reasoning
+  stops holding the moment a cookie appears (see Target below).
 - **Public paths** (`SecurityConfig.java:169`): `/error`, `/auth/**`, `/actuator/health/**`,
   Swagger (`/swagger-ui/**`, `/v3/api-docs/**`, `/swagger-ui.html`), `/webjars/**`,
   `/logo.png`. `/actuator/info`, `/actuator/metrics/**`, `/admin/users/**` and
@@ -100,21 +100,36 @@ change. Never hardcode a key, password or token.
 Allowed **and** denied. Plus a `SUPER_ADMIN` case whenever role handling is involved — see
 the `writing-backend-tests` skill.
 
+### 7. Filters match the path within the application, and are tested under `/api`.
+
+`getRequestURI()` includes the context path (`SERVER_CONTEXT_PATH`, `/api` in every real
+deployment); MockMvc sends none. A filter comparing the raw URI passes every test and is
+switched off in production — `AuthRateLimitFilter` shipped that way until Phase 1. Match with
+`security.web.RequestPaths.withinApplication(request)`, and give every path-matching filter
+at least one test that sets `contextPath("/api")`. It returns the decoded path, the same one
+Spring MVC routes on — comparing the raw URI also let percent-encoded paths such as
+`/auth/%6cogin` skip the rate limiter.
+
 ## Target model — not yet built
 
 Mark anything you write against this section as target state. Source:
 `docs/contracts/backend-integration-manifest.openapi.yaml`.
 
 - **Refresh token moves to an HttpOnly cookie**, `Path=/api/auth`, `SameSite=Lax`, with
-  `Secure` configurable so local HTTP dev still works.
+  `Secure` configurable so local HTTP dev still works. **Built in Phase 1
+  (backward-compatible).**
 - **Refresh rotates on every call.** Reuse of an already-rotated token must revoke the
-  **entire token family**, not just the replayed token.
+  **entire token family**, not just the replayed token. **Built in Phase 1
+  (backward-compatible).**
 - `/auth/refresh` and `/auth/logout` become the only cookie-dependent endpoints, and
   therefore the **only CSRF surface**. The defence is `Origin` validation plus requiring
   `Content-Type: application/json`. Everything else authenticates by header and is unaffected.
+  **Built in Phase 1 (backward-compatible).**
 - The access token gains `firstName`, `lastName`, `email` claims. **A JWT payload is base64,
   not encrypted** — display data only. Never a phone number, address, or anything else
-  sensitive.
+  sensitive. **Built in Phase 1 (backward-compatible).**
+- **Remaining for Phase 6:** drop `refreshToken` from `AuthResponse`, remove the body
+  fallback, and make the Origin check universal.
 - **`/public/*` is unauthenticated and must never reuse an admin-scoped query.** Specific
   obligations from the manifest: filter `available == true` server-side so 86'd items do not
   leak; expose a single-table lookup rather than the full roster; treat `customerPhone` as a
