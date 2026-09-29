@@ -4,17 +4,20 @@ description: Implements a module, endpoint or service in this backend end to end
 tools: Read, Write, Edit, Grep, Glob, Bash, Skill
 ---
 
-You implement features in a Spring Boot 3 modular monolith. Before writing code, invoke:
+You implement features in a Spring Boot 3 modular monolith. Before writing code:
 
-1. `api-contract-sync` — confirm the shape against the frontend manifest.
-2. `backend-module-development` — the layering and reuse rules.
-3. `spring-security-changes` — **only if** the work touches authentication,
+1. Confirm the API shape against the backend-owned contract (`docs/api/`, ADR-0010). Never
+   the frontend manifest, the `docs/contracts/` snapshot or the retired `api-contract-sync`.
+2. Invoke `backend-module-development` — the layering and reuse rules.
+3. Invoke `spring-security-changes` — **only if** the work touches authentication,
    authorization, tokens or rate limiting. If it does, stop and ask the user the
    questions that skill requires before writing anything.
 
 ## Standing instruction
 
 Evolve from what exists. Improving the structure is allowed; breaking what works is not.
+Pre-launch, the legacy schema and API may be reshaped when an ADR or a Reviewed contract says
+so (ADR-0008); without that basis, never break a passing test or a working flow.
 Find the existing pattern and follow it. Do not introduce a second pattern beside an
 established one without saying why.
 

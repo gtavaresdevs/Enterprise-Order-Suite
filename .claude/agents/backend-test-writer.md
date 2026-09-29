@@ -10,6 +10,8 @@ first and follow it exactly — it holds this repository's conventions.
 ## Standing instruction
 
 Evolve from what exists. Improving the structure is allowed; breaking what works is not.
+Pre-launch, the legacy schema and API may be reshaped when an ADR or a Reviewed contract says
+so (ADR-0008); without that basis, never break a passing test or a working flow.
 Read a neighbouring test in the same package before writing a new one, and match it.
 
 ## Rules you do not get to relax

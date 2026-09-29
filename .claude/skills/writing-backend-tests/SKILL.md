@@ -16,8 +16,8 @@ writing a new one — the house style is consistent and you should match it.
 | `*Test` | **No Spring context.** Plain JUnit 5 + Mockito. | `@ExtendWith(MockitoExtension.class)`, `@Mock`, `@InjectMocks` |
 | `*IT` | Full context, real Postgres and MinIO containers. | `@IntegrationTest` + `@AutoConfigureMockMvc` |
 
-Precedent: `orders/application/service/OrderServiceTest.java:48` and
-`orders/api/OrderControllerIT.java:34-35`.
+Precedent: `orders/application/service/OrderServiceTest.java:49` and
+`orders/api/OrderControllerIT.java:36-37`.
 
 **Never hand-roll `@SpringBootTest`.** Use the `@IntegrationTest` composite
 (`support/IntegrationTest.java`) — it imports `PostgresTestContainerConfig` and
@@ -29,7 +29,7 @@ silently.
 
 The house pattern creates a user through `userRepository`, POSTs to `/auth/login`, pulls
 `$.accessToken` out of the response, and sends it as `Bearer`. See
-`OrderControllerIT.java:341-371` for `createTestUser` and `loginAndGetAccessToken`.
+`OrderControllerIT.java:801-839` for `createTestUser` and `loginAndGetAccessToken`.
 
 This matters because it exercises `JwtAuthenticationFilter` and the real authority mapping.
 `@WithMockUser` injects an `Authentication` directly and bypasses both — and authority
@@ -48,7 +48,7 @@ the JWT filter. Existing precedent: `security/ActuatorSecurityIT.java:63`.
   `.as("why this must hold")` to any assertion whose failure would otherwise be cryptic —
   see `LoginRateLimitIT.java:48-53`.
 - **Unique test data.** Emails are `"prefix-" + UUID.randomUUID() + "@test.com"`
-  (`OrderControllerIT.java:69`). Integration tests share one container across the class, so
+  (`OrderControllerIT.java:73`). Integration tests share one container across the class, so
   fixed values collide across tests.
 - **Time.** Inject `Clock` in production code and drive it from `support/MutableClock.java`
   in the test. Never call `Instant.now()` directly in code that needs to be time-tested —
@@ -71,10 +71,26 @@ These are obligations, not suggestions. A change that lacks them is not finished
    not see — unavailable ("86'd") menu items, the full table roster, another customer's order.
 3. **Every change to role handling gets a `SUPER_ADMIN` case.** `SUPER_ADMIN` inherits
    `ADMIN` only through `RoleHierarchy`, which `methodSecurityExpressionHandler` applies to
-   `@PreAuthorize` and **not** to a raw `getAuthorities()` call. That is the live defect in
-   `orders/application/service/OrderService.java:209` — a `SUPER_ADMIN` fails
-   `equals("ROLE_ADMIN")` and is silently demoted. A test with only `ADMIN` and `USER` would
-   pass over it.
+   `@PreAuthorize` and **not** to a raw `getAuthorities()` call. Until the 2026-09-20 orders
+   authorization fix, `OrderService` compared raw authorities, so a `SUPER_ADMIN` failed
+   `equals("ROLE_ADMIN")` and was silently demoted, and the tests with only `ADMIN` and `USER`
+   passed over it. The regression cases are
+   `OrderControllerIT.getAllOrders_asSuperAdmin_seesOrdersFromEveryCustomer` and
+   `searchOrders_asSuperAdmin_seesOrdersFromEveryCustomer`.
+
+**Upcoming, not yet an obligation:** cross-tenant tests (one restaurant cannot read or write
+another restaurant's rows) become mandatory with the Build 1 (Tenant foundation) acceptance
+criteria (MASTER-PLAN §6). This skill gains that rule then.
+
+## New-architecture rules
+
+Only what is Accepted so far:
+
+- **New tables have ULID primary keys** (ADR-0009), so tests for new code never assume
+  `Long` or sequential ids.
+- **Restaurant-owned data is scoped to the caller's restaurant and fails closed without one**
+  (ADR-0001). How the restaurant is resolved comes from the Tenancy & Identity contract,
+  which is not written yet: do not invent a mechanism or a test fixture for one.
 
 ## Proving a defect
 

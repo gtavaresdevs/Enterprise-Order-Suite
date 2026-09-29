@@ -21,13 +21,20 @@ whichever environment runs second.
 ls src/main/resources/db/migration/ | sort -V | tail -1
 ```
 
-At the time of writing the highest is `V19__Add_Avatar_Key_To_User_Profile.sql`.
+At the time of writing (2026-09-29) the highest is `V21__Refresh_Token_Families.sql`.
 
 ## Never edit an applied migration
 
 Flyway checksums every migration it has run. Editing one breaks startup in every environment
 that already applied it — including any teammate's local database and CI. The fix is always
 a **new** version, never a correction in place.
+
+**One exception, before launch only** (ADR-0009): V1-V21 are replaced once by a new baseline
+that creates the target schema (ULID keys, the restaurant id on restaurant-owned tables, the
+missing foreign keys). It is planned for Build 1 (Tenant foundation), as one dedicated,
+reviewed change, and only while no environment holds data that must be kept; every local
+database is dropped and recreated afterwards. Outside that re-baseline, and always after
+launch, this rule applies without exception.
 
 ## Entity and schema ship together
 
@@ -44,6 +51,11 @@ one of the two is broken by construction, and it breaks for whoever checks it ou
 databases that may already hold the row.
 
 ## Renaming an enum value is a data migration
+
+**Not for pre-launch legacy data.** There is no production data (ADR-0008): the legacy
+`orders` statuses are replaced by the Order Core contract, not migrated, and no data
+migration or compatibility shim is written for legacy B2B data. The technique below applies
+once real data exists.
 
 Enums are persisted as strings — `@Enumerated(EnumType.STRING)` on
 `orders/domain/Order.java:25` — so the stored values are the **Java constant names**. Renaming
@@ -70,8 +82,20 @@ END;
 Never leave a row holding a value the Java enum no longer has — it deserializes to an
 exception on read, and only for the rows that happen to be old.
 
-(The mapping above is the one migration phase 4 needs; confirm the target names against
-`docs/contracts/backend-integration-manifest.openapi.yaml` before writing it.)
+(The mapping above only illustrates the technique; it is not a planned migration. Target
+enum names come from the backend-owned contract in `docs/api/drafts/` (ADR-0010), never from
+the frozen `docs/contracts/` snapshot.)
+
+## New-architecture rules
+
+Only what is Accepted so far:
+
+- **New tables get a ULID primary key** (ADR-0009). Never `IDENTITY`, `SERIAL`/`BIGSERIAL` or
+  a database sequence for a primary key; the application generates the id, and foreign keys
+  reference ULIDs. The column type is open (API conventions): do not pick one on your own.
+- **Restaurant-owned tables carry the restaurant id** (ADR-0001). Whether child rows (for
+  example order lines) carry it directly, and how queries are scoped, come from the Tenancy &
+  Identity contract, which is not written yet. Do not invent a mechanism.
 
 ## Before you write
 

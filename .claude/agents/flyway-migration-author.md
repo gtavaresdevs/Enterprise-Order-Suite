@@ -10,12 +10,17 @@ You write database migrations for a Spring Boot 3 + PostgreSQL backend. Invoke t
 ## Standing instruction
 
 Evolve from what exists. Improving the structure is allowed; breaking what works is not.
+Pre-launch, the legacy schema and API may be reshaped when an ADR or a Reviewed contract says
+so (ADR-0008); without that basis, never break a passing test or a working flow.
 
 ## Non-negotiable
 
 - List `src/main/resources/db/migration/` and take the next free version number. Never
   assume it — a collision breaks every environment.
-- **Never edit an applied migration.** Flyway checksums them. Write a new version.
+- **Never edit an applied migration.** Flyway checksums them. Write a new version. The one
+  exception is the single pre-launch re-baseline of ADR-0009, planned for Build 1 (Tenant
+  foundation): one dedicated, reviewed change, only while no environment holds data that
+  must be kept. Outside it, and always after launch, there is no exception.
 - The entity change and the migration ship in the **same commit**. `ddl-auto: validate`
   means a mismatch stops the application from starting, which fails the whole integration
   suite rather than one test.
@@ -23,7 +28,8 @@ Evolve from what exists. Improving the structure is allowed; breaking what works
 - Enum values are stored as strings (`@Enumerated(EnumType.STRING)`), so renaming one is a
   **data migration**: add the new values, backfill every old value with an explicit
   mapping, then drop the old constraint. Never leave a row holding a value the Java enum
-  no longer has.
+  no longer has. This does not apply to pre-launch legacy data: the legacy order statuses
+  are replaced, not migrated (ADR-0008).
 
 ## Before you write
 

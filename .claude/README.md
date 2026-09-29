@@ -32,6 +32,9 @@ needs (scripts, heavy reference docs). Follow `superpowers:writing-skills` conve
   when..." and states triggering conditions only, not the skill's process.
 - Keep skills project-specific here. Cross-project techniques belong in `~/.claude/skills/`.
 - One skill = one clear technique/pattern/reference; don't bundle unrelated guidance.
+- A retired skill keeps its file, with a `DEPRECATED ... never invoke` description and
+  `disable-model-invocation: true` in place of "Use when..." (today: `api-contract-sync`,
+  retired by ADR-0010).
 
 ### commands/
 
@@ -41,9 +44,14 @@ passed-in text.
 
 ### hooks/
 
-Executable scripts (`.sh`/`.ps1`/etc.) that `settings.json` wires to lifecycle events
+Executable scripts that `settings.json` wires to lifecycle events
 (`PreToolUse`, `PostToolUse`, `SessionStart`, ...). Keep hook logic in scripts here rather than
 inlining long shell commands in `settings.json` — easier to test and diff.
+
+Hooks must run on every OS, Linux cloud sessions included (ADR-0015), so do not depend on a
+runtime those sessions lack, such as `pwsh`. The current hook, `security-sensitive-file.mjs`,
+is a Node script that runs on every OS: before an edit to a security-sensitive file it asks
+for confirmation and points to the `spring-security-changes` skill. It never denies an edit.
 
 ## Adding something new
 

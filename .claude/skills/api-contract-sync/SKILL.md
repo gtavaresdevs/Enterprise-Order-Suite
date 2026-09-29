@@ -1,6 +1,7 @@
 ---
 name: api-contract-sync
-description: DEPRECATED (ADR-0010) - do not invoke. Retired because the backend owns the API contract; this skill checked endpoints against the frozen frontend manifest.
+description: DEPRECATED (ADR-0010) - never invoke. Retired skill, kept only as a historical record.
+disable-model-invocation: true
 ---
 
 > **RETIRED (2026-09-29). Do not invoke; do not follow.** The backend owns the API contract (ADR-0010). Change API shapes in `docs/api/drafts/` (design) or in code together with the committed `docs/api/openapi.yaml` (implementation). The frontend manifest and the `docs/contracts/` snapshot are frozen. The open-decisions table below is stale: see `docs/adr/0000-legacy-decisions-triage.md`.
