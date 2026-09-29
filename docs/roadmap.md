@@ -12,7 +12,7 @@
 | S0 | Decisions baseline: ADRs (new + legacy triage), architecture amendment proposal, open-questions register, superseded-docs list, memory cleanup | Claude | none | Done 2026-09-29 |
 | S1 | Gabriel's review: accept the ADRs and the architecture amendments; answer register Q-01..Q-10; push the frontend `.claude/` (Q-06, Q-07); Plane signup whenever convenient | Gabriel | S0 | Partially answered: Q-01..Q-03 answered 2026-09-29; Q-04..Q-10 open |
 | S2 | Docs skeleton in the backend repo `docs/` (ADR-0011): `README.md`, `roadmap.md`, ADRs, glossary seed, templates, superseded banners on legacy docs; rewrite both `CLAUDE.md` files | Claude | S1 Q-01..Q-03 (answered). Parts wait on Q-04, Q-05, Q-09, Q-10 | Partially done: skeleton, ADRs, banners and both `CLAUDE.md` rewrites pushed 2026-09-29; waiting on Q-04 (apply amendments), Q-05 (legacy triage), Q-09 (Reviewed signal), Q-10 (public README notes) |
-| S3 | Readiness tooling: version the frontend `.claude/`, port or remove the PowerShell hook, `permissions.deny` git rules, SessionStart setup, frontend lint baseline, Vitest, CI running today's checks in both repos | Claude (+ Gabriel for the S1 push) | S2 | Not started |
+| S3 | Readiness tooling: version the frontend `.claude/`, port or remove the PowerShell hook, `permissions.deny` git rules, SessionStart setup, frontend lint baseline, Vitest, CI running today's checks in both repos | Claude (+ Gabriel for the S1 push) | S2 | Partially done: everything except the frontend `.claude/` (hook port, git rules, SessionStart check, Vitest, CI in both repos, skills aligned) on 2026-09-29; the frontend `.claude/` waits on Q-06, Q-07 |
 | S4 | Cross-cutting design: API conventions doc, finalize the Edge-ready constraints (drafted in ADR-0003), then the Tenancy & Identity contract with Gabriel's question batch (register group 2) | Claude + Gabriel | S2 | Not started |
 | S5 | Scope of this run (short PRD) + NFR page + audit backlog triage | Claude + Gabriel | S4 | Not started |
 | Build 1 | Tenant foundation. Acceptance includes: ArchUnit tenant rule, cross-tenant tests, contract drift test, dev/test seed data, tenant id in logs | Claude | Readiness gate below. Whether it also waits for S5: Q-08 | Not started |
@@ -31,8 +31,8 @@ From MP §7. Tick an item only when it holds (repo items: on the working branche
 - [ ] ADRs and the amended architecture are Accepted by Gabriel.
 - [ ] Docs live in one agreed place with a "where to look" map; legacy docs carry superseded banners.
 - [x] Both `CLAUDE.md` files match the current decisions. Evidence: S2 commits of 2026-09-29 on both working branches (`CLAUDE.md`, `order-ui/CLAUDE.md`); re-check after S3 changes tooling.
-- [ ] Frontend `.claude/` is in git; no Windows-only hooks; git rules enforced by `permissions.deny`.
-- [ ] A fresh cloud session can run the full verification in both repos.
+- [ ] Frontend `.claude/` is in git; no Windows-only hooks; git rules enforced by `permissions.deny`. Backend part done 2026-09-29 (Node hooks, `permissions.deny` in `.claude/settings.json`); the frontend part waits on Q-06, Q-07.
+- [x] A fresh cloud session can run the full verification in both repos. Evidence: cloud session of 2026-09-29, backend `./gradlew test` 283 tests, 0 failures, with the Docker daemon and Gradle JDK path set by `.claude/hooks/session-start.mjs`; frontend `yarn install && yarn lint && yarn build && yarn test` green.
 - [ ] CI runs `./gradlew test` and `yarn lint && yarn build && yarn test` on the working branches, green.
 - [ ] API conventions + Tenancy & Identity contract are Reviewed. (Menu and Order Core contracts gate their own steps, not this one.)
 

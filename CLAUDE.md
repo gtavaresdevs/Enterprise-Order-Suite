@@ -25,22 +25,25 @@ Project skills live in `.claude/skills/` and are versioned. Invoke them; do not 
 
 | Skill | Invoke before | Status |
 |---|---|---|
-| `writing-backend-tests` | writing or changing any test | S3 update pending (tenancy, ULIDs) |
+| `writing-backend-tests` | writing or changing any test | current |
 | `spring-security-changes` | touching `security/`, `auth/`, any `@PreAuthorize`, JWT or rate limiting | current |
-| `backend-module-development` | adding a module, endpoint, service, entity or DTO | S3 update pending (tenancy, ULIDs) |
-| `flyway-migrations` | adding a migration or changing an entity's schema | S3 update pending (tenancy, ULIDs) |
+| `backend-module-development` | adding a module, endpoint, service, entity or DTO | current |
+| `flyway-migrations` | adding a migration or changing an entity's schema | current |
 
-`api-contract-sync` is retired and removed from this table (ADR-0010): never invoke it; the backend owns the contract. S3 deletes it or leaves it deprecated.
+`api-contract-sync` is retired (ADR-0010): the model cannot invoke it and the file is kept only as history; the backend owns the contract.
 
-`backend-module-development`, `flyway-migrations` and `writing-backend-tests` are updated in S3 for tenant scoping and ULIDs (ADR-0001, ADR-0009). Until then the ADRs win where they differ.
+The skills carry only the Accepted new-architecture rules (ULID keys, restaurant-scoped rows that fail closed); the tenancy mechanism arrives with the Tenancy & Identity contract (S4).
 
-Agents in `.claude/agents/`: `spring-security-reviewer` (read-only audit), `backend-test-writer`, `backend-feature-builder`, `flyway-migration-author`. `backend-feature-builder` step 1 (`api-contract-sync`, frontend manifest) is retired (ADR-0010).
+Agents in `.claude/agents/`: `spring-security-reviewer` (read-only audit), `backend-test-writer`, `backend-feature-builder`, `flyway-migration-author`.
 
-`.claude/settings.json` registers a `PreToolUse` hook that warns before edits to security-sensitive files. It advises, never blocks. It runs `pwsh`, so it does not run on Linux cloud sessions; S3 ports or removes it (ADR-0015).
+`.claude/settings.json` (Node hooks, every OS; ADR-0015):
+- `PreToolUse` `security-sensitive-file.mjs`: asks for confirmation before an edit to a security-sensitive file and points to `spring-security-changes`. It never denies.
+- `SessionStart` `session-start.mjs`: reports whether this session can run the full `./gradlew test` (JDK, Gradle JDK path, Docker). In cloud sessions it also points Gradle at the local JDK and starts the Docker daemon.
+- `permissions.deny`: the git rules below (ADR-0013). They match command prefixes, so they are a guardrail, not a boundary.
 
 **Verification:** a full `./gradlew test` (Docker required) before claiming anything works.
 
-**Git (backend):** working branch `feature/ai-agent`. Update with `git pull --ff-only` (a plain `git pull` can create a merge commit). Parallel worktree results land by `git cherry-pick`, never a merge. `permissions.deny` rules for the git rules land in S3 (ADR-0013).
+**Git (backend):** working branch `feature/ai-agent`. Update with `git pull --ff-only` (a plain `git pull` can create a merge commit). Parallel worktree results land by `git cherry-pick`, never a merge. CI (`.github/workflows/ci.yml`) runs `./gradlew test` on every push to it.
 
 ## Commands
 
@@ -58,11 +61,13 @@ Gradle, not Maven: ignore the Maven instructions in `README.md`.
 
 No lint task; rely on compilation and tests.
 
+`gradle.properties` pins `org.gradle.java.home` to a Windows JDK path. Elsewhere, override it: the SessionStart hook does so in cloud sessions (Gradle user-home `gradle.properties`), CI passes `-Dorg.gradle.java.home=$JAVA_HOME`.
+
 ## Environment
 
 Config is env-var driven: `spring-dotenv` loads `.env`; `.env.example` lists the minimum (`DB_NAME`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`). `build.gradle` reads `.env` directly for the Flyway Gradle plugin. Never hardcode secrets: extend `.env`/`.env.example` and reference them as `${VAR}` in `application.yml`, following the `storage:`, `jwt:` and `app.email:` blocks. JPA runs with `ddl-auto: validate`.
 
-Tests never use `.env` or a local Postgres: they start real containers through Testcontainers, so they are safe to run anywhere.
+Tests never need `.env` or a local Postgres: they start real containers through Testcontainers, and `src/test/resources/application-test.yml` gives every required variable a test fallback. `spring-dotenv` still loads a `.env` when one exists, so a test that asserts on a configurable value pins it with `@TestPropertySource` (see `RefreshCookieIT`).
 
 ## Code conventions
 

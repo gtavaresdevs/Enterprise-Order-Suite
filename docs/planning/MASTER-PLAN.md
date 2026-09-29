@@ -12,8 +12,8 @@ branches (backend `feature/ai-agent` @ `af2634e`, frontend `Claude-Assisted-Deve
 
 ## 1. Where we are
 
-**Current phase: S2 done 2026-09-29 (docs skeleton in the backend repo `docs/`; parts wait on Q-04, Q-05, Q-09, Q-10).
-Next: S3 and S4. S1 partially answered: Q-01..Q-03 answered 2026-09-29, Q-04..Q-10 open.** S0 (decisions baseline) is done, 2026-09-29. No code for the new architecture
+**Current phase: S3 mostly done 2026-09-29 (the frontend `.claude/` waits on Q-06, Q-07); next is S4. S2 done 2026-09-29
+(docs skeleton in the backend repo `docs/`; parts wait on Q-04, Q-05, Q-09, Q-10). S1 partially answered: Q-01..Q-03 answered 2026-09-29, Q-04..Q-10 open.** S0 (decisions baseline) is done, 2026-09-29. No code for the new architecture
 exists yet. Documentation and Claude readiness run in parallel; software development starts only after the gate in §7.
 
 S0 outputs (drafted in the project folder, pushed to the backend repo `docs/` in S2):
@@ -98,7 +98,7 @@ These are the parts of the earlier plans that did not make sense for a solo deve
 | S0 | ✅ **Decisions baseline** (done 2026-09-29): ADRs (new + legacy triage), architecture amendment proposal, open-questions register, superseded-docs list, memory cleanup. See §1. | Claude | — |
 | S1 | **Partially done.** Answered 2026-09-29: Q-01 docs location, Q-02 never-merge scope, Q-03 the 12 simplifications. Open: Q-04..Q-10 (the amendments, the legacy triage, how the frontend `.claude/` reaches git and which tools stay out, whether Build 1 waits for S5, how Reviewed is marked, README notes). Plane signup whenever convenient. | Gabriel | S0 |
 | **S2** | **Done 2026-09-29**, parts waiting on Q-04, Q-05, Q-09, Q-10. Docs skeleton in the backend repo `docs/` (ADR-0011): `docs/README.md` (map + current phase), `docs/roadmap.md`, ADRs, glossary seed, doc templates (with Status and Open questions), superseded banners on legacy docs. Rewrite both `CLAUDE.md` files to match. | Claude | S1 Q-01..Q-03 (answered). Parts wait on open Q-04, Q-05, Q-09, Q-10 (register "Blocks"); Q-12..Q-15 decided by Claude |
-| S3 | Readiness tooling: version frontend `.claude/`, port/remove the PowerShell hook, `permissions.deny` git rules, SessionStart setup, frontend lint baseline, Vitest, CI running today's checks in both repos. | Claude (+ Gabriel for S1 push) | S2 |
+| S3 | **Mostly done 2026-09-29**; the frontend `.claude/` waits on Q-06, Q-07 (status: `docs/roadmap.md`). Readiness tooling: version frontend `.claude/`, port/remove the PowerShell hook, `permissions.deny` git rules, SessionStart setup, frontend lint baseline, Vitest, CI running today's checks in both repos. | Claude (+ Gabriel for S1 push) | S2 |
 | S4 | Cross-cutting design: API conventions ADR, finalize the Edge-ready constraints (already drafted in ADR-0003), then **Tenancy & Identity** contract with Gabriel's question batch (register group 2). | Claude + Gabriel | S2 |
 | S5 | Scope of this run (short PRD) + NFR page + audit backlog triage. | Claude + Gabriel | S4 |
 | **Build 1** | Tenant foundation (acceptance includes: ArchUnit tenant rule, cross-tenant tests, contract drift test, seed data, tenant id in logs). | Claude | Gate §7 |

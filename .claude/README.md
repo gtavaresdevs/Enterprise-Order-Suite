@@ -49,9 +49,15 @@ Executable scripts that `settings.json` wires to lifecycle events
 inlining long shell commands in `settings.json` — easier to test and diff.
 
 Hooks must run on every OS, Linux cloud sessions included (ADR-0015), so do not depend on a
-runtime those sessions lack, such as `pwsh`. The current hook, `security-sensitive-file.mjs`,
-is a Node script that runs on every OS: before an edit to a security-sensitive file it asks
-for confirmation and points to the `spring-security-changes` skill. It never denies an edit.
+runtime those sessions lack, such as `pwsh`. Both hooks are Node scripts:
+
+- `security-sensitive-file.mjs` (`PreToolUse`): before an edit to a security-sensitive file it
+  asks for confirmation and points to the `spring-security-changes` skill. It never denies.
+- `session-start.mjs` (`SessionStart`): reports whether the session can run `./gradlew test`
+  (JDK, Gradle JDK path, Docker). In cloud sessions (`CLAUDE_CODE_REMOTE=true`) it also points
+  Gradle at the local JDK and starts the Docker daemon. It never blocks.
+
+`settings.json` also holds `permissions.deny` rules for the git rules (ADR-0013).
 
 ## Adding something new
 

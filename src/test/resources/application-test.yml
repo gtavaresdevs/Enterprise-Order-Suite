@@ -1,7 +1,25 @@
+# Tests must boot without a developer .env (CI, cloud sessions). Every value below still comes
+# from .env when one exists; the fallback after ':' is used only when the variable is unset.
+# Testcontainers replaces the datasource, MinioTestContainerConfig the storage settings and
+# TestEmailServiceConfig the email sender, so these fallbacks only have to resolve.
+server:
+  servlet:
+    context-path: ${SERVER_CONTEXT_PATH:/api}
+
 spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:test}
+    username: ${DB_USER:test}
+    password: ${DB_PASSWORD:test}
+
   jpa:
     hibernate:
       ddl-auto: validate
+
+  mail:
+    host: ${MAIL_HOST:localhost}
+    username: ${MAIL_USERNAME:test@example.com}
+    password: ${MAIL_PASSWORD:test}
 
   flyway:
     enabled: true
@@ -9,6 +27,30 @@ spring:
   test:
     database:
       replace: none
+
+# Test-only signing key (base64). Never used outside tests.
+jwt:
+  secret: ${JWT_SECRET:dGVzdC1vbmx5LWp3dC1zaWduaW5nLWtleS1mb3ItaW50ZWdyYXRpb24tdGVzdHMtbmV2ZXItcHJvZA==}
+
+storage:
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  region: ${MINIO_REGION:us-east-1}
+  access-key: ${MINIO_ROOT_USER:test}
+  secret-key: ${MINIO_ROOT_PASSWORD:test}
+  bucket: ${MINIO_BUCKET:test}
+
+app:
+  urls:
+    password-reset: ${APP_PASSWORD_RESET_URL:http://localhost:3000/reset-password}
+  email:
+    from: ${MAIL_USERNAME:test@example.com}
+
+# The mail health indicator dials the SMTP host, which tests do not have (the sender is
+# replaced), so it would report DOWN and turn /actuator/health into 503.
+management:
+  health:
+    mail:
+      enabled: false
 
 security:
   rate-limit:
