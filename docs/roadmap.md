@@ -33,7 +33,7 @@ From MP §7. Tick an item only when it holds (repo items: on the working branche
 - [x] Both `CLAUDE.md` files match the current decisions. Evidence: S2 commits of 2026-09-29 on both working branches (`CLAUDE.md`, `order-ui/CLAUDE.md`); re-check after S3 changes tooling.
 - [ ] Frontend `.claude/` is in git; no Windows-only hooks; git rules enforced by `permissions.deny`. Backend part done 2026-09-29 (Node hooks, `permissions.deny` in `.claude/settings.json`); the frontend part waits on Q-06, Q-07.
 - [x] A fresh cloud session can run the full verification in both repos. Evidence: cloud session of 2026-09-29, backend `./gradlew test` 283 tests, 0 failures, with the Docker daemon and Gradle JDK path set by `.claude/hooks/session-start.mjs`; frontend `yarn install && yarn lint && yarn build && yarn test` green.
-- [ ] CI runs `./gradlew test` and `yarn lint && yarn build && yarn test` on the working branches, green.
+- [x] CI runs `./gradlew test` and `yarn lint && yarn build && yarn test` on the working branches, green. Evidence (2026-09-29): backend CI run 36604877944 on `72cef45`; frontend CI run 36603662582 on `06de42e`.
 - [ ] API conventions + Tenancy & Identity contract are Reviewed. (Menu and Order Core contracts gate their own steps, not this one.)
 
 "Reviewed" = Gabriel read it and no open question blocks the next build step. Only Gabriel sets it (ADR-0016).
