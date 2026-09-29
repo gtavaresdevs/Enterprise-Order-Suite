@@ -1,113 +1,91 @@
-# CLAUDE.md
+## Start here (shared by backend and frontend; keep identical in both repos)
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+- **Docs live in the backend repo** `gtavaresdevs/enterprise-order-suite`, folder `docs/`, branch `feature/ai-agent`. Read `docs/README.md` first: it says what phase we are in and what to read for each kind of task. Frontend sessions clone the backend repo read-only to read them.
+- **The backend owns the docs and the API contract** and keeps them current (ADR-0010, ADR-0011). The frontend reads them and may add an annotation only when necessary and only after Gabriel has agreed to it.
+- **Decisions are ADRs** in `docs/adr/`. Check them before proposing anything that contradicts one; raise the conflict instead of working around it. Never apply a legacy decision from an old spec without checking `docs/adr/0000-legacy-decisions-triage.md`.
+- **Open questions** live in `docs/planning/open-questions.md` (ids `Q-NN`, never renumbered). Never record an answer Gabriel did not give.
+- **Current phase:** planning, documentation and Claude readiness (`docs/roadmap.md`). No feature code for the new architecture until the readiness gate in `docs/roadmap.md` passes.
+- **Git:** work only on the working branch (backend `feature/ai-agent`, frontend `Claude-Assisted-Development`); never read or base work on `main`. Commit straight to the working branch with an explicit pathspec (`git commit -m "..." -- <files>`) and push. Never merge (no `git merge`, no PR merges, nothing into `main`), never `git stash`, never `git add -A`, never force-push (ADR-0013). Only the main agent commits; subagents never write git state.
+- **Architecture in one paragraph:** one shared multi-tenant SaaS; every restaurant-owned row is scoped to its restaurant and fails closed without one (ADR-0001). One operational core (one Order model with channel + source, one Menu) that every interface calls through application services; no business rules in channel adapters (ADR-0002). The Restaurant Edge is optional and not built this run (ADR-0003); offline support means orders (ADR-0004). Payments are record-only: the app never processes or queues a payment and never reports an unconfirmed external operation as successful (ADR-0005). There is no production data yet, so schema and API may be reshaped (ADR-0008); ids are ULIDs (ADR-0009).
+- **Language:** code, comments and docs in English; ask Gabriel questions in the language he writes in.
 
-## Project
+## This repo (backend)
 
-Enterprise-grade B2B order management backend: Java 17, Spring Boot 3, PostgreSQL (Flyway-migrated), JWT auth. Base package: `com.enterprise.ordersuite`. Built as a modular monolith — modules under `src/main/java/com/enterprise/ordersuite/` (`auth`, `identity`, `orders`, `products`, `profile`, `security`, `storage`, `notifications`, `common`, `api`) are isolated by dependency inversion (see Architecture below), not by physical service boundaries.
+Java 17, Spring Boot 3, PostgreSQL (Flyway), JWT auth. Base package `com.enterprise.ordersuite`. A modular monolith: modules under `src/main/java/com/enterprise/ordersuite/` (`auth`, `identity`, `orders`, `products`, `profile`, `security`, `storage`, `notifications`, `common`, `config`, `api`) are isolated by dependency inversion, not by service boundaries.
 
-## Working in this repository
+It is becoming the restaurant-ops multi-tenant SaaS (ADR-0001, ADR-0002). The current code still has the legacy B2B shape: one tenant, `/orders` and `/products`, orders owned by a `User`, `Long` ids. That shape is replaced, not evolved (ADR-0008); do not extend it for new-architecture work.
 
-Project skills live in `.claude/skills/` and are versioned. Invoke them; do not re-derive
-the conventions.
+**Direction:** start at `docs/README.md` and the ADRs in `docs/adr/`; build order is Tenant foundation, Menu, Order Core, Storefront to Order Core (ADR-0007). The old direction (single restaurant, frontend-owned contract, anonymous customers only, the `docs/contracts/` snapshot, the 2026-09-20 migration design) is superseded or open: see the banners on those files and ADR-0000.
 
-| Skill | Invoke before |
-|---|---|
-| `writing-backend-tests` | writing or changing any test |
-| `spring-security-changes` | touching `security/`, `auth/`, any `@PreAuthorize`, JWT or rate limiting |
-| `backend-module-development` | adding a module, endpoint, service, entity or DTO |
-| `flyway-migrations` | adding a migration or changing an entity's schema |
-| `api-contract-sync` | creating or changing any endpoint or payload shape |
+**Kept legacy rules** (MASTER-PLAN D-16): authorization only in `@PreAuthorize` (D2); full `./gradlew test` before "done" (D5); `SCREAMING_SNAKE` error codes (D14); every persisted timestamp is an `Instant` on `timestamptz` (D15); auth D16-D24; the server derives every money value; order lines snapshot name and price; cancel is a status change.
 
-Agents in `.claude/agents/`: `spring-security-reviewer` (read-only audit),
-`backend-test-writer`, `backend-feature-builder`, `flyway-migration-author`.
+## Skills, agents, hooks
 
-A `PreToolUse` hook warns before edits to security-sensitive files. It advises, never blocks.
+Project skills live in `.claude/skills/` and are versioned. Invoke them; do not re-derive the conventions. Where a skill differs from an ADR, the ADR wins.
+
+| Skill | Invoke before | Status |
+|---|---|---|
+| `writing-backend-tests` | writing or changing any test | S3 update pending (tenancy, ULIDs) |
+| `spring-security-changes` | touching `security/`, `auth/`, any `@PreAuthorize`, JWT or rate limiting | current |
+| `backend-module-development` | adding a module, endpoint, service, entity or DTO | S3 update pending (tenancy, ULIDs) |
+| `flyway-migrations` | adding a migration or changing an entity's schema | S3 update pending (tenancy, ULIDs) |
+
+`api-contract-sync` is retired and removed from this table (ADR-0010): never invoke it; the backend owns the contract. S3 deletes it or leaves it deprecated.
+
+`backend-module-development`, `flyway-migrations` and `writing-backend-tests` are updated in S3 for tenant scoping and ULIDs (ADR-0001, ADR-0009). Until then the ADRs win where they differ.
+
+Agents in `.claude/agents/`: `spring-security-reviewer` (read-only audit), `backend-test-writer`, `backend-feature-builder`, `flyway-migration-author`. `backend-feature-builder` step 1 (`api-contract-sync`, frontend manifest) is retired (ADR-0010).
+
+`.claude/settings.json` registers a `PreToolUse` hook that warns before edits to security-sensitive files. It advises, never blocks. It runs `pwsh`, so it does not run on Linux cloud sessions; S3 ports or removes it (ADR-0015).
 
 **Verification:** a full `./gradlew test` (Docker required) before claiming anything works.
 
-**Language:** ask the user questions in the language they are writing in; write all code,
-comments and documentation in English.
+**Git (backend):** working branch `feature/ai-agent`. Update with `git pull --ff-only` (a plain `git pull` can create a merge commit). Parallel worktree results land by `git cherry-pick`, never a merge. `permissions.deny` rules for the git rules land in S3 (ADR-0013).
 
 ## Commands
 
-This project uses **Gradle**, not Maven — ignore the Maven instructions in README.md/HELP.md, they're stale.
+Gradle, not Maven: ignore the Maven instructions in `README.md`.
 
 ```bash
-# Build
 ./gradlew build
-
-# Run locally (uses application-local.yml, requires .env — see Environment below)
-./gradlew bootRun
-
-# Run all tests (JUnit 5 via Testcontainers — requires Docker running)
-./gradlew test
-
-# Run a single test class
+./gradlew bootRun      # profile local (optional, gitignored application-local.yml); needs .env (see Environment)
+./gradlew test         # JUnit 5 + Testcontainers; Docker must be running
 ./gradlew test --tests "com.enterprise.ordersuite.orders.application.service.OrderServiceTest"
-
-# Run a single test method
-./gradlew test --tests "com.enterprise.ordersuite.orders.api.OrderControllerIT.createOrder_shouldReturn201"
-
-# Flyway (migrations live in src/main/resources/db/migration, applied automatically on boot via ddl-auto: validate)
-./gradlew flywayMigrate
+./gradlew test --tests "com.enterprise.ordersuite.orders.api.OrderControllerIT.createOrder_asRegularUser_returns201"
+./gradlew flywayMigrate   # migrations: src/main/resources/db/migration (also applied on boot)
 ./gradlew flywayInfo
 ```
 
-There is no separate lint task configured; rely on compilation and tests.
+No lint task; rely on compilation and tests.
 
 ## Environment
 
-Config is env-var driven (`spring-dotenv` loads `.env` automatically; see `.env.example` for the minimal required set: `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`). `build.gradle` also reads `.env` directly to configure the Flyway Gradle plugin outside of Spring's context. Never hardcode secrets — extend `.env`/`.env.example` and reference via `${VAR}` in `application.yml`, following the existing pattern (see `storage:`, `jwt:`, `app.email:` blocks).
+Config is env-var driven: `spring-dotenv` loads `.env`; `.env.example` lists the minimum (`DB_NAME`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`). `build.gradle` reads `.env` directly for the Flyway Gradle plugin. Never hardcode secrets: extend `.env`/`.env.example` and reference them as `${VAR}` in `application.yml`, following the `storage:`, `jwt:` and `app.email:` blocks. JPA runs with `ddl-auto: validate`.
 
-Tests do **not** use `.env`/local Postgres — they spin up real containers via Testcontainers (see Testing below), so integration tests are safe to run without a manually configured DB and never hit production.
+Tests never use `.env` or a local Postgres: they start real containers through Testcontainers, so they are safe to run anywhere.
 
-## Architecture
+## Code conventions
 
-**Layering per module**: `api` (controllers + DTOs) → `application` (services, mappers) → `domain` (entities, domain exceptions) → `persistence` (Spring Data repositories). Not every module has all four packages, but new code should follow this shape when adding to a module.
+**Layering per module:** `api` (controllers, DTOs) → `application` (services, mappers) → `domain` (entities, domain exceptions) → `persistence` (Spring Data repositories). Not every module has all four; new code follows this shape.
 
-**Module isolation via Dependency Inversion**: `orders` depends on a `ProductService` *interface* it defines itself (`orders.application.service.ProductService`), not on the `products` module directly. The real implementation lives in `products.application.service.ProductService` and implements the orders-module interface. This is the established pattern for cross-module dependencies — when one module needs another's functionality, define the contract in the consuming module and have the providing module implement it, rather than importing across module packages directly.
+**Cross-module dependency inversion:** the consuming module defines the interface it needs and the providing module implements it. Example: `orders.application.service.ProductService` is an interface owned by `orders`, implemented by `products.application.service.ProductService`. Never import across module packages directly.
 
-**Reuse existing infrastructure** rather than re-implementing:
-- `identity.application.CurrentUserService` — get the logged-in user (id/email) from the security context.
-- `common.util.PagedResult` — pagination wrapper for search/list endpoints.
-- `api.errors.ApiErrorResponse` + `GlobalExceptionHandler`/`AuthExceptionHandler` — standard error response shape (`code`, `message`, `timestamp`, optional `errors` list for validation failures).
+**Reuse, do not re-implement:**
+- `identity.application.CurrentUserService`: the logged-in user (id, email) from the security context.
+- `common.util.PagedResult`: pagination wrapper for list and search endpoints.
+- `api.errors.ApiErrorResponse` with `GlobalExceptionHandler` / `AuthExceptionHandler`: the error shape (`code`, `message`, `timestamp`, optional `errors` for validation).
 
-**Authorization model**: Spring Security method security (`@PreAuthorize`) is the primary enforcement point, not just URL-level rules in `SecurityConfig`. Role hierarchy: `ROLE_SUPER_ADMIN > ROLE_ADMIN > ROLE_USER` (defined in `SecurityConfig.roleHierarchy()`). Resource-ownership checks (e.g. a user can only touch their own orders) are implemented as helper methods on the service itself referenced from the SpEL expression — see `OrderService.isOrderOwner` used via `@PreAuthorize("hasRole('ADMIN') or @orderService.isOrderOwner(#id, principal.id)")`. Follow this pattern for any new resource-scoped endpoint rather than filtering in the service body. Multi-tenant list/search endpoints (e.g. `OrderService.searchOrders`/`getAllOrders`) additionally force-filter by the current user's ID for non-admins at the query level.
+**Authorization:** only in `@PreAuthorize` (D2), never in a method body. Role hierarchy `ROLE_SUPER_ADMIN > ROLE_ADMIN > ROLE_USER` (`SecurityConfig.roleHierarchy()`) is applied by `methodSecurityExpressionHandler`, so it affects annotations and not a raw `getAuthorities()` call. Resource checks are helper beans referenced from SpEL, for example `@PreAuthorize("hasRole('ADMIN') or @orderService.isOrderOwner(#id, principal.id)")`. Code that must know a role for query filtering resolves it through `RoleHierarchy` (`OrderService.isAdmin`).
+- Legacy: `isOrderOwner` and the per-user filtering in `OrderService.searchOrders` / `getAllOrders` are B2B behavior (ADR-0000 row D2). "Tenant" now means restaurant (ADR-0001); the scoping mechanism comes from the Tenancy & Identity contract. Do not copy per-user ownership into new-architecture endpoints.
 
-Authorization is **only** expressed in `@PreAuthorize`. A manual check inside a method body
-bypasses the role hierarchy — `RoleHierarchy` is applied by `methodSecurityExpressionHandler`,
-so it affects annotations and not a raw `getAuthorities()` call. `OrderController` currently
-violates this and is scheduled for correction; do not copy it.
+**Legacy order domain:** `Order.transitionTo` enforces the status state machine (`InvalidStatusTransitionException`); every change goes through it. `OrderService.updateOrder` writes an `OrderHistory` row per transition and triggers a notification. Create and cancel change `Product` stock through `ProductService.decrementStock` / `incrementStock`; do not touch stock outside `OrderService`. The stock policy for the new Menu is open (ADR-0000 FS-08, Q-42).
 
-**Order domain**: `Order` has a state machine enforced on the entity itself (`Order.transitionTo`, throws `InvalidStatusTransitionException` for illegal transitions) — every status change must go through it, and `OrderService.updateOrder` records an `OrderHistory` row (previous status, new status, who, when) on every transition and triggers a notification. Creating/cancelling an order also mutates `Product` stock via `ProductService.decrementStock`/`incrementStock` — stock and order state are meant to stay consistent, so don't bypass `OrderService` to touch stock directly.
+**Auth:** stateless JWT access token (`SessionCreationPolicy.STATELESS`). The refresh token is an HttpOnly cookie on `<context-path>/auth`, rotated per use; reusing a rotated token revokes its whole family (V21). The body `refreshToken` is a backward-compatible fallback (`RefreshTokenSource`) until the auth cleanup in Tenant foundation. `RefreshOriginFilter` checks `Origin` on `/auth/refresh` and `/auth/logout`. `RefreshTokenCleanupScheduler` purges expired tokens. Password reset keeps `PasswordHistory` (no reuse). Per-endpoint rate limiting: `AuthRateLimitFilter` + `RateLimiter` (`InMemoryBucketedSlidingWindowRateLimiter`, or `NoOpRateLimiter` when `security.rate-limit.enabled=false`).
 
-**Auth**: JWT-based, stateless (`SessionCreationPolicy.STATELESS`), with refresh tokens (`RefreshToken`, `RefreshTokenService`, `RefreshTokenCleanupScheduler`), password reset flow with history tracking (`PasswordHistory` prevents password reuse), and per-endpoint rate limiting (`AuthRateLimitFilter` + `RateLimiter` implementations, configurable/toggleable via `security.rate-limit.*` properties, backed by `InMemoryBucketedSlidingWindowRateLimiter` or a `NoOpRateLimiter` when disabled).
-
-**Storage**: `storage.ObjectStorageService` abstracts S3-compatible object storage (AWS S3 in prod, MinIO in tests/local — see `ObjectStorageConfig`), currently used for profile avatars (`profile.application.service.AvatarImageProcessor`/`AvatarValidator`).
-
-## Product direction — read before adding features
-
-This backend is documented above as a B2B order suite. **It is becoming a restaurant
-operations system.** The frontend already runs that model on mock data and is waiting on it.
-
-- Contract snapshot: `docs/contracts/backend-integration-manifest.openapi.yaml`
-  (canonical copy lives in the frontend repo — see `docs/contracts/README.md`)
-- Design and migration phases:
-  `docs/superpowers/specs/2026-09-20-claude-tooling-and-restaurant-ops-migration-design.md`
-
-What this changes, in short: `OrderStatus` is renamed to `New/Preparing/Ready/Completed/
-Cancelled`; orders belong to **anonymous customers** (name + phone) rather than to a `User`,
-so `isOrderOwner` disappears and the back office becomes staff-only; `Product` grows into
-`MenuItem`; `Tables`, `MenuCategories`, `DeliveryZones` and `RestaurantSettings` are new; and
-an unauthenticated `/public/*` surface appears.
-
-Do not write new code in the legacy shape without checking the contract first.
+**Storage:** `storage.ObjectStorageService` abstracts S3-compatible storage (AWS S3 in prod, MinIO locally and in tests; `ObjectStorageConfig`). Used for profile avatars (`profile.application.service.AvatarImageProcessor`, `AvatarValidator`).
 
 ## Testing
 
-Integration tests use the `@IntegrationTest` composite annotation (`support.IntegrationTest`), which wires up `@SpringBootTest` plus real **Testcontainers** for Postgres (`support.PostgresTestContainerConfig`, via `@ServiceConnection` — no manual datasource wiring needed) and MinIO (`support.MinioTestContainerConfig`) for storage tests. This guarantees tests never touch a real/prod database or bucket. Prefer `@IntegrationTest` over hand-rolling `@SpringBootTest` for anything hitting the DB, security layer, or storage.
-
-Naming convention: `*Test` for plain unit tests (Mockito-style, no Spring context), `*IT` for integration tests that need the full context/containers.
-
-`support.MutableClock` is used where tests need to control `Instant.now()`/`Clock` behavior (e.g. rate limit windows, token expiry) — inject `Clock` rather than calling `Instant.now()` directly in new code that needs to be tested this way (existing services already follow this).
+- `@IntegrationTest` (`support.IntegrationTest`) = `@SpringBootTest` + Testcontainers Postgres (`support.PostgresTestContainerConfig`, `@ServiceConnection`) and MinIO (`support.MinioTestContainerConfig`). Use it for anything that hits the DB, security or storage instead of a hand-rolled `@SpringBootTest`.
+- Naming: `*Test` = unit test, no Spring context (Mockito); `*IT` = integration test with the full context and containers.
+- Time: inject `Clock`; never call `Instant.now()` directly in code under test. `support.MutableClock` controls time in tests (rate-limit windows, token expiry).

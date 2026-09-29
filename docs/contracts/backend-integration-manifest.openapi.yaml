@@ -1,3 +1,6 @@
+# FROZEN SNAPSHOT (0.3.0, taken 2026-09-24). SUPERSEDED 2026-09-29. NOT THE API CONTRACT.
+# The backend owns the contract (ADR-0010): live spec docs/api/openapi.yaml, drafts docs/api/drafts/.
+# Older than the frontend manifest 0.4.0, which seeds the drafts. Never re-sync or edit this file.
 openapi: 3.0.3
 info:
   title: Restaurant Ops — Backend Integration Manifest

@@ -1,5 +1,7 @@
 # Restaurant-ops migration, Phase 1 — Auth target design
 
+> **In force (2026-09-29).** D16-D24 are kept (MASTER-PLAN D-16). "Phase 6" below now means the auth cleanup inside Tenant foundation (MASTER-PLAN §4). "Contract work" is superseded (ADR-0010). The four frontend follow-ups are done (frontend `2026-09-25-auth-refresh-cookie-cross-tab.md`).
+
 Date: 2026-09-25
 Status: implemented — see ../plans/2026-09-25-restaurant-ops-phase-1-auth.md
 

@@ -1,5 +1,7 @@
 # Orders Authorization Fix Implementation Plan
 
+> **Executed plan, historical record (2026-09-29).** Do not re-execute it. Its contract steps (frontend manifest patches, the `docs/contracts/` snapshot, `api-contract-sync`) are superseded by ADR-0010. Current work starts at `docs/README.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 ## Status — executed 2026-09-20 (session C)

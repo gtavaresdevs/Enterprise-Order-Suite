@@ -1,5 +1,7 @@
 # Restaurant-ops Phase 1 — Auth Target Implementation Plan
 
+> **Executed plan, historical record (2026-09-29).** Do not re-execute it. Its contract steps (frontend manifest patches, the `docs/contracts/` snapshot, `api-contract-sync`) are superseded by ADR-0010. Current work starts at `docs/README.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make auth rate limiting actually fire under the production context path, then move the refresh token into an HttpOnly cookie with rotation, family revocation on reuse, `Origin` validation and identity claims in the JWT — without breaking any client that still sends the token in the body.

@@ -1,5 +1,9 @@
 # API contracts
 
+> **SUPERSEDED (2026-09-29). Do not re-sync or follow the rules below.**
+> The backend owns the API contract (ADR-0010). Live spec: `docs/api/openapi.yaml` in this repo, checked by a drift test. Design drafts: `docs/api/drafts/`.
+> The snapshot next to this file is frozen at 0.3.0 and is never re-synced. The frontend manifest is frozen at 0.4.0 and only seeds the drafts. The `api-contract-sync` skill is retired.
+
 ## backend-integration-manifest.openapi.yaml
 
 **This is a snapshot. It is not the source of truth.**

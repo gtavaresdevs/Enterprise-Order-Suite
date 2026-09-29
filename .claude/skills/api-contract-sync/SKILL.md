@@ -1,7 +1,9 @@
 ---
 name: api-contract-sync
-description: Use before creating or changing any REST endpoint, request body or response shape - checks it against the frontend's backend-integration manifest and defines how to report a necessary divergence back to the canonical copy.
+description: DEPRECATED (ADR-0010) - do not invoke. Retired because the backend owns the API contract; this skill checked endpoints against the frozen frontend manifest.
 ---
+
+> **RETIRED (2026-09-29). Do not invoke; do not follow.** The backend owns the API contract (ADR-0010). Change API shapes in `docs/api/drafts/` (design) or in code together with the committed `docs/api/openapi.yaml` (implementation). The frontend manifest and the `docs/contracts/` snapshot are frozen. The open-decisions table below is stale: see `docs/adr/0000-legacy-decisions-triage.md`.
 
 # Keeping the API in sync with the contract
 

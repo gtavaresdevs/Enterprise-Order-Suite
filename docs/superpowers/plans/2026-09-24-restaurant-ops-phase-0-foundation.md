@@ -1,5 +1,7 @@
 # Restaurant-ops Phase 0 — Foundation Implementation Plan
 
+> **Executed plan, historical record (2026-09-29).** Do not re-execute it. Its contract steps (frontend manifest patches, the `docs/contracts/` snapshot, `api-contract-sync`) are superseded by ADR-0010. Current work starts at `docs/README.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Land Phase 0 of the restaurant-ops migration: every persisted timestamp becomes an `Instant` on a `timestamptz` column (D15), item edits on a closed order are rejected with 409 (D13), and the contract manifest records decisions D9–D15 as version 0.3.0.

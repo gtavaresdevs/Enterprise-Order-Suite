@@ -1,5 +1,9 @@
 # Claude tooling + restaurant-ops migration — design
 
+> **Partly superseded (2026-09-29).** Phases 0-1 of this migration are done. Superseded: the migration plan phases 2-6 (Part 3, "Roadmap ordering"), replaced by the build order Tenant foundation → Menu → Order Core → Storefront ↔ Order Core (ADR-0007); the single-restaurant target (ADR-0001); "Contract ownership" by the frontend (ADR-0010); D7 and D8 (ADR-0008).
+> Salvaged: phase 5 `/public/*` hardening goes into the Storefront ↔ Order Core contract; phase 6 auth cleanup goes into Tenant foundation.
+> Verdicts for D1-D8: `docs/adr/0000-legacy-decisions-triage.md` (table A). Start at `docs/README.md`.
+
 Date: 2026-09-20
 Status: approved (design); implementation plan to follow
 
