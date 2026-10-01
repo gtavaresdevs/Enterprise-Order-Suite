@@ -454,25 +454,25 @@ Reviewed against D-1..D-16. No amendment is proposed for these:
 ## Checklist for Gabriel
 Tick one box per line. For "change", write the change after the arrow.
 
-- A-01 Status → Accepted with amendments, plus amendment log: [ ] accept [ ] change → ____ [ ] reject
-- A-02 Restaurant Edge optional (header, §2, §20, §24): [ ] accept [ ] change → ____ [ ] reject
-- A-03 Offline means orders (guiding principle, §3, §4.1, §4.2): [ ] accept [ ] change → ____ [ ] reject
-- A-04 Payment steps become payment records (§6, §10): [ ] accept [ ] change → ____ [ ] reject
-- A-05 Channel/source vocabulary flagged open (§7): [ ] accept [ ] change → ____ [ ] reject
-- A-06 Bounded owner customization (§9): [ ] accept [ ] change → ____ [ ] reject
-- A-07 Tablets use the Edge only where one exists (§11): [ ] accept [ ] change → ____ [ ] reject
-- A-08 Edge optional, "Offline Order Queue", no payment/fiscal gateway (§12): [ ] accept [ ] change → ____ [ ] reject
+- A-01 Status → Accepted with amendments, plus amendment log: [X] accept [ ] change → ____ [ ] reject
+- A-02 Restaurant Edge optional (header, §2, §20, §24): [X] accept [ ] change → ____ [ ] reject
+- A-03 Offline means orders (guiding principle, §3, §4.1, §4.2): [X] accept [ ] change → ____ [ ] reject
+- A-04 Payment steps become payment records (§6, §10): [X] accept [ ] change → ____ [ ] reject
+- A-05 Channel/source vocabulary flagged open (§7): [X] accept [ ] change → ____ [ ] reject
+- A-06 Bounded owner customization (§9): [X] accept [ ] change → ____ [ ] reject
+- A-07 Tablets use the Edge only where one exists (§11): [X] accept [ ] change → ____ [ ] reject
+- A-08 Edge optional, "Offline Order Queue", no payment/fiscal gateway (§12): [X] accept [ ] change → ____ [ ] reject
   - Includes the read-only caches (ADR-0003 C4, accepted with Q-03 on 2026-09-29; no separate tick)
-  - Includes dropping "Fiscal Gateway" (Reviewer note 1): [ ] drop [ ] keep as "fiscal device integration"
-- A-09 §13-§16 apply only with an Edge; design deferred: [ ] accept [ ] change → ____ [ ] reject
+  - Includes dropping "Fiscal Gateway" (Reviewer note 1): [X] drop [ ] keep as "fiscal device integration"
+- A-09 §13-§16 apply only with an Edge; design deferred: [X] accept [ ] change → ____ [ ] reject
   - Includes ULID everywhere and the human order number (ADR-0009, accepted with Q-03 on 2026-09-29; no separate tick)
   - Includes status history and in-process events, no outbox (ADR-0019, accepted with Q-03 on 2026-09-29; no separate tick)
-- A-10 Offline scope narrowed to orders (§17): [ ] accept [ ] change → ____ [ ] reject
-- A-11 Future payment/fiscal/marketplace work: integrate, never build (§19, §21): [ ] accept [ ] change → ____ [ ] reject
-- A-12 New §25 "Tenancy and identity" (pointer): [ ] accept [ ] change → ____ [ ] reject
-- A-13 New §26 "Payments and external systems" (principle): [ ] accept [ ] change → ____ [ ] reject
-- A-14 Shorter derived-documents list; Edge docs deferred: [ ] accept [ ] change → ____ [ ] reject
-- A-15 Original implementation order marked superseded (ADR-0007): [ ] accept [ ] change → ____ [ ] reject
+- A-10 Offline scope narrowed to orders (§17): [X] accept [ ] change → ____ [ ] reject
+- A-11 Future payment/fiscal/marketplace work: integrate, never build (§19, §21): [X] accept [ ] change → ____ [ ] reject
+- A-12 New §25 "Tenancy and identity" (pointer): [X] accept [ ] change → ____ [ ] reject
+- A-13 New §26 "Payments and external systems" (principle): [X] accept [ ] change → ____ [ ] reject
+- A-14 Shorter derived-documents list; Edge docs deferred: [X] accept [ ] change → ____ [ ] reject
+- A-15 Original implementation order marked superseded (ADR-0007): [X] accept [ ] change → ____ [ ] reject
 
 ## Sources
 Legend: PF = `/mnt/project-files/`; BE = backend repo `enterprise-order-suite` @ `feature/ai-agent` (`af2634e`); FE = frontend repo `enterprise-order-suite-frontend/order-ui` @ `Claude-Assisted-Development` (`14a3cfd`).
