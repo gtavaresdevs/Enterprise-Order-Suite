@@ -1,7 +1,7 @@
 # ADR-0016: Docs are open-ended; Draft / Reviewed / Ready statuses
 - Status: Accepted
 - Date: 2026-09-29
-- Decided by: Gabriel
+- Decided by: Gabriel. How Reviewed is signalled: Q-09 a, answered 2026-10-01
 - Supersedes: none (defines the statuses that `planning/ai-ready-development-plan.md` R4 L48 named without defining)
 - Related: ADR-0010, ADR-0011, ADR-0012, ADR-0015
 
@@ -27,6 +27,7 @@ Statuses:
 | **Ready** | Reviewed, and every requirement the next build step implements has testable acceptance criteria, so a plan can cite them without new questions to Gabriel. | The agent writing the implementation plan, after checking. | Yes. Informational; never a substitute for Reviewed. |
 
 - Demotion: a change to a Reviewed or Ready doc that alters a decision or adds a blocking question sets it back to Draft. Editorial fixes (typos, links, wording that changes no decision) keep the status.
+- How Gabriel signals Reviewed (Gabriel, 2026-10-01; Q-09 a, "Q9-a"): he posts "Reviewed: <doc>" in the project thread. Claude records it in the doc as "Reviewed by Gabriel on YYYY-MM-DD", with the date of his message. No git work is needed from him.
 - There is no Final, Done or Approved status. Docs keep growing.
 - ADR statuses (Proposed, Accepted, Superseded by ADR-XXXX) are separate: they record decisions, not doc maturity. Only Gabriel moves an ADR to Accepted (MASTER-PLAN §7 L99).
 - Legacy docs get a superseded banner instead (MASTER-PLAN §6 S2 L90); they are outside this lifecycle.
@@ -37,7 +38,7 @@ Statuses:
   - move answered questions out of the Open questions block into the doc body;
   - check a doc's status before building from it.
 - Agents must never:
-  - set Reviewed, or treat silence, a push, or their own review as Reviewed;
+  - set Reviewed without a "Reviewed: <doc>" message from Gabriel in the project thread, or treat silence, a push, or their own review as Reviewed;
   - start a build step from a Draft;
   - keep Reviewed on a doc after changing one of its decisions.
 - The S2 templates implement the Status line and the Open questions block (MASTER-PLAN §6 L90).
@@ -45,9 +46,10 @@ Statuses:
 
 ## Open questions
 - Confirm the Draft and Ready definitions and the demotion rule (Claude proposals). Register: Q-12, which also asks whether the architecture root carries a decision status ("Accepted with amendments") next to its doc status (AMD Reviewer note 2). Decided by Claude 2026-09-29 (option a: yes to both); Gabriel may override.
-- How Gabriel signals Reviewed (a message in the project thread, a commit of his own, or a PR review). Register: Q-09.
+- Q-09: answered 2026-10-01, a: a "Reviewed: <doc>" message from Gabriel in the project thread, which Claude records (Decision).
 
 ## Sources
 - `/mnt/project-files/planning/MASTER-PLAN.md` §3 D-14 (L47), §6 S2 (L90), §7 (L97-107), §9 (L122-126)
+- `planning/open-questions.md` Q-09: Gabriel's answer of 2026-10-01 (project thread, 2026-10-01T16:25Z)
 - `/mnt/project-files/planning/ai-ready-development-plan.md` R4 (L48), gate L91
 - `/tmp/claude/memory/team/silo/MEMORY.md` L12

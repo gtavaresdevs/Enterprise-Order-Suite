@@ -18,6 +18,7 @@ Accepted (Gabriel, 2026-09-29; Q-03 row 3.7, "3 Yes"). Proposed by Claude in MAS
 - The restaurant (tenant) record carries no plan, package or entitlement field. The answer to "what does a package switch on?" is "nothing yet".
 - Every restaurant gets the same feature set this run.
 - When the first paid tier is defined, a new ADR introduces the entitlement mechanism.
+- Decided later (Gabriel, 2026-10-01; Q-78 a, "Q78 -a"): pricing, packages and the choice between "plan" (subscription tier) and "package" (sellable feature module) are decided with the first paid tier. Until then the glossary reserves both words and the code uses neither.
 
 ## Consequences
 - Tenant foundation acceptance criteria contain no entitlement or plan work.
@@ -27,12 +28,13 @@ Accepted (Gabriel, 2026-09-29; Q-03 row 3.7, "3 Yes"). Proposed by Claude in MAS
 
 ## Open questions
 - Q-03 row 3.7 (this deferral): answered 2026-09-29, accepted. Q-11 was dropped: Gabriel had not confirmed it before.
-- Pricing and packages: MASTER-PLAN §8d (L120), Later. Register: Q-78.
-- Vocabulary: "package" as a sellable product module (core-package spec) vs "plan" as a subscription tier (pm-tool): glossary. Register: Q-78.
+- Q-78: answered 2026-10-01, a: pricing, packages and the plan/package vocabulary are decided with the first paid tier (Decision); MASTER-PLAN §8d (L120), Later.
+- Gabriel's Q-80 answer (2026-10-01) calls the future Edge an "optional paid feature". The Edge is not built this run, so this ADR is unchanged; its entitlement waits for the ADR named in Decision.
 - Reviewer note: memory `MEMORY.md` L13 lists "Packages/pricing deferred" under "Decisions (Gabriel, 2026-09-29)", while MASTER-PLAN §4 (L63) marks it as a Claude proposal and §8a Q3 (L114) still asks Gabriel to accept it. This ADR follows the master plan (Proposed). If Gabriel already confirmed it, it becomes Accepted at S1; if not, the memory line should be corrected in the S0 memory cleanup. Register: Q-11. Resolved: Q-11 dropped (not confirmed earlier); Gabriel accepted the deferral with Q-03 on 2026-09-29.
 
 ## Sources
 - `/mnt/project-files/planning/MASTER-PLAN.md` §3 D-1 (L34), D-8 (L41), §4 packages row (L63), §6 Later/Out (L95), §8a Q3 (L114), §8d (L120)
+- `planning/open-questions.md` Q-78, Q-80: Gabriel's answers of 2026-10-01 (project thread, 2026-10-01T16:25Z)
 - `/mnt/project-files/planning/pm-tool-recommendation.md` L76-88
 - `/mnt/project-files/planning/ai-ready-development-plan.md` §6 (L93-95)
 - Frontend `order-ui/docs/superpowers/specs/2026-09-15-core-package-br-i18n-ux-design.md` L7-10, L328-351 (`Claude-Assisted-Development` @ `14a3cfd`)

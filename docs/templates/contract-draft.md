@@ -4,8 +4,8 @@ The prose lives in docs/architecture/ (ADR-0011 layout); the OpenAPI draft lives
 see docs/api/drafts/README.md). File names are fixed when each contract starts.
 Keep every heading; write "none" when empty. Delete this comment.
 Rules: change shapes only in the backend repo; seed from the frontend manifest 0.4.0 (frozen), never from the
-docs/contracts/ 0.3.0 snapshot; follow the API conventions doc once it is Reviewed, and until then leave
-money, casing, ids, pagination, idempotency and errors marked open (Q-33..Q-40).
+docs/contracts/ 0.3.0 snapshot; follow the API conventions doc once it is Reviewed, and until then cite the
+register answers for money, casing, ids, pagination, idempotency and errors (Q-33..Q-40, all a, 2026-10-01).
 Ask Gabriel his questions in his language while drafting; record answers in English with the date (ADR-0012, ADR-0016).
 The build step for this area starts only after this doc is Reviewed (ADR-0007).
 -->

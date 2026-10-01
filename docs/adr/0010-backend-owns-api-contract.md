@@ -1,7 +1,7 @@
 # ADR-0010: The backend owns the API contract
 - Status: Accepted
 - Date: 2026-09-29
-- Decided by: Gabriel
+- Decided by: Gabriel. Decision 7: his register answers of 2026-10-01 (Q-32, Q-40, Q-76)
 - Supersedes: legacy "Contract ownership" (frontend manifest canonical, `2026-09-20-claude-tooling-and-restaurant-ops-migration-design.md` L175-179); manifest `x-maintenance` canonical-copy and source-of-truth order (manifest 0.4.0 L1005-1007); frontend lockstep rule (`order-ui/CLAUDE.md` L81-88); backend `api-contract-sync` skill; backend `docs/contracts/` snapshot; ai-ready R13a cross-repo export PR and gate item L90
 - Related: ADR-0007, ADR-0008, ADR-0009, ADR-0011, ADR-0012, ADR-0015, ADR-0016
 
@@ -29,6 +29,10 @@ Target flow:
 4. **Committed live spec + drift test.** `docs/api/openapi.yaml` is springdoc's output for the running app, committed in git. One backend integration test boots the app, reads `/v3/api-docs` (YAML), and fails if it differs from the committed file. It runs inside `./gradlew test`, so the D5 full-suite rule and CI enforce it.
 5. **Frontend generation + CI drift check.** The frontend generates TypeScript types from the backend's committed `docs/api/openapi.yaml` with `openapi-typescript` (for example `yarn gen:api`) and commits the generated file. Frontend CI regenerates and fails on any diff. Hand-written API types in `src/types/*` are deleted feature by feature as each feature moves from mock to the real backend (ai-ready R13b L70).
 6. **Frozen manifest.** The frontend manifest stays at 0.4.0, read-only, with a superseded banner (S2). No version bump, no `x-changelog` entry, no new `x-open-decisions`.
+7. **Decided later (Gabriel, 2026-10-01; "Q32 RECOMMENDED", "Q33  - Q64- Recommended", "Q73 - 77 a"):**
+   - Q-76 a: the frontend keeps a vendored copy of `docs/api/openapi.yaml`, updated by a sync script that fetches it from a pinned backend commit. The frontend generates its types from that copy, and frontend CI checks that the generated types match it. Builds are reproducible without a token, and every contract change shows up in the frontend diff.
+   - Q-40 a: one draft file per contract area in `docs/api/drafts/`. An operation leaves its draft when it is live in `docs/api/openapi.yaml`. The frontend may generate types from a draft only for mock-backed work.
+   - Q-32 a: breaking API changes are free until the first pilot restaurant; from then on the live spec follows semver with a changelog and deprecation rules (ADR-0008). No pilot is planned yet (Q-23 b).
 
 Retired (marked superseded, not deleted; MASTER-PLAN §4 L68):
 - `order-ui/CLAUDE.md` L81-88 "Backend integration manifest stays in lockstep too": removed in the S2 CLAUDE.md rewrite.
@@ -43,13 +47,13 @@ Retired (marked superseded, not deleted; MASTER-PLAN §4 L68):
   - change API shape only in the backend repo (draft or code);
   - regenerate and commit `docs/api/openapi.yaml` in the same commit as any endpoint change;
   - run `./gradlew test` (includes the drift test) before claiming done;
-  - regenerate and commit frontend types after the backend spec changes.
+  - after the backend spec changes, run the frontend sync script to the new pinned backend commit, then regenerate and commit the frontend types (Q-76 a).
 - Agents must never:
   - edit the frontend manifest or the backend snapshot to record a decision;
   - hand-edit `docs/api/openapi.yaml` to make the drift test pass;
-  - hand-edit generated frontend types;
+  - hand-edit generated frontend types or the frontend's vendored copy of the spec (only the sync script changes it, Q-76 a);
   - design a request or response shape in the frontend repo.
-- The frontend `connect-backend` skill (on Gabriel's machine only; `order-ui/CLAUDE.md` L75-78) must read the committed spec and generated types (ai-ready R8f L67).
+- The frontend `connect-backend` skill (versioned in `order-ui/.claude/skills/connect-backend/` since FE commit `c4a7309`, 2026-10-01, Q-06/Q-07) must read the vendored spec and generated types (ai-ready R8f L67; Q-76 a).
 - `flyway-migrations/SKILL.md` L73-74 points to the `docs/contracts/` manifest for target enum names; repoint to the drafts (see ADR-0009).
 - The drift test, the committed `openapi.yaml` and frontend generation are acceptance criteria of Build 1 (MASTER-PLAN §4 L64, §6 L93), not readiness-gate items. The first spec committed will describe today's live endpoints (auth, users, roles, admin, legacy `/orders`, `/products`).
 - Draft graduation rules, money type, enum casing, ids, pagination, `Idempotency-Key` and the error envelope are set by the API conventions doc (MASTER-PLAN §5 L75); drafts follow it once it is Reviewed.
@@ -57,13 +61,14 @@ Retired (marked superseded, not deleted; MASTER-PLAN §4 L68):
 
 ## Open questions
 - Q-01 (docs location) and Q-03 row 3.2 (drift-test flow instead of the cross-repo export): answered 2026-09-29, accepted.
-- How frontend CI and local frontend sessions obtain the backend spec (raw file from the public backend repo on `feature/ai-agent`, a pinned commit, or an attached checkout): S3 / Build 1. Gabriel's Q-01 answer says the frontend fetches the docs from the backend repo (ADR-0011). Register: Q-76.
+- Q-76: answered 2026-10-01, a: a vendored copy of `docs/api/openapi.yaml` in the frontend, synced by a script from a pinned backend commit; CI checks the generated types (Decision 7). It fits Gabriel's Q-01 answer ("frontend should fetch from it"): the script fetches from the backend repo.
 - How the committed spec is regenerated (a Gradle task, or a test mode that rewrites the file) and how the drift test normalizes output (semantic YAML compare vs byte compare): Build 1 detail.
-- Whether the frontend may generate types from drafts to keep building mock-backed features before endpoints exist: API conventions (S4), Q-40.
-- Draft granularity (one file per contract area or one file) and the exact graduation rule: API conventions (S4), Q-40.
-- Versioning policy for the live spec before and after the first real restaurant or first Edge client: API conventions (S4), Q-32.
+- Q-40: answered 2026-10-01, a: one draft file per contract area; an operation leaves its draft when it is live; frontend types from a draft only for mock-backed work (Decision 7). The API conventions doc (S4) writes out the detail.
+- Q-32: answered 2026-10-01, a: breaking changes stop being free at the first pilot restaurant; then semver, a changelog and deprecation rules (Decision 7). The API conventions doc (S4) writes out the policy.
+- Where the vendored spec copy and the sync script live in the frontend repo, and how the pinned commit is recorded: Build 1 detail (Q-76 a).
 
 ## Sources
+- `planning/open-questions.md` Q-32, Q-40, Q-76: Gabriel's answers of 2026-10-01 (project thread, 2026-10-01T16:25Z)
 - `/mnt/project-files/planning/MASTER-PLAN.md` §3 D-9 (L42), §4 contract row (L58), ArchUnit row (L64), superseded row (L68), §5 API conventions (L75), §6 S2/S3/Build 1 (L90-93)
 - `/mnt/project-files/planning/pm-tool-recommendation.md` L61, L98, L104, L106
 - `/mnt/project-files/planning/ai-ready-development-plan.md` R6 (L53), R13a (L63), R8f (L67), R13b (L70), gate L90
@@ -71,4 +76,4 @@ Retired (marked superseded, not deleted; MASTER-PLAN §4 L68):
 - `/mnt/project-files/2026-09-14-backend-integration-manifest.openapi.yaml` (= `order-ui/docs/superpowers/specs/2026-09-14-backend-integration-manifest.openapi.yaml`, 0.4.0) L4, L978-1007
 - `/mnt/project-files/backend-integration-manifest.openapi.yaml` (= backend `docs/contracts/` snapshot, 0.3.0) L4; `/mnt/project-files/README.md` (= backend `docs/contracts/README.md`) L5-24
 - Backend `enterprise-order-suite` (`feature/ai-agent` @ `af2634e`): `CLAUDE.md` L20, L94-95; `.claude/skills/api-contract-sync/SKILL.md` L8-21, L69-72; `.claude/skills/flyway-migrations/SKILL.md` L73-74; `build.gradle` L77; `src/main/java/com/enterprise/ordersuite/api/OpenApiConfig.java`; `src/main/resources/application.yml` L123-128
-- Frontend `order-ui` (`Claude-Assisted-Development` @ `14a3cfd`): `CLAUDE.md` L75-78, L81-88; `package.json` scripts
+- Frontend `order-ui` (`Claude-Assisted-Development` @ `14a3cfd`): `CLAUDE.md` L75-78, L81-88; `package.json` scripts; @ `c4a7309`: `.claude/skills/connect-backend/SKILL.md`

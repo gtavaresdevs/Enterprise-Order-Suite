@@ -2,11 +2,11 @@
 - Status: Accepted
 - Date: 2026-09-29
 - Decided by: Gabriel
-- Supersedes: none. It restates and generalizes the legacy "one Order model, one KDS queue" and "Menu is configured once and served everywhere" (PF `2026-09-09-restaurant-ops-redesign-design.md` L52-60). The legacy channel vocabulary (`Online | Dine-in | Phone` plus `Pickup | Delivery`) stays in place until the mapping below is decided.
+- Supersedes: none. It restates and generalizes the legacy "one Order model, one KDS queue" and "Menu is configured once and served everywhere" (PF `2026-09-09-restaurant-ops-redesign-design.md` L52-60). The legacy channel vocabulary (`Online | Dine-in | Phone` plus `Pickup | Delivery`) is replaced by the mapping Gabriel chose on 2026-10-01 (Q-49 a, Decision 5); the existing code keeps it until the Order Core rewires it.
 - Related: ADR-0001, ADR-0003, ADR-0004, ADR-0007, ADR-0010, ADR-0019
 
 ## Context
-- Gabriel's architecture sets the direction (status Proposed; PF `architecture/RESTAURANT-OPS-ARCHITECTURE.md`):
+- Gabriel's architecture sets the direction (status Proposed; Accepted with amendments on 2026-10-01, Q-04; PF `architecture/RESTAURANT-OPS-ARCHITECTURE.md`):
   - §1 L18-38: no independent Storefront, Waiter, Tablet, POS or Delivery orders. All of them work on one domain (Restaurant, Menu, Order, Table, Customer, Product, Configuration).
   - §7 L125-140: an Order has `channel` `DINE_IN | TAKEAWAY | DELIVERY` and `source` `WAITER | POS | QR | TABLET | STOREFRONT | FUTURE_MARKETPLACE`.
   - §8 L151-165: one menu model; "No surface keeps its own menu database".
@@ -32,8 +32,15 @@
 3. An Order carries two dimensions, **channel** and **source** (architecture §7).
    - Reading of the §7 value sets: channel is how the order is served (`DINE_IN`, `TAKEAWAY`, `DELIVERY`); source is the interface that created it (`WAITER`, `POS`, `QR`, `TABLET`, `STOREFRONT`, `FUTURE_MARKETPLACE`). This wording is Claude's reading of §7 and goes to the glossary for confirmation.
    - The two-dimension concept is decided.
-   - The value sets, their wire casing and the mapping from the legacy vocabulary are open (see Open questions).
+   - The value sets, their wire casing and the mapping from the legacy vocabulary were decided on 2026-10-01 (Decision 5).
 4. There is one Menu per restaurant. No surface keeps its own menu copy or menu store. Each surface consumes a representation of the same menu.
+5. Decided later (Gabriel's register answers, 2026-10-01; the Order Core and Menu contracts and the glossary record the detail):
+   - Q-49 a: `channel` = DINE_IN, TAKEAWAY or DELIVERY (today's fulfillment folds in; no separate `fulfillment` field); `source` = STOREFRONT, PHONE, WAITER, POS, QR or TABLET (PHONE added for staff-taken phone orders). Online becomes source STOREFRONT, Pickup becomes TAKEAWAY, Dine-in becomes DINE_IN, Phone becomes source PHONE. Architecture §7's `FUTURE_MARKETPLACE` is not in this set; marketplaces are Out this run (ADR-0007).
+   - Q-34 a: enums are SCREAMING_SNAKE on the wire (`DINE_IN`, `NEW`).
+   - Q-47 a: the order status set is NEW, PREPARING, READY, COMPLETED, plus CANCELLED.
+   - Q-51 a: the customer is a snapshot on each order (name, phone, address); no Customer table this run.
+   - Q-53 a: Order Core gets a minimal Table (id, name) so staff dine-in orders reference a real table; QR self-ordering stays Later.
+   - Q-41 b: modifiers are option groups, each with required, min and max and a price per option; today's sizes and add-ons both become groups.
 
 ## Consequences
 - Must: put order rules in the application and domain layers, reachable by every adapter. These are validation, price and total derivation, line snapshots, status transitions and cancel-as-status.
@@ -43,21 +50,22 @@
 - Never: create per-interface order models, tables, types or services. Examples: `StorefrontOrder`, `WaiterOrder`, or a `KdsTicket`-style duplicate (the frontend deleted `types/kds.ts` for this reason, PF `RESTAURANT-OPS-ROADMAP.md` L112-114).
 - Never: write a channel-specific service that holds business rules, such as `StorefrontService.createOrder()` with storefront-only rules.
 - Never: add a second menu data source in any feature or module.
-- Never: invent channel or source values, rename existing enums or pick a wire casing before the Order Core contract and the API conventions settle them. Use the glossary once it exists.
+- Never: invent channel or source values beyond Decision 5 (Q-49 a), or use another wire casing than SCREAMING_SNAKE (Q-34 a). Use the glossary once it exists.
 - The class name `OrderApplicationService` comes from architecture §23 and illustrates the rule. The Order Core contract and its plan fix the actual names.
 - Where the core code lives until an Edge exists (existing packages, free of web types) is ADR-0019.
 
 ## Open questions
 Order Core / Menu batch (PF `planning/MASTER-PLAN.md` §8c L118). Ids from the register, PF `planning/open-questions.md`.
-- **Channel/source vocabulary mapping.** Proposed map: `Online -> STOREFRONT`, `Pickup -> TAKEAWAY`, `Dine-in -> DINE_IN`. Staff phone orders have no source yet ("Phone -> ?"). Does `fulfillment` stay a separate field or fold into `channel`? (MASTER-PLAN §5 L78, §8c.) Register: Q-49.
-- Order status set and casing (§8c): Q-47. Enum casing on the wire is in the API conventions (§5 L75): Q-34.
-- Customer as a per-restaurant record, or a snapshot on each order (§8c)? Q-51.
-- A minimal Table in Order Core, or does dine-in wait (§8c)? Q-53.
-- Modifier model depth: option groups, required, min/max (§8c; Menu contract): Q-41.
+- Q-49: answered 2026-10-01, a: channel DINE_IN/TAKEAWAY/DELIVERY with fulfillment folded in; source adds PHONE for staff phone orders (Decision 5).
+- Q-47: answered 2026-10-01, a: NEW, PREPARING, READY, COMPLETED, CANCELLED. Q-34: answered 2026-10-01, a: SCREAMING_SNAKE on the wire.
+- Q-51: answered 2026-10-01, a: customer snapshot on each order; no Customer table this run.
+- Q-53: answered 2026-10-01, a: a minimal Table (id, name) in Order Core; QR self-ordering stays Later.
+- Q-41: answered 2026-10-01, b: option groups with required, min, max and a price per option.
 
 ## Sources
 Legend: PF = `/mnt/project-files/`; BE = backend repo `enterprise-order-suite` @ `feature/ai-agent` (`af2634e`), Java paths under `src/main/java/com/enterprise/ordersuite/`; FE = frontend repo `enterprise-order-suite-frontend/order-ui` @ `Claude-Assisted-Development` (`14a3cfd`).
 - PF `planning/MASTER-PLAN.md` §3 D-2 (L35), D-16 (L49), §5 (L75, L78), §8c (L118)
+- `planning/open-questions.md` Q-34, Q-41, Q-47, Q-49, Q-51, Q-53: Gabriel's answers of 2026-10-01 (project thread, 2026-10-01T16:25Z)
 - PF `architecture/RESTAURANT-OPS-ARCHITECTURE.md` §1 (L18-38), §7 (L125-149), §8 (L151-165), §23 (L294-298)
 - PF `2026-09-09-restaurant-ops-redesign-design.md` L52-60, L146-151
 - PF `RESTAURANT-OPS-ROADMAP.md` L21-23, L104-116

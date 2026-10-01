@@ -1,9 +1,9 @@
 # Architecture amendments (proposed)
 
-- Status: Proposed (awaiting Gabriel's review in S1: Q-04, open). Updated 2026-09-29 after Q-01 and Q-03 were answered: the ADR bases below are Accepted; the amendments themselves still wait for Q-04.
+- Status: Accepted and applied. Gabriel accepted all 15 amendments A-01..A-15 on 2026-10-01 (Q-04): he ticked "accept" on every line of the checklist below and "drop" for "Fiscal Gateway" (commit `6a60b6d`). Gabriel: "Done, edited the file in github repo with my confirmations for the checklist." Claude applied them to `architecture/RESTAURANT-OPS-ARCHITECTURE.md` the same day as written, except A-01: its placeholders were filled in, its status line was split into a decision status and a doc status (Q-12, decided by Claude, Gabriel may override), and the log lists each amendment (see that doc's "Amendment log"). This file stays as the record of what changed and why. Earlier: updated 2026-09-29 after Q-01 and Q-03 were answered (the ADR bases below are Accepted).
 - Date: 2026-09-29
 - Proposed by: Claude (proposed)
-- Target: `architecture/RESTAURANT-OPS-ARCHITECTURE.md`, Gabriel's text (header Status "Proposed", L3; 341 lines on 2026-09-29). All line numbers below refer to that version.
+- Target: `architecture/RESTAURANT-OPS-ARCHITECTURE.md`, Gabriel's text (header Status "Proposed", L3; 341 lines on 2026-09-29). All line numbers below refer to that version, the file as of commit `6a60b6d`, before the amendments were applied.
 - Related: ADR-0001, ADR-0002, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0009, ADR-0011, ADR-0014, ADR-0016, ADR-0019
 - Plan step: written in S0 (MASTER-PLAN §5 L73, §6 L87). Gabriel accepts it in S1 (§6 L88). "The amended architecture is Accepted by Gabriel" is a readiness-gate item (§7 L99).
 
@@ -277,7 +277,7 @@ This part applies now, without an Edge. Orders and order lines get client-genera
 - ADR: ADR-0003, ADR-0004, ADR-0009, ADR-0019.
 - Basis:
   - (a) and safe retry without duplicates: Accepted D-3, D-4, through ADR-0003 C2 and ADR-0004 decision 3.
-  - Client-generated order and line ids as the retry key (ADR-0003 C1), ULID everywhere and the human order number (ADR-0009), status history and in-process events (ADR-0019), and C3/C4: accepted with Q-03 rows 3.4, 3.5 and 3.11 (2026-09-29). Retry mechanism details: Q-38.
+  - Client-generated order and line ids as the retry key (ADR-0003 C1), ULID everywhere and the human order number (ADR-0009), status history and in-process events (ADR-0019), and C3/C4: accepted with Q-03 rows 3.4, 3.5 and 3.11 (2026-09-29). Retry mechanism details: Q-38 (answered 2026-10-01: a).
 
 ## A-10: Offline scope narrowed to orders (§17)
 - Current §17 (L231): "**Must work:** read menu; read restaurant configuration; read tables; create order; modify order; cancel order where policy permits; update operational order status; send order to production; receive KDS updates; table ordering; waiter ordering; POS order operations."
@@ -421,7 +421,7 @@ Current order of work: `planning/MASTER-PLAN.md` §6 and ADR-0007. Claude's orig
 
 ## Sections left unchanged
 Reviewed against D-1..D-16. No amendment is proposed for these:
-- §1 Vision (L10-38): already names future payment, fiscal and marketplace work as integrations (L14). Its domain list (L30-38) names Customer, Product and Table; whether each is a separate entity this run is open, not decided (Q-51, Q-43, Q-53). A-05 flags the same for §7. No text change proposed.
+- §1 Vision (L10-38): already names future payment, fiscal and marketplace work as integrations (L14). Its domain list (L30-38) names Customer, Product and Table; whether each is a separate entity this run is open, not decided (Q-51, Q-43, Q-53; all three answered a on 2026-10-01, after this review). A-05 flags the same for §7. No text change proposed.
 - §4.3 (L83): already treats connectivity backup as infrastructure, which matches D-4.
 - §5 (L85-110): matches Build 1-4.
 - §8 (L151-165): matches D-2. Modifier depth is a Menu-contract question (MASTER-PLAN §8c L118).
@@ -429,27 +429,29 @@ Reviewed against D-1..D-16. No amendment is proposed for these:
 - §22-§23 (L279-298): match D-2 and D-7.
 
 ## Open questions
-- Q-03 (answered 2026-09-29, all twelve rows): the MASTER-PLAN §4 simplifications that A-08, A-09 and A-14 rely on are Accepted: ADR-0003 C1/C3/C4 (row 3.4), ADR-0019 (row 3.5), ADR-0009 (row 3.11) and the smaller derived-docs set (row 3.3). The amendments themselves still wait for Q-04.
+- Q-04 (answered 2026-10-01): a, all 15 amendments accepted and "Fiscal Gateway" dropped; applied to the architecture doc the same day (see Status).
+- Q-03 (answered 2026-09-29, all twelve rows): the MASTER-PLAN §4 simplifications that A-08, A-09 and A-14 rely on are Accepted: ADR-0003 C1/C3/C4 (row 3.4), ADR-0019 (row 3.5), ADR-0009 (row 3.11) and the smaller derived-docs set (row 3.3). The amendments themselves were accepted with Q-04 on 2026-10-01.
 - Q-01 (answered 2026-09-29): the docs live in the backend repo `docs/`; A-14's paths and the amended doc's location follow ADR-0011.
-- Channel/source mapping, including staff phone orders; the order status set and casing; Customer as a record or a snapshot; a minimal Table in Order Core. Order Core batch, MASTER-PLAN §8c L118. Register: Q-49, Q-47 (with Q-34), Q-51, Q-53.
-- Connection lost at the restaurant while customers stay online: a customer's phone on mobile data can still reach the cloud when the restaurant's Internet is down. Its storefront order is then acknowledged, but the restaurant's KDS cannot see it. What do staff screens and the KDS show in that state? Register: Q-60 (ADR-0004 open questions).
-- How online storefront customers pay this run, and what a payment record holds. MASTER-PLAN §8c L118; ADR-0005. Register: Q-65, Q-58.
-- Exact owner customization per area, and the logo/cover upload. MASTER-PLAN §8c L118; ADR-0014. Register: Q-66, Q-44.
-- The Tenancy & Identity batch for §25. MASTER-PLAN §8b L116. Register: Q-16..Q-31.
-- Edge build criteria. MASTER-PLAN §8d L120. Register: Q-80.
+- Channel/source mapping, including staff phone orders; the order status set and casing; Customer as a record or a snapshot; a minimal Table in Order Core. Order Core batch, MASTER-PLAN §8c L118. Register: Q-49, Q-47 (with Q-34), Q-51, Q-53. Answered 2026-10-01: each a, its Recommendation (Gabriel: "Q33  - Q64- Recommended").
+- Connection lost at the restaurant while customers stay online: a customer's phone on mobile data can still reach the cloud when the restaurant's Internet is down. Its storefront order is then acknowledged, but the restaurant's KDS cannot see it. What do staff screens and the KDS show in that state? Register: Q-60 (ADR-0004 open questions). Answered 2026-10-01: a.
+- How online storefront customers pay this run, and what a payment record holds. MASTER-PLAN §8c L118; ADR-0005. Register: Q-65, Q-58. Answered 2026-10-01: Q-58 a; Q-65 a, plus PIX paid in advance at checkout, with the approach delegated to Claude (ADR-0020, Proposed).
+- Exact owner customization per area, and the logo/cover upload. MASTER-PLAN §8c L118; ADR-0014. Register: Q-66, Q-44. Answered 2026-10-01: both a.
+- The Tenancy & Identity batch for §25. MASTER-PLAN §8b L116. Register: Q-16..Q-31. Answered 2026-10-01 except Q-30, which stays open; Q-24 took none of the options (Claude proposal awaiting Gabriel's review) and Q-26 was delegated to Claude (decided: a). See the register.
+- Edge build criteria. MASTER-PLAN §8d L120. Register: Q-80. Answered 2026-10-01: b. Gabriel: "b when I decide, for now we focus only on making sure everything is funcional but keeping in mind we will have edge later and that its optional paid feature".
 
 ## Reviewer notes
 - Reviewer note 1: MASTER-PLAN §5 L73 only asks to drop "Payment Device Gateway". A-08 also drops "Fiscal Gateway", per this step's assignment and D-5 ("integrate ... never build").
   - Concern: §21 (L273) lists "SAT where applicable". Some fiscal integrations need an adapter at the restaurant, next to an existing fiscal device.
   - Such an adapter would be an integration, not a build, so D-5 would allow it.
-  - If Gabriel wants to keep that option visible, change A-08's last line to name a future "fiscal device integration (adapter to an existing system)" instead of dropping the item entirely. Register: Q-04.
+  - If Gabriel wants to keep that option visible, change A-08's last line to name a future "fiscal device integration (adapter to an existing system)" instead of dropping the item entirely. Register: Q-04. Gabriel ticked "drop" on 2026-10-01 (`6a60b6d`), so A-08 was applied as written.
 - Reviewer note 2: A-01 sets the architecture doc's status to "Accepted", because MASTER-PLAN says so (§5 L73 "status → Accepted"; §7 L99 "the amended architecture ... Accepted by Gabriel").
   - Conflict: ADR-0016 lists architecture docs under the Draft / Reviewed / Ready lifecycle and says "There is no Final, Done or Approved status". It reserves Proposed/Accepted for ADRs.
   - Suggestion: MASTER-PLAN or ADR-0016 should state that the architecture root carries a decision status ("Accepted with amendments"), because it records decisions, in addition to or instead of a doc status.
-  - This file follows MASTER-PLAN. Register: Q-12 (decided by Claude 2026-09-29, Gabriel may override: a, the root gets a decision status next to its doc status once Q-04 is answered).
+  - This file follows MASTER-PLAN. Register: Q-12 (decided by Claude 2026-09-29, Gabriel may override: a, the root gets a decision status next to its doc status once Q-04 is answered). Applied 2026-10-01: the architecture doc's header carries "Decision status: Accepted with amendments" and, as its doc status, "Status: Draft".
 - Reviewer note 3: MASTER-PLAN §7 L99 gates on "the amended architecture ... Accepted" but does not say how partial answers count.
   - Proposed reading: the gate item is met when every amendment in the checklist is ticked (accept, change or reject). For a rejected amendment that restates an Accepted decision, the decision question must also be settled (see "How to use this file").
   - Unticked amendments keep the gate open. Register: Q-13 (decided by Claude 2026-09-29, Gabriel may override: a, this reading).
+  - Every line was ticked on 2026-10-01 (all "accept"), so under this reading the gate item is met.
 
 ## Checklist for Gabriel
 Tick one box per line. For "change", write the change after the arrow.

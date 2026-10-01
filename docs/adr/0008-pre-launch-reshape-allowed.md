@@ -1,7 +1,7 @@
 # ADR-0008: Pre-launch: schema and API may be reshaped freely
 - Status: Accepted
 - Date: 2026-09-29
-- Decided by: Gabriel
+- Decided by: Gabriel. End of the window (Decision 4): Gabriel, Q-32 a, 2026-10-01
 - Supersedes: none directly. It removes the backward-compatibility premise behind the legacy migration approach: "Auth migrates early, backward-compatible" (D8) and the frozen `/orders` permission matrix, "The frontend contract must not shift under a refactor" (D7) (PF `2026-09-20-claude-tooling-and-restaurant-ops-migration-design.md` L59-60, L152-156). Their final status is set in ADR-0000.
 - Related: ADR-0000, ADR-0001, ADR-0002, ADR-0009, ADR-0010
 
@@ -22,6 +22,7 @@
 1. Until real data exists, the database schema and the API contract **may be changed in breaking ways**, with no data migration and no backward-compatibility layer.
 2. The legacy B2B `/orders` and `/products` shapes are **replaced**, not evolved, by the Tenant, Menu and Order Core contracts (ADR-0007 build order).
 3. The decision rests on the fact "no production data". When that stops being true, this ADR must be superseded, and normal migration and compatibility discipline returns.
+4. Decided later (Q-32 a, 2026-10-01): breaking API and schema changes stop being free at the first pilot restaurant. From then on: semver, a changelog, deprecation rules, and no more Flyway re-baseline (ADR-0009 decision 4). No pilot is planned yet (Q-23 b, 2026-10-01), so the window has no date.
 
 ## Consequences
 - Allowed: breaking changes to tables, columns, keys, enums, endpoints and payloads; dropping legacy endpoints; replacing id types (ADR-0009).
@@ -33,13 +34,14 @@
 - How the Flyway history is handled (one re-baseline of V1-V21 before launch) and how the `flyway-migrations` skill rule changes are set by ADR-0009 (Accepted 2026-09-29). Until that skill amendment lands (with or before the re-baseline, ADR-0009 Consequences), the skill's rule stands.
 
 ## Open questions
-- What event ends the reshape window: the first pilot restaurant, the first production deployment, or something else? Topic for the S5 scope page (PF `planning/MASTER-PLAN.md` §5 L76) and the API conventions (§5 L75: how drafts graduate to the live spec). Register: Q-32 (with Q-23, pilot timing).
+- Q-32: answered 2026-10-01, a: the reshape window ends at the first pilot restaurant (Decision 4). Q-23: answered 2026-10-01, b: no pilot is planned yet.
 - Flyway re-baseline vs incremental migrations: settled by ADR-0009 (Q-03 row 3.11, accepted 2026-09-29).
-- Contract versioning and deprecation rules after launch (API conventions, S4): Q-32.
+- Contract versioning and deprecation rules after the first pilot: semver, a changelog and deprecation rules (Q-32 a); the API conventions (S4) spell them out.
 
 ## Sources
 Legend: PF = `/mnt/project-files/`; BE = backend repo `enterprise-order-suite` @ `feature/ai-agent` (`af2634e`).
 - PF `planning/MASTER-PLAN.md` §3 D-8 (L41), D-16 (L49), §4 (L67-68), §5 (L75-76)
+- `planning/open-questions.md` Q-23, Q-32 (Gabriel's answers of 2026-10-01, project thread, 2026-10-01T16:25Z)
 - PF `planning/pm-tool-recommendation.md` L137-139
 - PF `2026-09-20-claude-tooling-and-restaurant-ops-migration-design.md` L59-60, L134-156
 - PF `2026-09-14-backend-integration-manifest.openapi.yaml` L393-394, L1010
