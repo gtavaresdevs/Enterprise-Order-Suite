@@ -1,6 +1,5 @@
 # Runs the full backend test suite on the working branch (ADR-0015 readiness gate).
-# Testcontainers uses the runner's Docker. org.gradle.java.home is overridden because the
-# committed gradle.properties points at a Windows JDK path.
+# Testcontainers uses the runner's Docker.
 name: CI
 
 on:
@@ -22,4 +21,4 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v6
-      - run: ./gradlew test "-Dorg.gradle.java.home=$JAVA_HOME"
+      - run: ./gradlew test

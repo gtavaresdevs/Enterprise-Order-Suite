@@ -54,8 +54,8 @@ runtime those sessions lack, such as `pwsh`. Both hooks are Node scripts:
 - `security-sensitive-file.mjs` (`PreToolUse`): before an edit to a security-sensitive file it
   asks for confirmation and points to the `spring-security-changes` skill. It never denies.
 - `session-start.mjs` (`SessionStart`): reports whether the session can run `./gradlew test`
-  (JDK, Gradle JDK path, Docker). In cloud sessions (`CLAUDE_CODE_REMOTE=true`) it also points
-  Gradle at the local JDK and starts the Docker daemon. It never blocks.
+  (JDK, Docker). In cloud sessions (`CLAUDE_CODE_REMOTE=true`) it also starts the Docker
+  daemon. It never blocks.
 
 `settings.json` also holds `permissions.deny` rules for the git rules (ADR-0013).
 

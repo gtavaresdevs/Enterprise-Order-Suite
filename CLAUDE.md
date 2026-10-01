@@ -38,7 +38,7 @@ Agents in `.claude/agents/`: `spring-security-reviewer` (read-only audit), `back
 
 `.claude/settings.json` (Node hooks, every OS; ADR-0015):
 - `PreToolUse` `security-sensitive-file.mjs`: asks for confirmation before an edit to a security-sensitive file and points to `spring-security-changes`. It never denies.
-- `SessionStart` `session-start.mjs`: reports whether this session can run the full `./gradlew test` (JDK, Gradle JDK path, Docker). In cloud sessions it also points Gradle at the local JDK and starts the Docker daemon.
+- `SessionStart` `session-start.mjs`: reports whether this session can run the full `./gradlew test` (JDK, Docker). In cloud sessions it also starts the Docker daemon.
 - `permissions.deny`: the git rules below (ADR-0013). They match command prefixes, so they are a guardrail, not a boundary.
 
 **Verification:** a full `./gradlew test` (Docker required) before claiming anything works.
@@ -61,7 +61,7 @@ Gradle, not Maven: ignore the Maven instructions in `README.md`.
 
 No lint task; rely on compilation and tests.
 
-`gradle.properties` pins `org.gradle.java.home` to a Windows JDK path. Elsewhere, override it: the SessionStart hook does so in cloud sessions (Gradle user-home `gradle.properties`), CI passes `-Dorg.gradle.java.home=$JAVA_HOME`.
+The repo has no `gradle.properties` (Q-84): Gradle uses `JAVA_HOME`. To pin a JDK on your machine, set `org.gradle.java.home` in your user-level `~/.gradle/gradle.properties`, never in the repo.
 
 ## Environment
 
