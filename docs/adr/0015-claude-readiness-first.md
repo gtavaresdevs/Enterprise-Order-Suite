@@ -17,7 +17,7 @@
 ## Decision
 Accepted (D-13).
 - No software development (Build 1, Tenant foundation, onward) starts until every item of the readiness gate in MASTER-PLAN §7 is checked:
-  - ADRs and the amended architecture are Accepted by Gabriel.
+  - ADRs and the amended architecture are Accepted by Gabriel (ADR-0000..ADR-0019; an ADR added later, such as ADR-0020, gates the build step that depends on it, here Build 4, not Build 1; Claude's reading, 2026-10-01, Gabriel may override; MASTER-PLAN §7).
   - Docs live in one agreed place with a "where to look" map; legacy docs carry superseded banners.
   - Both `CLAUDE.md` files match the current decisions.
   - Frontend `.claude/` is in git; no Windows-only hooks; git rules enforced by `permissions.deny`.

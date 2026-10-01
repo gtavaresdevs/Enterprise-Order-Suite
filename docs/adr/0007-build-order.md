@@ -33,7 +33,7 @@
 | Build 2–4 | Menu → Order Core → Storefront ↔ Order Core. Each contract is reviewed before its step. Small existing-feature fixes from the audit ride alongside; so do Phase 11's small polish items, with Build 3-4 (Q-82 a). | Claude | their contract |
 
 3. **Readiness gate before Build 1** (MASTER-PLAN §7, L97-107):
-   - ADRs and the amended architecture are Accepted by Gabriel (ADR-0000..ADR-0019; an ADR added later, such as ADR-0020, gates the build step that depends on it, here Build 4, not Build 1).
+   - ADRs and the amended architecture are Accepted by Gabriel (ADR-0000..ADR-0019; an ADR added later, such as ADR-0020, gates the build step that depends on it, here Build 4, not Build 1; Claude's reading, 2026-10-01, Gabriel may override).
    - Docs live in one agreed place with a "where to look" map; legacy docs carry superseded banners.
    - Both `CLAUDE.md` files match the current decisions.
    - Frontend `.claude/` is in git; no Windows-only hooks; git rules enforced by `permissions.deny`.

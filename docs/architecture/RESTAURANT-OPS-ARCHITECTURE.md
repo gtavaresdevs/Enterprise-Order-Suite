@@ -455,6 +455,6 @@ Cross-doc questions live in `planning/open-questions.md` (ADR-0016). Those that 
   - A-13: new §26 "Payments and external systems".
   - A-14: shorter derived-documents list; Edge docs deferred.
   - A-15: original implementation order marked superseded by ADR-0007.
-- 2026-10-01: pointer notes, not amendments. Gabriel's register answers of the same day are noted under §7 (Q-34, Q-47, Q-49, Q-51, Q-53), §9 (Q-66), §12 (Q-80) and §25 (Q-16..Q-26), and an "Open questions" block is added (ADR-0016). The text above each note is unchanged; rewording it to match needs a new amendment ticked by Gabriel.
+- 2026-10-01: pointer notes, not amendments. Gabriel's register answers of the same day are noted under §7 (Q-34, Q-47, Q-49, Q-51, Q-53), §9 (Q-66), §12 (Q-80) and §25 (Q-16..Q-20, Q-25; Q-26 decided by Claude at Gabriel's request), and an "Open questions" block is added (ADR-0016). The text above each note is unchanged; rewording it to match needs a new amendment ticked by Gabriel.
 - Text marked "(Proposed)" follows an ADR that is not yet Accepted.
 - Where this document disagrees with an Accepted ADR, the ADR wins until this document is amended again.

@@ -105,7 +105,8 @@ Only what is Accepted so far:
 
 - **New tables get a ULID primary key** (ADR-0009). Never an `IDENTITY`, `SERIAL`/`BIGSERIAL`
   or sequence-backed key; the application generates the id, and foreign keys reference
-  ULIDs. The column type and wire format are open (API conventions): do not pick one.
+  ULIDs. Column type and wire format: `char(26)` Crockford Base32 in the database, logs and
+  API alike (Q-35 a, 2026-10-01; ADR-0009 Decision 6).
 - **Restaurant-owned rows carry the restaurant id**, and every read and write of them is
   scoped to the caller's restaurant. A missing restaurant context fails closed (ADR-0001).
 - **The scoping mechanism comes from the Tenancy & Identity contract**, which is not written

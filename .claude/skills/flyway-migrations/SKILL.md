@@ -92,7 +92,8 @@ Only what is Accepted so far:
 
 - **New tables get a ULID primary key** (ADR-0009). Never `IDENTITY`, `SERIAL`/`BIGSERIAL` or
   a database sequence for a primary key; the application generates the id, and foreign keys
-  reference ULIDs. The column type is open (API conventions): do not pick one on your own.
+  reference ULIDs. The column type is `char(26)` Crockford Base32, the same string in the
+  database, logs and API (Q-35 a, 2026-10-01; ADR-0009 Decision 6).
 - **Restaurant-owned tables carry the restaurant id** (ADR-0001). Whether child rows (for
   example order lines) carry it directly, and how queries are scoped, come from the Tenancy &
   Identity contract, which is not written yet. Do not invent a mechanism.

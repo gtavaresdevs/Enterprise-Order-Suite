@@ -1,6 +1,6 @@
 # Restaurant-ops migration, Phase 0 — Foundation design
 
-> **Partly superseded (2026-09-29).** Still in force: D12, D13, D14, D15 (D13 and D15 are built). Superseded: D9 int64 ids (ADR-0009), D10a timezone fallback to deployment config (ADR-0001), and "Contract work" (ADR-0010). Pending re-examination: D10 `businessDate` (Order Core contract) and D11 category identity (Menu contract).
+> **Partly superseded (2026-09-29).** Still in force: D12, D13, D14, D15 (D13 and D15 are built). Superseded: D9 int64 ids (ADR-0009), D10a timezone fallback to deployment config (ADR-0001), and "Contract work" (ADR-0010). Decided 2026-10-01: D10 `businessDate` is kept (Q-28 a, Q-21 a; the Order Core contract records it); D11 category identity is superseded: each category has a ULID on the wire (Q-46 a; the Menu contract records it).
 > Verdicts: `docs/adr/0000-legacy-decisions-triage.md` (table B).
 
 Date: 2026-09-24

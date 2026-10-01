@@ -1,7 +1,7 @@
 # Superseded and stale legacy docs (S2 banner list)
 
 - Status: Draft
-- Date: 2026-09-29 (updated after Q-01..Q-03 were answered; updated 2026-10-01 after Gabriel's answers: F1, F2, F3, F4, F5, F9, F10, F11, B4, B6, B11, B12, B13, §5, Open questions)
+- Date: 2026-09-29 (updated after Q-01..Q-03 were answered; updated 2026-10-01 after Gabriel's answers: F1, F2, F3, F4, F5, F6, F9, F10, F11, B4, B6, B9, B11, B12, B13, §5, Open questions)
 - Written by: Claude (S0). Follows MASTER-PLAN §4 (L68), §6 S2 (L89-90) and ADR-0000.
 - Used in: S2 (banners, both `CLAUDE.md` rewrites) and S3 (skills, agents, tooling).
 
@@ -88,7 +88,7 @@ Banner (under the H1):
 
 Update 2026-10-01: Gabriel's answers close the banner's "Open" line (the applied banner reads "Open, decided in the contracts, not here: ... stock counts. Decided since: ids are ULIDs (ADR-0009)."). Replacement for that line, applied 2026-10-01 in the frontend repo:
 ```markdown
-> Decided since (Gabriel, 2026-10-01; the contracts record the detail): one tenant = one restaurant location, not a chain (Q-22 a); the customer is a snapshot on each order, with no Customer table (Q-51 a); `channel` DINE_IN, TAKEAWAY or DELIVERY and `source` STOREFRONT, PHONE, WAITER, POS, QR or TABLET, SCREAMING_SNAKE on the wire (Q-49 a, Q-34 a); no stock counts, the 86 toggle only (Q-42 c); ids are ULIDs (ADR-0009).
+> Decided since (Gabriel, 2026-10-01; the contracts record the detail): one tenant = one restaurant location, not a chain (Q-22 a); the customer is a snapshot on each order, with no Customer table (Q-51 a); `channel` DINE_IN, TAKEAWAY or DELIVERY and `source` STOREFRONT, PHONE, WAITER, POS, QR or TABLET, SCREAMING_SNAKE on the wire (Q-49 a, Q-34 a); no stock counts, the 86 toggle only (Q-42 c). Ids are ULIDs (ADR-0009; Q-03 row 3.11, 2026-09-29).
 ```
 
 ### F3. `docs/superpowers/specs/2026-09-14-backend-integration-manifest.openapi.yaml`, version 0.4.0 (High)
@@ -172,6 +172,11 @@ Banner (under the H1):
 > **Status snapshot of 2026-09-16, not current (2026-09-29).** "Implemented" and "Diverges" tags predate later fixes; about half of the audit list is already fixed. Re-verify a rule against the code before acting on it. "[NEW]" rules are proposals Gabriel has not confirmed. Order and menu rules are input to the Order Core, Menu and Storefront contracts in `enterprise-order-suite/docs/`, which win where they differ. This English file wins over the pt-BR versions (ADR-0012).
 ```
 
+Update 2026-10-01: Gabriel's register answers of 2026-10-01 settle several "[NEW]" rules. Replacement banner, applied 2026-10-01 in the frontend repo:
+```markdown
+> **Status snapshot of 2026-09-16, not current (2026-09-29).** "Implemented" and "Diverges" tags predate later fixes; about half of the audit list is already fixed. Re-verify a rule against the code before acting on it. "[NEW]" rules are proposals Gabriel has not confirmed, except those his register answers of 2026-10-01 settled (for example rules 6, 8, 13, 18 and 46: Q-48 a; rules 29 and 30: Q-45 a; rule 48: Q-56 a; rule 47: Q-67 a; rule 15 rejected by Q-55 a): check `enterprise-order-suite/docs/planning/open-questions.md` first. Order and menu rules are input to the Order Core, Menu and Storefront contracts in `enterprise-order-suite/docs/`, which win where they differ. This English file wins over the pt-BR versions (ADR-0012).
+```
+
 ### F7. `docs/superpowers/specs/2026-09-16-regras-de-negocio.md` and `2026-09-16-fluxo-de-dados.md` (Low)
 
 Why: pt-BR docs. D-10: docs in English; the English file wins (ADR-0012, which leaves the banner wording to this list). `fluxo-de-dados.md` has no English counterpart (ADR-0012 Context) and describes a mock/real boundary that moves as features go live (ADR-0007).
@@ -213,13 +218,21 @@ Banner (under the H1, same text in each):
 | L104-106 | Real test credentials from the `order-ui-test-login` memory | Machine-local memory; cloud sessions do not have it. S3 decides the source. | ADR-0015 |
 | L129-139 | Git workflow | Keep; align with ADR-0013 and the Q-02 answer; mention the `permissions.deny` rules. | ADR-0013 |
 
-### F10. Frontend `.claude/` (not in git; not inspected)
+### F10. Frontend `.claude/` (in git since FE `c4a7309`, 2026-10-01; Q-06 a, Q-07)
 
 Skills `connect-backend`, `scaffold-feature`, `migrate-shared-type`, `verify-ui`, `audit-requirement`; agents `requirement-auditor`, `ui-behavior-verifier`; hook `lint-typecheck.cjs` exist only on Gabriel's machine (FE `.gitignore` L17; FE `CLAUDE.md` L23-24, L75-78, L96-99). They cannot be checked from here. S3 reviews them after Gabriel's push; `connect-backend` must read the backend-owned spec (ADR-0010 Consequences). No banner.
 
-Update 2026-10-01: in git since FE `c4a7309` (Gabriel, Q-06 a, Q-07), with the `graphify` skill, `settings.json` and `.claude/CLAUDE.md`; `permissions.deny` git rules added in FE `30bc172`. Still to fix: `order-ui/.claude/skills/connect-backend/SKILL.md` checks the local live swagger (L16-30) and its §6 (L74-78) patches the frontend manifest, which ADR-0010 retires. Stopgap applied 2026-10-01 in the frontend repo: the banner below, after the frontmatter. The rewrite of the skill around the vendored spec and generated types (Q-76 a) waits for Build 1, when they exist.
+Update 2026-10-01: in git since FE `c4a7309` (Gabriel, Q-06 a, Q-07), with the `graphify` skill, `settings.json` and `.claude/CLAUDE.md`; `permissions.deny` git rules added in FE `30bc172`. Still to fix: `order-ui/.claude/skills/connect-backend/SKILL.md` checks the local live swagger (L16-30) and its §6 (L76-82) patches the frontend manifest, which ADR-0010 retires. Stopgap applied 2026-10-01 in the frontend repo: the banner below, after the frontmatter. The rewrite of the skill around the vendored spec and generated types (Q-76 a) waits for Build 1, when they exist.
 ```markdown
 > **Partly superseded (2026-10-01). Where this skill and ADR-0010 differ, the ADR wins.** §6 is retired: never patch the frozen frontend manifest. The live swagger of a local backend (§0-§1) shows what that backend runs today; it is not the contract. API shapes come from the backend repo `enterprise-order-suite/docs/api/` (`drafts/` while a contract is designed, `openapi.yaml` once implemented) and, from Build 1, from the frontend's vendored copy of that spec and the types generated from it (Q-76 a). Raise any difference between them to Gabriel and the backend; never settle it in the frontend. §4 predates Vitest: verify with `yarn lint && yarn build && yarn test`.
+```
+
+`scaffold-feature/SKILL.md` (L56-58) and `migrate-shared-type/SKILL.md` step 7 (L42-45) also patch the frozen manifest. Stopgap banners applied 2026-10-01 in the frontend repo, after the frontmatter:
+```markdown
+> **Partly superseded (2026-10-01). Where this skill and ADR-0010 differ, the ADR wins.** Never add resources to the frozen frontend manifest; a new backend need is raised to Gabriel and the backend. Target DTO shapes come from the backend repo `enterprise-order-suite/docs/` (contract docs, `docs/api/drafts/`), not from the 2026-09-09 spec.
+```
+```markdown
+> **Partly superseded (2026-10-01). Where this skill and ADR-0010 differ, the ADR wins.** Step 7 is retired: never patch the frozen frontend manifest; raise a contract change to Gabriel and the backend. Target shapes come from the backend repo `enterprise-order-suite/docs/` (contract docs, `docs/api/drafts/`), not from the 2026-09-09 spec, whose banner lists what is superseded or decided since (for example channel and source, Q-49 a). Step 5 predates Vitest: verify with `yarn lint && yarn build && yarn test`.
 ```
 
 ### F11. Public READMEs (Low; applied 2026-10-01, Q-10 a)
@@ -364,9 +377,9 @@ Banner (under the H1):
 | Lines | Section / text | Why stale | Replaced by |
 |---|---|---|---|
 | L82, L91-106 | D9 int64 ids | ULIDs everywhere. | ADR-0009 |
-| L83, L108-156 | D10 `businessDate` | Pending, Order Core contract. | ADR-0000 D10 |
+| L83, L108-156 | D10 `businessDate` | Kept (Q-28 a, Q-21 a, 2026-10-01); the Order Core contract records it. | ADR-0000 D10 |
 | L84, L120-146 | D10a zone fallback to `restaurant.timezone`, startup fails; "one restaurant" (L144-146) | Deployment config cannot hold a restaurant value. | ADR-0001 |
-| L86, L158-172 | D11 category identity | Pending, Menu contract. | ADR-0000 D11 |
+| L86, L158-172 | D11 category identity | Superseded by Q-46 a (2026-10-01): categories carry a ULID on the wire. | ADR-0000 D11 |
 | L268-309 | Contract work: patch the canonical frontend manifest in place, uncommitted | Ownership reversed. | ADR-0010 |
 | L403-407 | `RESTAURANT_TIMEZONE` as a required first-run step | Moot: D10a superseded and never built. | ADR-0001 |
 
@@ -376,6 +389,11 @@ Banner (under the H1):
 ```markdown
 > **Partly superseded (2026-09-29).** Still in force: D12, D13, D14, D15 (D13 and D15 are built). Superseded: D9 int64 ids (ADR-0009: ULIDs), D10a timezone fallback to deployment config (ADR-0001), and "Contract work" (ADR-0010). Pending re-examination: D10 `businessDate` (Order Core contract) and D11 category identity (Menu contract).
 > Verdicts: `enterprise-order-suite/docs/adr/0000-legacy-decisions-triage.md` (table B).
+```
+
+Update 2026-10-01: Q-28 a and Q-46 a settle the banner's "Pending re-examination" sentence. Replacement for that sentence, applied 2026-10-01:
+```markdown
+Decided 2026-10-01: D10 `businessDate` is kept (Q-28 a, Q-21 a; the Order Core contract records it); D11 category identity is superseded: each category has a ULID on the wire (Q-46 a; the Menu contract records it).
 ```
 
 ### B10. `docs/superpowers/specs/2026-09-25-restaurant-ops-phase-1-auth-design.md` (Low)
@@ -548,7 +566,7 @@ Handled by the S0 memory cleanup, not this list.
 
 | Item | Source | Status |
 |---|---|---|
-| Set `SUPER_ADMIN_EMAIL` in every environment | PF `2026-09-20-test-failures-and-audit-followups.md` L77-81 | Open; the root admin's meaning depends on Tenancy & Identity (ADR-0000 AF-3) |
+| Set `SUPER_ADMIN_EMAIL` in every environment | PF `2026-09-20-test-failures-and-audit-followups.md` L77-81 | Open; the root admin is the platform admin (Q-17 a, 2026-10-01; ADR-0000 AF-3) |
 | Rotate the seeded super-admin password before any deployment with a real credential | same L94-96; PF phase-0 design L430-431 | Open (ADR-0000 AF-4) |
 | Behind a proxy: `SERVER_FORWARD_HEADERS_STRATEGY=native` and trusted `server.tomcat.remoteip.internal-proxies` | PF phase-1 auth design L180-188 (D23); BE `application.yml` L10 | Open |
 | Keep `REFRESH_COOKIE_SECURE=true` (default); only local dev opts out | PF phase-0 design L181-188 (D12) | Open |
@@ -558,7 +576,7 @@ Handled by the S0 memory cleanup, not this list.
 | `org.springframework.security` logs at `DEBUG` | BE `application.yml` L91-93 | Open |
 | Delete the verification user `phase5-verify-test-delete-me@example.com` | PF `RESTAURANT-OPS-ROADMAP.md` L144-146 | Open |
 | Phase 6 auth cleanup done | S-2 above | Moves to Tenant foundation |
-| `RESTAURANT_TIMEZONE` required at first run | PF phase-0 design L403-407 | Dropped (D10a superseded, never built); per-restaurant zone at onboarding is a Tenancy & Identity question |
+| `RESTAURANT_TIMEZONE` required at first run | PF phase-0 design L403-407 | Dropped (D10a superseded, never built); the zone is required when the restaurant is created (Q-28 a, 2026-10-01) |
 | Four frontend auth follow-ups (credentials, single-flight, no retry, new claims) | PF phase-1 auth design L229-232, L363-367 | Done (FE `2026-09-25-auth-refresh-cookie-cross-tab.md`) |
 
 ## Open questions
@@ -566,7 +584,7 @@ Handled by the S0 memory cleanup, not this list.
 - Q-01 (docs location): answered 2026-09-29; the banners use `enterprise-order-suite/docs` (ADR-0011).
 - Q-02 (never-merge scope) sets the git wording of both `CLAUDE.md` rewrites and of banner F1 (ADR-0013).
 - Banners on the two public READMEs (F11, B13): answered 2026-10-01, Q-10 a ("Q10- a"); applied the same day (BE `c8bf761`, FE `30bc172`).
-- F5 and F10 (frontend tooling): Q-06 a and Q-07 answered 2026-10-01 (FE `c4a7309`). The F5 replacement banner and the F10 `connect-backend` stopgap banner were applied 2026-10-01 (frontend repo); the skill's rewrite around the vendored spec (Q-76 a) waits for Build 1.
+- F5 and F10 (frontend tooling): Q-06 a and Q-07 answered 2026-10-01 (FE `c4a7309`). The F5 replacement banner and the F10 stopgap banners (`connect-backend`, `scaffold-feature`, `migrate-shared-type`) were applied 2026-10-01 (frontend repo); the skill's rewrite around the vendored spec (Q-76 a) waits for Build 1.
 - Banners made stale by Gabriel's answers of 2026-10-01 (F1, F2, F4 in the frontend repo; the B11 extra line in this repo): replacement lines recorded under each entry and applied 2026-10-01.
 - What happens to the flat copies in `/mnt/project-files` after S2 (keep as mirrors, delete, or banner them too). Register: Q-15 (decided by Claude 2026-09-29, Gabriel may override: a, keep them under a pointer README saying the repo wins).
 - Wording for pt-BR legacy docs: F7 proposes "Reference only; the English file wins", answering ADR-0012's open question; Gabriel confirms in S1. Register: Q-14 (decided by Claude 2026-09-29, Gabriel may override: the F7 wording, applied in S2).

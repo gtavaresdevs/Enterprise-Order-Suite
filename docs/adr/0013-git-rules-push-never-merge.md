@@ -23,7 +23,7 @@ Accepted (D-11):
 
 Accepted with D-11's enforcement (Q-03 row 3.9, 2026-09-29; MASTER-PLAN §4 L65):
 4. Both repos adopt the frontend's existing rules: explicit-pathspec commits, never `git add -A`, never `git stash`, never force push, only the main agent runs git write commands.
-5. Enforcement is `permissions.deny` in each repo's committed `.claude/settings.json`, added in S3. The frontend needs `.claude/` versioned first (Gabriel's S1 push, MASTER-PLAN §6 L88). Done 2026-10-01: Gabriel versioned the frontend `.claude/` (FE commit `c4a7309`), and the 2026-10-01 batch adds these deny rules to `order-ui/.claude/settings.json`.
+5. Enforcement is `permissions.deny` in each repo's committed `.claude/settings.json`, added in S3. The frontend needs `.claude/` versioned first (Gabriel's S1 push, MASTER-PLAN §6 L88). Done 2026-10-01: Gabriel versioned the frontend `.claude/` (FE commit `c4a7309`), and Claude added these deny rules to `order-ui/.claude/settings.json` and the repo-root `.claude/settings.json` the same day (FE commit `30bc172`).
 
 Accepted (Gabriel, 2026-10-01; Q-72 a, "Q71 - 72 a"):
 6. Gabriel turns on GitHub branch protection for `main` in both repos. It is his action in the GitHub settings; not yet confirmed done.
