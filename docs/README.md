@@ -1,7 +1,7 @@
 # Enterprise Order Suite docs: read first
 
 - Status: Draft
-- Updated: 2026-10-01 (Gabriel's register answers of 2026-10-01; S1, S2 and S3 done). Earlier: 2026-09-29 (S2, docs skeleton)
+- Updated: 2026-10-02 (the Plane runbook states Claude's defaults). Earlier: 2026-10-01 (Gabriel's register answers of 2026-10-01; S1, S2 and S3 done). Earlier: 2026-09-29 (S2, docs skeleton)
 - Maintained by: Claude, in this repo on `feature/ai-agent` (ADR-0011). Only Gabriel sets Reviewed (ADR-0016).
 - Related: `planning/MASTER-PLAN.md`, `adr/README.md`, `roadmap.md`, `planning/open-questions.md`
 
@@ -120,7 +120,7 @@ docs/
 ## Open questions
 
 - Still open in the register: Q-30 (where restaurant settings and delivery zones are built; not in Gabriel's 2026-10-01 batch) and Q-86 (clarifies his Q-70 pickup answer, which ends mid-sentence).
-- Waiting for Gabriel's review: ADR-0020 (storefront PIX prepayment, Proposed), `planning/proposals/settings-and-notifications.md` (Draft, Q-24), `ops/plane-setup.md` (Draft, Q-83; it asks HTTPS exposure, off-box backups and `EOS-<n>` ids).
+- Waiting for Gabriel's review: ADR-0020 (storefront PIX prepayment, Proposed), `planning/proposals/settings-and-notifications.md` (Draft, Q-24), `ops/plane-setup.md` (Draft, Q-83; for HTTPS exposure, off-box backups and work-item ids it states Claude's defaults (Tailscale Funnel, encrypted Google Drive backups, `EOS-<n>` ids), which Gabriel can change).
 - Q-72: Gabriel turns on branch protection for `main` in both repos; not yet confirmed done.
 - Decided by Claude, Gabriel may override: Q-12 (Draft and Ready definitions), Q-13 (when the amended architecture counts as Accepted), Q-14 (business-rules master stays in FE until S5; pt-BR banner wording), Q-15 (PF copies), all 2026-09-29; Q-26 (where a request's restaurant comes from), 2026-10-01, on Gabriel's delegation.
 - ADR-0011 point 4: where an agreed frontend annotation lives (local to ADR-0011).

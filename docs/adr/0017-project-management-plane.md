@@ -22,7 +22,7 @@
 - Changed by Gabriel on 2026-10-01 (Q-83 b): "Q83 - b -> other I already create the oracle free tier with always free account, its fresh and ready to begin the setup, so this is the first thing we do before begin working on the actual app."
   - Plane is no longer off the critical path for the build: its setup is the first step before work on the app, so Build 1 waits for it. Docs and readiness work (S2-S5) continue meanwhile.
   - The VPS is Gabriel's Oracle Cloud Always Free account, already created and fresh.
-  - Not specified, so still pending: the HTTPS exposure method, off-box backups and the `EOS-<n>` id convention. The runbook `docs/ops/plane-setup.md` (Draft) asks them at setup time.
+  - Not specified, so still pending as answers: the HTTPS exposure method, off-box backups and the `EOS-<n>` id convention. The runbook `docs/ops/plane-setup.md` (Draft, section 0) states Claude's defaults (Tailscale Funnel, encrypted Google Drive backups, `EOS-<n>` ids). Claude chose them on 2026-10-01 because Gabriel asked not to be asked during this run; they are not his answers, and he can change any.
   - `docs/roadmap.md` stays the tracker until Plane is set up. No history import, no empty future modules and no automations, as before.
 
 ## Consequences
@@ -37,8 +37,8 @@
 
 ## Open questions
 - Q-03 row 3.10 ("Plane off the critical path, `docs/roadmap.md` interim"): answered 2026-09-29, accepted.
-- Q-83: answered 2026-10-01, b (other): Gabriel's Oracle Always Free account is created and fresh, and the Plane setup is the first step before Build 1 (Decision). HTTPS exposure, off-box backups and the work-item id convention were not specified: pending, asked in `docs/ops/plane-setup.md` (Draft).
-- Work-item id convention once Plane exists (`EOS-<n>` in commit messages and plan files; no per-item branches or PRs under ADR-0013; pm-tool L27): pending, asked in `docs/ops/plane-setup.md` Open questions 3 (Q-83).
+- Q-83: answered 2026-10-01, b (other): Gabriel's Oracle Always Free account is created and fresh, and the Plane setup is the first step before Build 1 (Decision). HTTPS exposure, off-box backups and the work-item id convention were not specified: pending as answers; `docs/ops/plane-setup.md` (Draft, section 0) states Claude's defaults for them.
+- Work-item id convention once Plane exists (`EOS-<n>` in commit messages and plan files; no per-item branches or PRs under ADR-0013; pm-tool L27): pending as an answer; it is Claude's default in `docs/ops/plane-setup.md` section 0 (Q-83).
 
 ## Sources
 - `/mnt/project-files/planning/MASTER-PLAN.md` §3 D-15 (L48), §4 Plane row (L66), §6 S1 (L88)
