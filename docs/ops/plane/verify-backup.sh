@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # verify-backup.sh: non-destructive check that a Plane backup made by backup.sh can be restored.
 #
-# Part of docs/ops/plane-setup.md (Enterprise Order Suite), steps 9 and 12.
+# Part of docs/ops/plane-setup.md (Enterprise Order Suite), sections 8 and 11.
 # Usage, as the user that installed Plane (member of the docker group):
 #     ~/plane-ops/verify-backup.sh                  # newest backup on the off-box remote
 #     ~/plane-ops/verify-backup.sh <local-folder>   # a backup folder already on disk
@@ -21,7 +21,9 @@ FALLBACK_PG_IMAGE="${FALLBACK_PG_IMAGE:-postgres:15.7-alpine}"   # used only if 
 work="$(mktemp -d)"
 cname="plane-verify-$$"
 cleanup() {
-  docker rm -f "$cname" >/dev/null 2>&1 || true
+  # -v also removes the container's anonymous data volume: the postgres image keeps its data in
+  # one, and without -v every run would leave a full copy of the restored database on disk.
+  docker rm -f -v "$cname" >/dev/null 2>&1 || true
   rm -rf -- "$work"
 }
 trap cleanup EXIT
@@ -81,7 +83,8 @@ q() { docker exec "$cname" psql -U plane -d plane -tAc "$1"; }
 tables="$(q "select count(*) from information_schema.tables where table_schema = 'public'")"
 [ "${tables:-0}" -gt 0 ] || fail "the restored database has no tables"
 echo "ok  $tables tables restored"
+# Plane deletes rows softly (deleted_at), so count only the rows that are not deleted.
 for t in workspaces projects issues; do
-  echo "    $t: $(q "select count(*) from $t" 2>/dev/null || echo 'n/a')"
+  echo "    $t: $(q "select count(*) from $t where deleted_at is null" 2>/dev/null || echo 'n/a')"
 done
 echo "PASS: $src can be restored"
