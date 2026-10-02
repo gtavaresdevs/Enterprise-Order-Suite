@@ -2,6 +2,12 @@ server:
   port: ${SERVER_PORT:8080}
   servlet:
     context-path: ${SERVER_CONTEXT_PATH}
+  # D23. Whether X-Forwarded-For / X-Forwarded-Proto are trusted. "none": the client IP is the
+  # socket address - right locally and when exposed directly, and the only safe default (a
+  # client could otherwise forge its IP and dodge every rate limit). Behind a reverse proxy or
+  # load balancer set "native": Tomcat's RemoteIpValve then trusts the headers only from
+  # server.tomcat.remoteip.internal-proxies (private ranges by default).
+  forward-headers-strategy: ${SERVER_FORWARD_HEADERS_STRATEGY:none}
 
 spring:
   datasource:
@@ -41,6 +47,12 @@ storage:
   bucket: ${MINIO_BUCKET}
 
 app:
+  # The anti-lockout root account. Both values are absent by default so tests and fresh
+  # clones boot without a secret; when unset, nothing is seeded and no account is protected.
+  # SUPER_ADMIN_PASSWORD_HASH is a bcrypt hash, never a plaintext password.
+  root-super-admin:
+    email: ${SUPER_ADMIN_EMAIL:}
+    password-hash: ${SUPER_ADMIN_PASSWORD_HASH:}
   urls:
     password-reset: ${APP_PASSWORD_RESET_URL}
   # CUSTOM MAPS CORRESPONDING TO THE @ConfigurationProperties(prefix = "app.email") CLASS
@@ -70,6 +82,11 @@ security:
     reset-password:
       capacity: ${RATE_LIMIT_RESET_PASSWORD_CAPACITY:5}
       refill-seconds: ${RATE_LIMIT_RESET_PASSWORD_REFILL:10}
+  refresh-cookie:
+    secure: ${REFRESH_COOKIE_SECURE:true}
+    same-site: ${REFRESH_COOKIE_SAME_SITE:Lax}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
 
 logging:
   level:

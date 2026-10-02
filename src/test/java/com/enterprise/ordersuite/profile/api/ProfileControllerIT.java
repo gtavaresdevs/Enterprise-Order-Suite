@@ -565,7 +565,11 @@ class ProfileControllerIT {
           .file(file)
           .header("Authorization", "Bearer " + token)
       )
-      .andExpect(status().isBadRequest());
+      .andExpect(status().isBadRequest())
+      // Asserts the ApiErrorResponse shape, not just the status: the two RuntimeException
+      // advices are order-dependent, and a regression there would silently hand back
+      // Spring Boot's default {timestamp,status,error,path} body instead.
+      .andExpect(jsonPath("$.code").value("INVALID_AVATAR"));
 
     UserProfile unchangedProfile =
       userProfileRepository.findByUserId(user.getId()).orElseThrow();

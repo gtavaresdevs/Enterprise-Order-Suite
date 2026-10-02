@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.containers.MinIOContainer;
+import org.testcontainers.utility.DockerImageName;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -18,7 +19,12 @@ import java.net.URI;
 @TestConfiguration(proxyBeanMethods = false)
 public class MinioTestContainerConfig {
 
-  private static final String MINIO_IMAGE = "minio/minio:latest";
+  // minio/minio is no longer published on Docker Hub, so a clean machine (CI, cloud sessions)
+  // cannot pull it. pgsty/minio is a maintained build of the same server; pinned for
+  // reproducible runs.
+  private static final DockerImageName MINIO_IMAGE = DockerImageName
+    .parse("pgsty/minio:RELEASE.2026-08-04T00-00-00Z")
+    .asCompatibleSubstituteFor("minio/minio");
   private static final String BUCKET = "eos-assets";
   private static final String REGION = "us-east-1";
 

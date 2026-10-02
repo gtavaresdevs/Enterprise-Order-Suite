@@ -15,5 +15,10 @@ public interface OrderItemMapper {
     @Mapping(target = "subtotal", expression = "java(item.getUnitPrice().multiply(new BigDecimal(item.getQuantity())))")
     OrderItemResponse toResponse(OrderItem item);
 
+    // unitPrice is ignored on purpose. OrderService resolves it from the catalogue right
+    // after this call, but leaving the mapping in place would let a client-supplied price
+    // reach an entity even transiently - and a future caller that forgot to overwrite it
+    // would silently reintroduce price tampering.
+    @Mapping(target = "unitPrice", ignore = true)
     OrderItem toEntity(OrderItemRequest request);
 }

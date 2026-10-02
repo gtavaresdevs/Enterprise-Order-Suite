@@ -17,7 +17,7 @@ public class EmailProperties {
 
   /**
    * The 'From' destination envelope sender mailbox identity address utilized
-   * globally across platform transactional mail templates (e.g., gtavaresdev@gmail.com).
+   * globally across platform transactional mail templates (e.g., no-reply@example.com).
    */
   private String from;
 

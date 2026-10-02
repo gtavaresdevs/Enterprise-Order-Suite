@@ -86,14 +86,17 @@
       String newAvatarKey =
         "avatars/" + UUID.randomUUID() + ".webp";
 
-      objectStorageService.upload(
+      // Store the key the storage layer reports, not the one we proposed: upload()
+      // returns the canonical key, and an implementation that normalised or prefixed it
+      // would otherwise leave the profile pointing at an object that does not exist.
+      String storedAvatarKey = objectStorageService.upload(
         newAvatarKey,
         new ByteArrayInputStream(webpImage),
         webpImage.length,
         "image/webp"
       );
 
-      profile.setAvatarKey(newAvatarKey);
+      profile.setAvatarKey(storedAvatarKey);
       userProfileRepository.save(profile);
 
       if (oldAvatarKey != null) {

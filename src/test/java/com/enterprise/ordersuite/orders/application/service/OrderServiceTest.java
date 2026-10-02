@@ -12,10 +12,10 @@ import com.enterprise.ordersuite.orders.domain.Order;
 import com.enterprise.ordersuite.orders.domain.OrderHistory;
 import com.enterprise.ordersuite.orders.domain.OrderItem;
 import com.enterprise.ordersuite.orders.domain.OrderStatus;
+import com.enterprise.ordersuite.orders.domain.exception.OrderNotEditableException;
 import com.enterprise.ordersuite.orders.domain.exception.ProductNotFoundException;
 import com.enterprise.ordersuite.orders.persistence.OrderHistoryRepository;
 import com.enterprise.ordersuite.orders.persistence.OrderRepository;
-import com.enterprise.ordersuite.products.application.service.ProductService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +29,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -66,11 +67,16 @@ class OrderServiceTest {
   @Mock
   private CurrentUserService currentUserService;
 
+  // The orders-side interface, in this same package - not the products class that
+  // implements it. OrderService is not allowed to know that class exists.
   @Mock
   private ProductService productService;
 
   @Mock
   private NotificationService notificationService;
+
+  @Mock
+  private RoleHierarchy roleHierarchy;
 
   @InjectMocks
   private OrderService orderService;
@@ -86,6 +92,13 @@ class OrderServiceTest {
     lenient()
       .when(currentUserService.getEmail())
       .thenReturn(CURRENT_USER_EMAIL);
+
+    // Identity expansion: these unit tests assert the admin/non-admin branches from the
+    // authorities they set directly. The hierarchy's real expansion is proven against the
+    // actual bean in OrderControllerIT.getAllOrders_asSuperAdmin_seesOrdersFromEveryCustomer.
+    lenient()
+      .when(roleHierarchy.getReachableGrantedAuthorities(any()))
+      .thenAnswer(invocation -> invocation.getArgument(0));
   }
 
   @AfterEach
@@ -138,6 +151,8 @@ class OrderServiceTest {
 
     when(productService.productExists(101L)).thenReturn(true);
     when(productService.productExists(102L)).thenReturn(true);
+    when(productService.getPrice(101L)).thenReturn(new BigDecimal("25.00"));
+    when(productService.getPrice(102L)).thenReturn(new BigDecimal("10.00"));
     when(orderMapper.toEntity(request)).thenReturn(order);
     when(orderItemMapper.toEntity(itemRequest1)).thenReturn(orderItem1);
     when(orderItemMapper.toEntity(itemRequest2)).thenReturn(orderItem2);
@@ -157,6 +172,11 @@ class OrderServiceTest {
     verify(productService).productExists(102L);
     verify(productService).decrementStock(101L, 2);
     verify(productService).decrementStock(102L, 1);
+
+    // The line prices are the catalogue's, not the request's - both itemRequests carried
+    // the same numbers here, so the proof that they were re-derived is these lookups.
+    verify(productService).getPrice(101L);
+    verify(productService).getPrice(102L);
 
     verify(orderRepository).save(order);
     verify(orderMapper).toResponse(order);
@@ -197,6 +217,7 @@ class OrderServiceTest {
 
     verify(productService).productExists(999L);
     verify(productService, never()).decrementStock(anyLong(), anyInt());
+    verify(productService, never()).getPrice(anyLong());
     verify(orderMapper, never()).toEntity(any());
     verify(orderRepository, never()).save(any());
     verify(orderHistoryRepository, never()).save(any());
@@ -320,7 +341,7 @@ class OrderServiceTest {
   }
 
   @Test
-  void getAllOrders_asRegularUser_searchesOnlyCurrentUsersOrders() {
+  void getAllOrders_asRegularUser_listsOnlyCurrentUsersOrders() {
     setAuthenticatedUserAsRegularUser();
 
     PageRequest pageable = PageRequest.of(0, 10);
@@ -338,12 +359,8 @@ class OrderServiceTest {
     Page<Order> orderPage =
       new PageImpl<>(List.of(order), pageable, 1);
 
-    when(orderRepository.searchOrders(
-      null,
-      null,
-      CURRENT_USER_ID,
-      pageable
-    )).thenReturn(orderPage);
+    when(orderRepository.findByCustomerId(CURRENT_USER_ID, pageable))
+      .thenReturn(orderPage);
 
     when(orderMapper.toResponse(order))
       .thenReturn(response);
@@ -355,9 +372,15 @@ class OrderServiceTest {
       .containsExactly(response);
 
     verify(orderRepository)
-      .searchOrders(null, null, CURRENT_USER_ID, pageable);
+      .findByCustomerId(CURRENT_USER_ID, pageable);
 
     verify(orderRepository, never()).findAll(any(Pageable.class));
+
+    // searchOrders treats a null customerId as "no filter"; a non-admin's list must never
+    // be scoped by it, or one null user id away it returns every order in the database.
+    verify(orderRepository, never())
+      .searchOrders(any(), any(), any(), any());
+
     verify(orderMapper).toResponse(order);
   }
 
@@ -596,6 +619,9 @@ class OrderServiceTest {
     when(productService.productExists(202L))
       .thenReturn(true);
 
+    when(productService.getPrice(202L))
+      .thenReturn(new BigDecimal("15.00"));
+
     when(orderItemMapper.toEntity(itemRequest))
       .thenReturn(newItem);
 
@@ -616,11 +642,334 @@ class OrderServiceTest {
     verify(productService)
       .productExists(202L);
 
+    verify(productService)
+      .decrementStock(202L, 3);
+
     verify(orderItemMapper)
       .toEntity(itemRequest);
 
     verify(orderRepository)
       .save(existingOrder);
+  }
+
+  @Test
+  void updateOrder_replacingItems_creditsTheOldItemsAndDebitsTheNewOnes() {
+    Long orderId = 1L;
+
+    OrderItem existingItem = OrderItem.builder()
+      .productId(101L)
+      .quantity(2)
+      .unitPrice(new BigDecimal("10.00"))
+      .build();
+
+    Order existingOrder = Order.builder()
+      .customerId(CURRENT_USER_ID)
+      .status(OrderStatus.PENDING)
+      .items(new ArrayList<>(List.of(existingItem)))
+      .build();
+
+    existingOrder.setId(orderId);
+
+    OrderItemRequest itemRequest = OrderItemRequest.builder()
+      .productId(101L)
+      .quantity(5)
+      .unitPrice(new BigDecimal("10.00"))
+      .build();
+
+    // Same status, so transitionTo returns early - the item replacement still runs, and
+    // is the path that used to hand out stock the order had never paid for.
+    OrderUpdateRequest request = OrderUpdateRequest.builder()
+      .status(OrderStatus.PENDING)
+      .items(List.of(itemRequest))
+      .build();
+
+    OrderItem newItem = OrderItem.builder()
+      .productId(101L)
+      .quantity(5)
+      .unitPrice(new BigDecimal("10.00"))
+      .build();
+
+    when(orderRepository.findById(orderId))
+      .thenReturn(Optional.of(existingOrder));
+
+    when(productService.productExists(101L))
+      .thenReturn(true);
+
+    when(productService.getPrice(101L))
+      .thenReturn(new BigDecimal("10.00"));
+
+    when(orderItemMapper.toEntity(itemRequest))
+      .thenReturn(newItem);
+
+    when(orderRepository.save(existingOrder))
+      .thenReturn(existingOrder);
+
+    when(orderMapper.toResponse(existingOrder))
+      .thenReturn(new OrderResponse());
+
+    orderService.updateOrder(orderId, request);
+
+    verify(productService)
+      .incrementStock(101L, 2);
+
+    verify(productService)
+      .decrementStock(101L, 5);
+  }
+
+  @Test
+  void updateOrder_replacingItemsOnAShippedOrder_throwsOrderNotEditable() {
+    // Also asks for a legal transition, SHIPPED -> DELIVERED: the rejection must win before
+    // any of it - history, notification, save - happens.
+    assertReplacingItemsIsRejected(OrderStatus.SHIPPED, OrderStatus.DELIVERED);
+  }
+
+  @Test
+  void updateOrder_replacingItemsOnADeliveredOrder_throwsOrderNotEditable() {
+    assertReplacingItemsIsRejected(OrderStatus.DELIVERED, OrderStatus.DELIVERED);
+  }
+
+  @Test
+  void updateOrder_replacingItemsOnACancelledOrder_throwsOrderNotEditable() {
+    assertReplacingItemsIsRejected(OrderStatus.CANCELLED, OrderStatus.CANCELLED);
+  }
+
+  // A SHIPPED or DELIVERED order consumed its stock for good and a CANCELLED one gave it back:
+  // none of them is open. Replacing their items used to be accepted, and with an empty list
+  // it rewrote totalAmount to zero with no history row. These tests used to assert only that
+  // no stock moved; now the request is refused before anything is looked up, moved or saved,
+  // which covers that and more. Product 999 does not exist: a closed order answers 409, not
+  // PRODUCT_NOT_FOUND.
+  private void assertReplacingItemsIsRejected(OrderStatus current, OrderStatus requested) {
+    Long orderId = 1L;
+
+    OrderItem existingItem = OrderItem.builder()
+      .productId(101L)
+      .quantity(2)
+      .unitPrice(new BigDecimal("10.00"))
+      .build();
+
+    Order existingOrder = Order.builder()
+      .customerId(CURRENT_USER_ID)
+      .status(current)
+      .totalAmount(new BigDecimal("20.00"))
+      .items(new ArrayList<>(List.of(existingItem)))
+      .build();
+
+    existingOrder.setId(orderId);
+
+    OrderUpdateRequest request = OrderUpdateRequest.builder()
+      .status(requested)
+      .items(List.of(OrderItemRequest.builder()
+        .productId(999L)
+        .quantity(5)
+        .unitPrice(new BigDecimal("10.00"))
+        .build()))
+      .build();
+
+    when(orderRepository.findById(orderId))
+      .thenReturn(Optional.of(existingOrder));
+
+    assertThatThrownBy(() -> orderService.updateOrder(orderId, request))
+      .isInstanceOf(OrderNotEditableException.class);
+
+    assertThat(existingOrder.getItems())
+      .as("the stored lines must survive a rejected request")
+      .containsExactly(existingItem);
+
+    assertThat(existingOrder.getTotalAmount())
+      .as("the silent zeroing of totalAmount is the defect")
+      .isEqualByComparingTo("20.00");
+
+    assertThat(existingOrder.getStatus())
+      .isEqualTo(current);
+
+    verifyNoInteractions(productService, orderItemMapper, orderHistoryRepository, notificationService);
+
+    verify(orderRepository, never())
+      .save(any(Order.class));
+  }
+
+  @Test
+  void updateOrder_replacingItemsOnAProcessingOrder_isAccepted() {
+    Long orderId = 1L;
+
+    OrderItem existingItem = OrderItem.builder()
+      .productId(101L)
+      .quantity(2)
+      .unitPrice(new BigDecimal("10.00"))
+      .build();
+
+    Order existingOrder = Order.builder()
+      .customerId(CURRENT_USER_ID)
+      .status(OrderStatus.PROCESSING)
+      .items(new ArrayList<>(List.of(existingItem)))
+      .build();
+
+    existingOrder.setId(orderId);
+
+    OrderItemRequest itemRequest = OrderItemRequest.builder()
+      .productId(202L)
+      .quantity(3)
+      .unitPrice(new BigDecimal("15.00"))
+      .build();
+
+    OrderUpdateRequest request = OrderUpdateRequest.builder()
+      .status(OrderStatus.PROCESSING)
+      .items(List.of(itemRequest))
+      .build();
+
+    OrderItem newItem = OrderItem.builder()
+      .productId(202L)
+      .quantity(3)
+      .unitPrice(new BigDecimal("15.00"))
+      .build();
+
+    when(orderRepository.findById(orderId))
+      .thenReturn(Optional.of(existingOrder));
+
+    when(productService.productExists(202L))
+      .thenReturn(true);
+
+    when(productService.getPrice(202L))
+      .thenReturn(new BigDecimal("15.00"));
+
+    when(orderItemMapper.toEntity(itemRequest))
+      .thenReturn(newItem);
+
+    when(orderRepository.save(existingOrder))
+      .thenReturn(existingOrder);
+
+    when(orderMapper.toResponse(existingOrder))
+      .thenReturn(new OrderResponse());
+
+    orderService.updateOrder(orderId, request);
+
+    // A kitchen can still add a drink to an order being prepared.
+    assertThat(existingOrder.getItems())
+      .containsExactly(newItem);
+
+    assertThat(existingOrder.getTotalAmount())
+      .isEqualByComparingTo("45.00");
+
+    verify(productService)
+      .incrementStock(101L, 2);
+
+    verify(productService)
+      .decrementStock(202L, 3);
+  }
+
+  @Test
+  void updateOrder_replacingItemsWhileShippingAProcessingOrder_isAccepted() {
+    Long orderId = 1L;
+
+    OrderItem existingItem = OrderItem.builder()
+      .productId(101L)
+      .quantity(2)
+      .unitPrice(new BigDecimal("10.00"))
+      .build();
+
+    Order existingOrder = Order.builder()
+      .customerId(CURRENT_USER_ID)
+      .status(OrderStatus.PROCESSING)
+      .items(new ArrayList<>(List.of(existingItem)))
+      .build();
+
+    existingOrder.setId(orderId);
+
+    OrderItemRequest itemRequest = OrderItemRequest.builder()
+      .productId(202L)
+      .quantity(3)
+      .unitPrice(new BigDecimal("15.00"))
+      .build();
+
+    // Editability is judged on the order as it stands before the request. It is open, so the
+    // replacement settles stock first and the transition to SHIPPED runs after it.
+    OrderUpdateRequest request = OrderUpdateRequest.builder()
+      .status(OrderStatus.SHIPPED)
+      .items(List.of(itemRequest))
+      .build();
+
+    OrderItem newItem = OrderItem.builder()
+      .productId(202L)
+      .quantity(3)
+      .unitPrice(new BigDecimal("15.00"))
+      .build();
+
+    when(orderRepository.findById(orderId))
+      .thenReturn(Optional.of(existingOrder));
+
+    when(productService.productExists(202L))
+      .thenReturn(true);
+
+    when(productService.getPrice(202L))
+      .thenReturn(new BigDecimal("15.00"));
+
+    when(orderItemMapper.toEntity(itemRequest))
+      .thenReturn(newItem);
+
+    when(orderRepository.save(existingOrder))
+      .thenReturn(existingOrder);
+
+    when(orderMapper.toResponse(existingOrder))
+      .thenReturn(new OrderResponse());
+
+    orderService.updateOrder(orderId, request);
+
+    assertThat(existingOrder.getStatus())
+      .isEqualTo(OrderStatus.SHIPPED);
+
+    assertThat(existingOrder.getItems())
+      .containsExactly(newItem);
+
+    verify(productService)
+      .incrementStock(101L, 2);
+
+    verify(productService)
+      .decrementStock(202L, 3);
+
+    verify(orderHistoryRepository)
+      .save(any(OrderHistory.class));
+  }
+
+  @Test
+  void updateOrder_statusOnlyOnADeliveredOrder_isNotRejected() {
+    Long orderId = 1L;
+
+    OrderItem existingItem = OrderItem.builder()
+      .productId(101L)
+      .quantity(2)
+      .unitPrice(new BigDecimal("10.00"))
+      .build();
+
+    Order existingOrder = Order.builder()
+      .customerId(CURRENT_USER_ID)
+      .status(OrderStatus.DELIVERED)
+      .items(new ArrayList<>(List.of(existingItem)))
+      .build();
+
+    existingOrder.setId(orderId);
+
+    // No items key at all - what every status-only PUT in OrderControllerIT sends.
+    OrderUpdateRequest request = OrderUpdateRequest.builder()
+      .status(OrderStatus.DELIVERED)
+      .build();
+
+    when(orderRepository.findById(orderId))
+      .thenReturn(Optional.of(existingOrder));
+
+    when(orderRepository.save(existingOrder))
+      .thenReturn(existingOrder);
+
+    when(orderMapper.toResponse(existingOrder))
+      .thenReturn(new OrderResponse());
+
+    assertThat(orderService.updateOrder(orderId, request))
+      .isPresent();
+
+    assertThat(existingOrder.getItems())
+      .containsExactly(existingItem);
+
+    verifyNoInteractions(productService);
   }
 
   @Test
@@ -657,6 +1006,12 @@ class OrderServiceTest {
 
     verify(productService)
       .productExists(999L);
+
+    verify(productService, never())
+      .incrementStock(anyLong(), anyInt());
+
+    verify(productService, never())
+      .decrementStock(anyLong(), anyInt());
 
     verify(orderRepository, never())
       .save(any(Order.class));

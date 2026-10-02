@@ -1,6 +1,6 @@
 package com.enterprise.ordersuite.identity.api.dto;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record UserDetailResponse(
         Long id,
@@ -9,6 +9,6 @@ public record UserDetailResponse(
         boolean active,
         String firstName,
         String lastName,
-        LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        Instant createdAt,
+        Instant updatedAt
 ) {}

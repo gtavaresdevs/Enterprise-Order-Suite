@@ -1,7 +1,6 @@
 package com.enterprise.ordersuite.orders.api;
 
 import com.enterprise.ordersuite.common.util.PagedResult;
-import com.enterprise.ordersuite.identity.application.CurrentUserService;
 import com.enterprise.ordersuite.orders.api.dto.OrderCreateRequest;
 import com.enterprise.ordersuite.orders.api.dto.OrderResponse;
 import com.enterprise.ordersuite.orders.api.dto.OrderUpdateRequest;
@@ -17,7 +16,6 @@ import org.slf4j.MDC;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PostAuthorize;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,13 +24,16 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Orders", description = "Order Management APIs")
+// Every endpoint here names the roles it admits rather than using isAuthenticated().
+// Under the hierarchy hasAnyRole('USER','ADMIN') is exactly today's behaviour for all
+// three existing roles, but isAuthenticated() would also admit any role added later -
+// the restaurant-ops staff roles would have gained order access on creation.
 public class OrderController {
 
     private final OrderService orderService;
-    private final CurrentUserService currentUserService;
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('SCOPE_order:write')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
     @Operation(summary = "Create a new order", description = "Creates a new order in the system.")
     public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody OrderCreateRequest request) {
         String requestId = MDC.get("requestId");
@@ -42,8 +43,7 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('SCOPE_order:read')")
-    @PostAuthorize("hasRole('ADMIN') or returnObject.body.customerId == authentication.principal.id")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
     @Operation(summary = "Get order by ID", description = "Retrieves a specific order by its ID. Users can only access their own orders unless they are an admin.")
     public ResponseEntity<OrderResponse> getOrderById(@PathVariable Long id) {
         String requestId = MDC.get("requestId");
@@ -57,7 +57,7 @@ public class OrderController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('SCOPE_order:read')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
     @Operation(summary = "Get all orders", description = "Retrieves a paginated list of all orders. Non-admin users will only see their own orders.")
     public ResponseEntity<PagedResult<OrderResponse>> getAllOrders(Pageable pageable) {
         String requestId = MDC.get("requestId");
@@ -66,7 +66,7 @@ public class OrderController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('SCOPE_order:read')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
     @Operation(summary = "Search orders", description = "Retrieves a paginated list of orders based on search criteria. Non-admin users will only see their own orders.")
     public ResponseEntity<PagedResult<OrderResponse>> searchOrders(
             @RequestParam(required = false) String orderNumber,
@@ -81,19 +81,14 @@ public class OrderController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('SCOPE_order:write')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
     @Operation(summary = "Update an existing order", description = "Updates an existing order identified by its ID. Users can only update their own orders unless they are an admin.")
     public ResponseEntity<OrderResponse> updateOrder(@PathVariable Long id, @Valid @RequestBody OrderUpdateRequest request) {
         String requestId = MDC.get("requestId");
         log.info("requestId: {} - Received request to update order with ID: {}", requestId, id);
 
         return orderService.updateOrder(id, request)
-                .map(orderResponse -> {
-                    if (!isAdmin() && !orderResponse.getCustomerId().equals(currentUserService.getUserId())) {
-                         return new ResponseEntity<OrderResponse>(HttpStatus.FORBIDDEN);
-                    }
-                    return new ResponseEntity<>(orderResponse, HttpStatus.OK);
-                })
+                .map(orderResponse -> new ResponseEntity<>(orderResponse, HttpStatus.OK))
                 .orElseGet(() -> {
                     log.warn("requestId: {} - Order with ID: {} not found for update.", requestId, id);
                     return new ResponseEntity<>(HttpStatus.NOT_FOUND);
@@ -101,17 +96,14 @@ public class OrderController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('SCOPE_order:delete')")
-    @Operation(summary = "Delete an order", description = "Deletes an order identified by its ID. Users can only delete their own orders unless they are an admin.")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Delete an order", description = "Deletes an order identified by its ID. Restricted to ADMIN and above; a regular user cannot delete an order, including their own.")
     public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
         String requestId = MDC.get("requestId");
         log.info("requestId: {} - Received request to delete order with ID: {}", requestId, id);
 
         return orderService.getOrderById(id)
                 .map(order -> {
-                    if (!isAdmin() && !order.getCustomerId().equals(currentUserService.getUserId())) {
-                        return new ResponseEntity<Void>(HttpStatus.FORBIDDEN);
-                    }
                     orderService.deleteOrder(id);
                     return new ResponseEntity<Void>(HttpStatus.NO_CONTENT);
                 })
@@ -119,10 +111,5 @@ public class OrderController {
                     log.warn("requestId: {} - Order with ID: {} not found for deletion.", requestId, id);
                     return new ResponseEntity<>(HttpStatus.NOT_FOUND);
                 });
-    }
-
-    private boolean isAdmin() {
-        return org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
     }
 }

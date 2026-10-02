@@ -10,7 +10,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Getter
 @Setter
@@ -23,8 +23,8 @@ public abstract class BaseEntity {
     protected Long id;
 
     @CreationTimestamp
-    protected LocalDateTime createdAt;
+    protected Instant createdAt;
 
     @UpdateTimestamp
-    protected LocalDateTime updatedAt;
+    protected Instant updatedAt;
 }

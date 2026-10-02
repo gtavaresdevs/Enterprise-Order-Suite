@@ -1,7 +1,7 @@
 package com.enterprise.ordersuite.auth.dtos;
 
-import jakarta.validation.constraints.NotBlank;
-
-public record RefreshRequest(@NotBlank String refreshToken) {
+// Optional since Phase 1: the refresh token normally arrives in the HttpOnly cookie.
+// The body field is the backward-compatible fallback, removed in Phase 6.
+public record RefreshRequest(String refreshToken) {
 
 }

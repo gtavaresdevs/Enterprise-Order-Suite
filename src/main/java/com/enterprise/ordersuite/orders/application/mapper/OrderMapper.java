@@ -4,11 +4,7 @@ import com.enterprise.ordersuite.orders.api.dto.OrderCreateRequest;
 import com.enterprise.ordersuite.orders.api.dto.OrderResponse;
 import com.enterprise.ordersuite.orders.api.dto.OrderUpdateRequest;
 import com.enterprise.ordersuite.orders.domain.Order;
-import com.enterprise.ordersuite.orders.domain.OrderItem;
 import org.mapstruct.*;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE, uses = {OrderItemMapper.class})
 public interface OrderMapper {
@@ -18,17 +14,11 @@ public interface OrderMapper {
 
     OrderResponse toResponse(Order order);
 
+    // Items are mapped by OrderService, never here. It is the only place that can take the
+    // stock an item costs and resolve its price from the catalogue, and a mapper that built
+    // OrderItems from an OrderItemRequest would carry the client's unitPrice straight onto
+    // the order.
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "items", ignore = true)
     void updateEntityFromDto(OrderUpdateRequest request, @MappingTarget Order order);
-
-    default List<OrderItem> mapOrderItemRequestsToOrderItems(List<com.enterprise.ordersuite.orders.api.dto.OrderItemRequest> itemRequests) {
-        return itemRequests.stream()
-                .map(request -> OrderItem.builder()
-                        .productId(request.getProductId())
-                        .quantity(request.getQuantity())
-                        .unitPrice(request.getUnitPrice())
-                        .build())
-                .collect(Collectors.toList());
-    }
 }

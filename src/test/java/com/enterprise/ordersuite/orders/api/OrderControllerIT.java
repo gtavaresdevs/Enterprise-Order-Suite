@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.endsWith;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -55,10 +57,12 @@ class OrderControllerIT {
   private User adminUser;
   private User regularUser;
   private User otherUser;
+  private User superAdminUser;
 
   private String adminToken;
   private String userToken;
   private String otherToken;
+  private String superAdminToken;
 
   @BeforeEach
   void setUp() throws Exception {
@@ -83,6 +87,13 @@ class OrderControllerIT {
       "other-" + UUID.randomUUID() + "@test.com"
     );
 
+    superAdminUser = createTestUser(
+      "SUPER_ADMIN",
+      "Super",
+      "Admin",
+      "superadmin-" + UUID.randomUUID() + "@test.com"
+    );
+
     adminToken = loginAndGetAccessToken(
       adminUser.getEmail(),
       DEFAULT_PASSWORD
@@ -95,6 +106,11 @@ class OrderControllerIT {
 
     otherToken = loginAndGetAccessToken(
       otherUser.getEmail(),
+      DEFAULT_PASSWORD
+    );
+
+    superAdminToken = loginAndGetAccessToken(
+      superAdminUser.getEmail(),
       DEFAULT_PASSWORD
     );
   }
@@ -112,7 +128,8 @@ class OrderControllerIT {
     mockMvc.perform(get("/orders/{id}", orderId)
         .header("Authorization", "Bearer " + userToken))
       .andExpect(status().isOk())
-      .andExpect(jsonPath("$.orderNumber").value(orderNumber));
+      .andExpect(jsonPath("$.orderNumber").value(orderNumber))
+      .andExpect(jsonPath("$.createdAt").value(endsWith("Z")));
   }
 
   @Test
@@ -338,6 +355,449 @@ class OrderControllerIT {
       .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
   }
 
+  @Test
+  void updateOrder_replacingItemsThenCancelling_doesNotMintStock() throws Exception {
+    Long productId = createProduct(
+      "Phantom Stock Product",
+      "SKU-" + UUID.randomUUID(),
+      new BigDecimal("10.00"),
+      10
+    );
+
+    OrderCreateRequest createRequest = OrderCreateRequest.builder()
+      .orderNumber("ORD-PHANTOM-" + UUID.randomUUID())
+      .customerId(adminUser.getId())
+      .status(OrderStatus.PENDING)
+      .items(List.of(OrderItemRequest.builder()
+        .productId(productId)
+        .quantity(2)
+        .unitPrice(new BigDecimal("10.00"))
+        .build()))
+      .build();
+
+    String createResponse = mockMvc.perform(post("/orders")
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(createRequest)))
+      .andExpect(status().isCreated())
+      .andReturn()
+      .getResponse()
+      .getContentAsString();
+
+    Long orderId = objectMapper.readTree(createResponse)
+      .get("id")
+      .asLong();
+
+    assertThat(getProductStock(productId))
+      .as("creating the order must take 2 units")
+      .isEqualTo(8);
+
+    // Same status, so transitionTo returns early - but the items are still replaced.
+    // The replacement must settle stock, or the order ends up holding 5 units that were
+    // never debited and the cancellation below credits all 5 back.
+    OrderUpdateRequest replaceItems = OrderUpdateRequest.builder()
+      .status(OrderStatus.PENDING)
+      .items(List.of(OrderItemRequest.builder()
+        .productId(productId)
+        .quantity(5)
+        .unitPrice(new BigDecimal("10.00"))
+        .build()))
+      .build();
+
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(replaceItems)))
+      .andExpect(status().isOk());
+
+    assertThat(getProductStock(productId))
+      .as("replacing 2 units with 5 must credit the 2 back and debit the 5")
+      .isEqualTo(5);
+
+    OrderUpdateRequest cancel = OrderUpdateRequest.builder()
+      .status(OrderStatus.CANCELLED)
+      .build();
+
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(cancel)))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+    assertThat(getProductStock(productId))
+      .as("a create-replace-cancel round trip must leave the catalogue exactly as it started")
+      .isEqualTo(10);
+  }
+
+  @Test
+  void updateOrder_replacingItemsOnADeliveredOrder_returns409AndLeavesTheOrderIntact() throws Exception {
+    Long productId = createProduct(
+      "Delivered Order Product",
+      "SKU-" + UUID.randomUUID(),
+      new BigDecimal("10.00"),
+      10
+    );
+
+    Long orderId = createDeliveredOrder(productId);
+
+    // The exact payload from the security audit: it used to wipe the lines and rewrite
+    // totalAmount to 0, with no history row.
+    OrderUpdateRequest wipeItems = OrderUpdateRequest.builder()
+      .status(OrderStatus.DELIVERED)
+      .items(List.of())
+      .build();
+
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(wipeItems)))
+      .andExpect(status().isConflict())
+      .andExpect(jsonPath("$.code").value("ORDER_NOT_EDITABLE"));
+
+    // A status-only assertion would not have caught the original defect. Re-read the order.
+    String body = mockMvc.perform(get("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + adminToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.items.length()").value(1))
+      .andReturn()
+      .getResponse()
+      .getContentAsString();
+
+    assertThat(new BigDecimal(objectMapper.readTree(body).get("totalAmount").asText()))
+      .as("the rejected request must not have touched the total")
+      .isEqualByComparingTo("20.00");
+
+    assertThat(getProductStock(productId))
+      .as("a delivered order's 2 units stay consumed")
+      .isEqualTo(8);
+  }
+
+  @Test
+  void updateOrder_statusOnlyOnADeliveredOrder_stillReturns200() throws Exception {
+    Long productId = createProduct(
+      "Delivered Status Product",
+      "SKU-" + UUID.randomUUID(),
+      new BigDecimal("10.00"),
+      10
+    );
+
+    Long orderId = createDeliveredOrder(productId);
+
+    // Proves the narrowing did not overreach: no items key, no rejection.
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(OrderUpdateRequest.builder()
+          .status(OrderStatus.DELIVERED)
+          .build())))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.status").value("DELIVERED"));
+  }
+
+  @Test
+  void createOrder_withTamperedUnitPrice_pricesTheOrderFromTheCatalogue() throws Exception {
+    Long productId = createProduct(
+      "Tamper Test Product",
+      "SKU-" + UUID.randomUUID(),
+      new BigDecimal("10.00"),
+      10
+    );
+
+    OrderCreateRequest request = OrderCreateRequest.builder()
+      .orderNumber("ORD-TAMPER-" + UUID.randomUUID())
+      .customerId(regularUser.getId())
+      .status(OrderStatus.PENDING)
+      .items(List.of(OrderItemRequest.builder()
+        .productId(productId)
+        .quantity(2)
+        .unitPrice(new BigDecimal("0.01"))
+        .build()))
+      .build();
+
+    mockMvc.perform(post("/orders")
+        .header("Authorization", "Bearer " + userToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isCreated())
+      .andExpect(jsonPath("$.items[0].unitPrice").value(10.00))
+      .andExpect(jsonPath("$.totalAmount").value(20.00));
+  }
+
+  @Test
+  void updateOrder_withTamperedUnitPrice_pricesTheOrderFromTheCatalogue() throws Exception {
+    Long productId = createProduct(
+      "Tamper Update Product",
+      "SKU-" + UUID.randomUUID(),
+      new BigDecimal("10.00"),
+      20
+    );
+
+    OrderCreateRequest createRequest = OrderCreateRequest.builder()
+      .orderNumber("ORD-TMPU-" + UUID.randomUUID())
+      .customerId(regularUser.getId())
+      .status(OrderStatus.PENDING)
+      .items(List.of(OrderItemRequest.builder()
+        .productId(productId)
+        .quantity(1)
+        .unitPrice(new BigDecimal("10.00"))
+        .build()))
+      .build();
+
+    String createResponse = mockMvc.perform(post("/orders")
+        .header("Authorization", "Bearer " + userToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(createRequest)))
+      .andExpect(status().isCreated())
+      .andReturn()
+      .getResponse()
+      .getContentAsString();
+
+    Long orderId = objectMapper.readTree(createResponse)
+      .get("id")
+      .asLong();
+
+    OrderUpdateRequest updateRequest = OrderUpdateRequest.builder()
+      .status(OrderStatus.PENDING)
+      .items(List.of(OrderItemRequest.builder()
+        .productId(productId)
+        .quantity(3)
+        .unitPrice(new BigDecimal("0.01"))
+        .build()))
+      .build();
+
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + userToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(updateRequest)))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.items[0].unitPrice").value(10.00))
+      .andExpect(jsonPath("$.totalAmount").value(30.00));
+  }
+
+  // ---- Frozen permission matrix ----
+  // These characterize the /orders permissions as they are enforced today, so the
+  // authorization refactor can be verified to change none of them. If one of these
+  // turns red during the refactor, the refactor is wrong - not the test.
+
+  @Test
+  void createOrder_asRegularUser_returns201() throws Exception {
+    OrderCreateRequest request = orderCreateRequestFor(
+      "ORD-FRZ-CRT-" + UUID.randomUUID(),
+      regularUser.getId()
+    );
+
+    mockMvc.perform(post("/orders")
+        .header("Authorization", "Bearer " + userToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isCreated());
+  }
+
+  @Test
+  void createOrder_asSuperAdmin_returns201() throws Exception {
+    OrderCreateRequest request = orderCreateRequestFor(
+      "ORD-FRZ-SAC-" + UUID.randomUUID(),
+      superAdminUser.getId()
+    );
+
+    mockMvc.perform(post("/orders")
+        .header("Authorization", "Bearer " + superAdminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isCreated());
+  }
+
+  @Test
+  void getOrderById_asSuperAdmin_onAnotherUsersOrder_returns200() throws Exception {
+    Long orderId = createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-SAG-" + UUID.randomUUID()
+    );
+
+    mockMvc.perform(get("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + superAdminToken))
+      .andExpect(status().isOk());
+  }
+
+  @Test
+  void updateOrder_asNonOwner_returns403() throws Exception {
+    Long orderId = createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-UPD-" + UUID.randomUUID()
+    );
+
+    OrderUpdateRequest request = OrderUpdateRequest.builder()
+      .status(OrderStatus.PROCESSING)
+      .build();
+
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + otherToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void deleteOrder_asOwner_returns403() throws Exception {
+    Long orderId = createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-DLO-" + UUID.randomUUID()
+    );
+
+    mockMvc.perform(delete("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + userToken))
+      .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void deleteOrder_asAdmin_returns204() throws Exception {
+    Long orderId = createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-DLA-" + UUID.randomUUID()
+    );
+
+    mockMvc.perform(delete("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + adminToken))
+      .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void getAllOrders_asRegularUser_seesOnlyOwnOrders() throws Exception {
+    createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-MINE-" + UUID.randomUUID()
+    );
+    createOrderAsUser(
+      otherToken,
+      otherUser.getId(),
+      "ORD-FRZ-THRS-" + UUID.randomUUID()
+    );
+
+    mockMvc.perform(get("/orders")
+        .param("size", "100")
+        .param("sort", "id,desc")
+        .header("Authorization", "Bearer " + userToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.items[?(@.customerId == " + regularUser.getId() + ")]")
+        .isNotEmpty())
+      .andExpect(jsonPath("$.items[?(@.customerId != " + regularUser.getId() + ")]")
+        .isEmpty());
+  }
+
+  @Test
+  void getAllOrders_asSuperAdmin_seesOrdersFromEveryCustomer() throws Exception {
+    createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-SAA-" + UUID.randomUUID()
+    );
+    createOrderAsUser(
+      otherToken,
+      otherUser.getId(),
+      "ORD-FRZ-SAB-" + UUID.randomUUID()
+    );
+
+    mockMvc.perform(get("/orders")
+        .param("size", "100")
+        .param("sort", "id,desc")
+        .header("Authorization", "Bearer " + superAdminToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.items[?(@.customerId == " + regularUser.getId() + ")]")
+        .isNotEmpty())
+      .andExpect(jsonPath("$.items[?(@.customerId == " + otherUser.getId() + ")]")
+        .isNotEmpty());
+  }
+
+  @Test
+  void updateOrder_asSuperAdmin_onAnotherUsersOrder_returns200() throws Exception {
+    Long orderId = createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-SAU-" + UUID.randomUUID()
+    );
+
+    OrderUpdateRequest request = OrderUpdateRequest.builder()
+      .status(OrderStatus.PROCESSING)
+      .build();
+
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + superAdminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(request)))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.status").value("PROCESSING"));
+  }
+
+  @Test
+  void deleteOrder_asSuperAdmin_returns204() throws Exception {
+    Long orderId = createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-SAD-" + UUID.randomUUID()
+    );
+
+    mockMvc.perform(delete("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + superAdminToken))
+      .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void searchOrders_asRegularUser_cannotQueryAnotherCustomersOrders() throws Exception {
+    createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-SRO-" + UUID.randomUUID()
+    );
+    createOrderAsUser(
+      otherToken,
+      otherUser.getId(),
+      "ORD-FRZ-SRT-" + UUID.randomUUID()
+    );
+
+    // The client asks for another customer's orders; the service must force-filter
+    // the criteria back to the caller rather than honouring the parameter.
+    mockMvc.perform(get("/orders/search")
+        .param("customerId", String.valueOf(otherUser.getId()))
+        .param("size", "100")
+        .param("sort", "id,desc")
+        .header("Authorization", "Bearer " + userToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.items[?(@.customerId == " + regularUser.getId() + ")]")
+        .isNotEmpty())
+      .andExpect(jsonPath("$.items[?(@.customerId != " + regularUser.getId() + ")]")
+        .isEmpty());
+  }
+
+  @Test
+  void searchOrders_asSuperAdmin_seesOrdersFromEveryCustomer() throws Exception {
+    createOrderAsUser(
+      userToken,
+      regularUser.getId(),
+      "ORD-FRZ-SSA-" + UUID.randomUUID()
+    );
+    createOrderAsUser(
+      otherToken,
+      otherUser.getId(),
+      "ORD-FRZ-SSB-" + UUID.randomUUID()
+    );
+
+    mockMvc.perform(get("/orders/search")
+        .param("size", "100")
+        .param("sort", "id,desc")
+        .header("Authorization", "Bearer " + superAdminToken))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.items[?(@.customerId == " + regularUser.getId() + ")]")
+        .isNotEmpty())
+      .andExpect(jsonPath("$.items[?(@.customerId == " + otherUser.getId() + ")]")
+        .isNotEmpty());
+  }
+
   private User createTestUser(
     String roleName,
     String firstName,
@@ -378,10 +838,9 @@ class OrderControllerIT {
       .asText();
   }
 
-  private Long createOrderAsUser(
-    String token,
-    Long customerId,
-    String orderNumber
+  private OrderCreateRequest orderCreateRequestFor(
+    String orderNumber,
+    Long customerId
   ) throws Exception {
     Long productId = createProduct(
       "Generic Product",
@@ -396,12 +855,20 @@ class OrderControllerIT {
       .unitPrice(new BigDecimal("10.00"))
       .build();
 
-    OrderCreateRequest request = OrderCreateRequest.builder()
+    return OrderCreateRequest.builder()
       .orderNumber(orderNumber)
       .customerId(customerId)
       .status(OrderStatus.PENDING)
       .items(List.of(item))
       .build();
+  }
+
+  private Long createOrderAsUser(
+    String token,
+    Long customerId,
+    String orderNumber
+  ) throws Exception {
+    OrderCreateRequest request = orderCreateRequestFor(orderNumber, customerId);
 
     String response = mockMvc.perform(post("/orders")
         .header("Authorization", "Bearer " + token)
@@ -415,6 +882,49 @@ class OrderControllerIT {
     return objectMapper.readTree(response)
       .get("id")
       .asLong();
+  }
+
+  // Two units at 10.00, walked through every legal transition to DELIVERED.
+  private Long createDeliveredOrder(Long productId) throws Exception {
+    OrderCreateRequest createRequest = OrderCreateRequest.builder()
+      .orderNumber("ORD-DELIVERED-" + UUID.randomUUID())
+      .customerId(adminUser.getId())
+      .status(OrderStatus.PENDING)
+      .items(List.of(OrderItemRequest.builder()
+        .productId(productId)
+        .quantity(2)
+        .unitPrice(new BigDecimal("10.00"))
+        .build()))
+      .build();
+
+    String response = mockMvc.perform(post("/orders")
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(createRequest)))
+      .andExpect(status().isCreated())
+      .andReturn()
+      .getResponse()
+      .getContentAsString();
+
+    Long orderId = objectMapper.readTree(response)
+      .get("id")
+      .asLong();
+
+    moveTo(orderId, OrderStatus.PROCESSING);
+    moveTo(orderId, OrderStatus.SHIPPED);
+    moveTo(orderId, OrderStatus.DELIVERED);
+
+    return orderId;
+  }
+
+  private void moveTo(Long orderId, OrderStatus target) throws Exception {
+    mockMvc.perform(put("/orders/{id}", orderId)
+        .header("Authorization", "Bearer " + adminToken)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(OrderUpdateRequest.builder()
+          .status(target)
+          .build())))
+      .andExpect(status().isOk());
   }
 
   private Long createProduct(

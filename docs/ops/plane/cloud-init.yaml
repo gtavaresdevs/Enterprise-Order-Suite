@@ -1,0 +1,173 @@
+#cloud-config
+# cloud-init.yaml: first-boot setup of the Oracle Ampere A1 instance "plane" (Enterprise Order Suite,
+# docs/ops/plane-setup.md). Ubuntu 24.04 aarch64, VM.Standard.A1.Flex, 2 OCPU / 12 GB.
+#
+# Where it goes: Oracle console > Compute > Instances > Create instance > 1. Basic information >
+# Advanced options > Management > Initialization script: upload this file (browse to it, or drag it
+# into the box). Oracle passes it to cloud-init as user data; the first line "#cloud-config" tells
+# cloud-init what it is. Oracle's limit for user data is 32,000 bytes; this file is about 9,000.
+#
+# What happens on the first boot (about 15-30 minutes), as root, with no questions:
+#   1. Downloads the helper scripts from the repo into /home/ubuntu/plane-ops/:
+#      bootstrap-host.sh, install-plane.sh, plane-url.sh, backup.sh, verify-backup.sh.
+#   2. bootstrap-host.sh: OS updates, automatic security updates, 4 GB swap, Docker with the
+#      Compose plugin, container log cap, docker group for "ubuntu", /opt/plane-selfhost,
+#      timezone America/Sao_Paulo.
+#   3. Installs Tailscale but does NOT log in: there is no auth key in this file. You log in once
+#      over SSH with "sudo tailscale up --hostname=plane".
+#   4. install-plane.sh: installs Plane Community Edition v1.4.2 (the tested release) in
+#      /opt/plane-selfhost with fresh random passwords made on the instance, and starts it on
+#      http://localhost (port 80). Upgrade later with ./setup.sh upgrade (runbook, maintenance).
+# It never reboots the instance: Oracle's docs say an initialization script must not trigger a
+# reboot. When updates need one, the log says so at the end; then run "sudo reboot" yourself.
+#
+# Follow it after SSH login:   sudo tail -f /var/log/plane-bootstrap.log
+# Finished:                    /var/lib/plane-bootstrap.done exists (it holds the finish time)
+# Failed:                      /var/lib/plane-bootstrap.failed exists (it names the failed step);
+#                              fix the cause, then re-run: sudo /usr/local/sbin/plane-firstboot.sh
+# Neither file yet:            still running (or cloud-init itself failed: cloud-init status --long)
+#
+# Contains no secrets: no passwords, keys, tokens, IP addresses or host names. Plane's passwords are
+# generated on the instance and stay in /opt/plane-selfhost/plane-app/plane.env (owner-only).
+#
+# Network: keep the VCN security list as Oracle creates it (inbound SSH only) and add no ingress
+# rules. That list is what keeps Plane's port 80 off the internet: Docker publishes container ports
+# past the host firewall rules (/etc/iptables/rules.v4, which Oracle's images ship allowing only
+# SSH). Nothing here needs an open port: Tailscale only makes outbound connections, and Plane is
+# reached through Tailscale (serve or funnel) or an SSH port forward.
+
+write_files:
+  # Unattended apt during first boot: wait for the apt lock (Ubuntu's own update timers can hold it
+  # right after boot) instead of failing, and keep existing config files when a package update
+  # ships a new version of one. The file stays afterwards; both settings are harmless later.
+  - path: /etc/apt/apt.conf.d/90plane-firstboot
+    owner: root:root
+    permissions: '0644'
+    content: |
+      // Written by cloud-init for the Plane instance (docs/ops/plane-setup.md).
+      DPkg::Lock::Timeout "900";
+      Dpkg::Options { "--force-confdef"; "--force-confold"; };
+
+  # The first-boot runner. Kept as a script so it can be re-run by hand after a failure.
+  - path: /usr/local/sbin/plane-firstboot.sh
+    owner: root:root
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      # plane-firstboot.sh: first-boot setup of the Plane instance, written by cloud-init.
+      # Runs once from cloud-init; safe to re-run by hand after a failure:
+      #     sudo /usr/local/sbin/plane-firstboot.sh
+      # Every step is idempotent. Contains no secrets.
+      set -euo pipefail
+
+      # Where the helper scripts come from (the repo's working branch) and where they go.
+      BASE_URL="${PLANE_OPS_BASE_URL:-https://raw.githubusercontent.com/gtavaresdevs/Enterprise-Order-Suite/feature/ai-agent/docs/ops/plane}"
+      OPS_USER="${PLANE_OPS_USER:-ubuntu}"
+      OPS_DIR="${PLANE_OPS_DIR:-/home/$OPS_USER/plane-ops}"
+      FILES="bootstrap-host.sh install-plane.sh plane-url.sh backup.sh verify-backup.sh"
+      TZ_NAME="${TZ_NAME:-America/Sao_Paulo}"
+      # The Plane release the runbook was tested with. "latest" could be a release nobody tested.
+      PLANE_RELEASE="${PLANE_RELEASE:-v1.4.2}"
+      LOG="${PLANE_BOOTSTRAP_LOG:-/var/log/plane-bootstrap.log}"
+      DONE_MARKER="${PLANE_BOOTSTRAP_DONE:-/var/lib/plane-bootstrap.done}"
+      FAILED_MARKER="${PLANE_BOOTSTRAP_FAILED:-/var/lib/plane-bootstrap.failed}"
+      LOCK_FILE=/run/lock/plane-firstboot.lock
+
+      # cloud-init starts this with a minimal environment.
+      export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      export HOME="${HOME:-/root}" TERM=dumb
+      export DEBIAN_FRONTEND=noninteractive NEEDRESTART_SUSPEND=1
+
+      if [ "$(id -u)" -ne 0 ]; then
+        echo "Run as root: sudo /usr/local/sbin/plane-firstboot.sh" >&2
+        exit 1
+      fi
+
+      # One run at a time: a re-run by hand must not overlap the first-boot run still in progress.
+      mkdir -p "$(dirname "$LOCK_FILE")"
+      exec 8>"$LOCK_FILE"
+      if ! flock -n 8; then
+        echo "plane-firstboot.sh is already running (see: sudo tail -f $LOG). Not starting again." >&2
+        exit 1
+      fi
+
+      # Everything below goes to the log file and to cloud-init's own output log.
+      touch "$LOG"
+      chmod 640 "$LOG"
+      exec > >(tee -a "$LOG") 2>&1
+
+      if [ -e "$DONE_MARKER" ]; then
+        echo "Plane first-boot setup already finished ($(cat "$DONE_MARKER")). Nothing to do."
+        exit 0
+      fi
+      rm -f "$FAILED_MARKER"
+
+      step="start"
+      on_exit() {
+        local rc=$?
+        if [ "$rc" -ne 0 ]; then
+          printf 'step=%s\nexit=%s\ntime=%s\nlog=%s\n' "$step" "$rc" "$(date -Is)" "$LOG" > "$FAILED_MARKER"
+          echo "PLANE FIRST BOOT FAILED at step '$step' (exit $rc). Marker: $FAILED_MARKER"
+          echo "Fix the cause shown above, then re-run: sudo /usr/local/sbin/plane-firstboot.sh"
+        fi
+      }
+      trap on_exit EXIT
+      say() { printf '\n######## %s  %s\n' "$(date -Is)" "$*"; }
+
+      say "Plane first-boot setup started"
+
+      step="download helper scripts"
+      say "1/4 $step from $BASE_URL"
+      install -d -o "$OPS_USER" -g "$OPS_USER" -m 755 "$OPS_DIR"
+      for f in $FILES; do
+        curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o "$OPS_DIR/$f.download" "$BASE_URL/$f"
+        # A real script starts with "#!"; anything else (an error page, an empty file) stops here.
+        first_line=""
+        IFS= read -r first_line < "$OPS_DIR/$f.download" || true
+        case "$first_line" in
+          '#!'*) ;;
+          *) rm -f "$OPS_DIR/$f.download"; echo "$f from $BASE_URL is not a script"; exit 1 ;;
+        esac
+        chmod 755 "$OPS_DIR/$f.download"
+        chown "$OPS_USER:$OPS_USER" "$OPS_DIR/$f.download"
+        mv -f "$OPS_DIR/$f.download" "$OPS_DIR/$f"
+        echo "  $f"
+      done
+
+      step="bootstrap-host.sh"
+      say "2/4 $step (updates, swap, Docker, timezone $TZ_NAME)"
+      TZ_NAME="$TZ_NAME" TARGET_USER="$OPS_USER" "$OPS_DIR/bootstrap-host.sh"
+
+      step="install Tailscale"
+      say "3/4 $step (no login)"
+      if command -v tailscale >/dev/null 2>&1; then
+        echo "Tailscale already installed: $(tailscale version | head -n 1)"
+      else
+        curl -fsSL --retry 5 --retry-delay 10 https://tailscale.com/install.sh | sh
+      fi
+      systemctl enable --now tailscaled
+
+      step="install-plane.sh"
+      say "4/4 $step (Plane Community Edition $PLANE_RELEASE on http://localhost)"
+      PLANE_RELEASE="$PLANE_RELEASE" "$OPS_DIR/install-plane.sh"
+
+      step="finish"
+      say "Plane first-boot setup finished."
+      if [ -f /var/run/reboot-required ]; then
+        echo "Updates need a reboot. After the steps below, or now: sudo reboot (Plane starts again by itself)."
+      fi
+      cat <<'EOF'
+      Next (docs/ops/plane-setup.md), in this order:
+        1. sudo cat /opt/plane-selfhost/plane-app/plane.env   -> copy it into your password manager
+        2. From your PC: ssh -L 8080:127.0.0.1:80 ubuntu@<public IP>, open
+           http://localhost:8080/god-mode/ and claim the instance admin; then in God mode
+           turn off "Allow anyone to sign up even without an invite".
+        3. Only then: sudo tailscale up --hostname=plane, sudo ~/plane-ops/plane-url.sh <name>,
+           sudo tailscale funnel --bg 80.
+      EOF
+      # Written last, so it exists only when every step above succeeded.
+      date -Is > "$DONE_MARKER"
+      echo "Marker: $DONE_MARKER"
+
+runcmd:
+  - [/usr/local/sbin/plane-firstboot.sh]

@@ -1,5 +1,7 @@
 # Enterprise Order Suite
 
+> **Note (2026-10-01):** this README describes the earlier B2B order suite. The product is now a multi-tenant restaurant operations SaaS; see [`docs/README.md`](docs/README.md) on the `feature/ai-agent` branch.
+
 ### Production-oriented B2B Order Management Backend built with Java 17 and Spring Boot 3
 
 **Enterprise Order Suite (EOS)** is a backend system for managing B2B purchasing workflows between companies. It demonstrates production-oriented Java backend engineering across **REST API design, Spring Boot, Spring Security, JWT authentication, hierarchical RBAC, PostgreSQL, JPA, Flyway, object storage, Docker, and automated integration testing with Testcontainers**.

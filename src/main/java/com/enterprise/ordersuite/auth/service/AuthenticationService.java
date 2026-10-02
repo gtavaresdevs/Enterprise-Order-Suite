@@ -2,8 +2,6 @@ package com.enterprise.ordersuite.auth.service;
 
 import com.enterprise.ordersuite.auth.dtos.AuthRequest;
 import com.enterprise.ordersuite.auth.dtos.AuthResponse;
-import com.enterprise.ordersuite.auth.dtos.LogoutRequest;
-import com.enterprise.ordersuite.auth.dtos.RefreshRequest;
 import com.enterprise.ordersuite.auth.dtos.RegisterRequest;
 import com.enterprise.ordersuite.auth.domain.RefreshToken;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidCredentialsException;
@@ -84,35 +82,47 @@ public class AuthenticationService {
     return new AuthResponse(accessToken, issuedRefresh.rawToken());
   }
 
-  public AuthResponse refresh(RefreshRequest request) {
-    RefreshToken existing = refreshTokenService.getActiveTokenOrNull(request.refreshToken());
+  // noRollbackFor: the reuse branch revokes the family and then answers 401. If the
+  // exception rolled that back, reuse detection would silently do nothing.
+  @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
+  public AuthResponse refresh(String rawRefreshToken) {
+    RefreshToken existing = refreshTokenService.findForRotationOrNull(rawRefreshToken);
     if (existing == null) {
+      throw new InvalidRefreshTokenException();
+    }
+
+    // D16/D17: a used or revoked token presented again is reuse - kill the whole family.
+    if (existing.isUsed() || existing.isRevoked()) {
+      refreshTokenService.revokeFamily(existing);
+      throw new InvalidRefreshTokenException();
+    }
+
+    if (refreshTokenService.isExpired(existing)) {
       throw new InvalidRefreshTokenException();
     }
 
     User user = existing.getUser();
 
     if (!Boolean.TRUE.equals(user.getActive())) {
-      refreshTokenService.revoke(existing);
+      refreshTokenService.revokeFamily(existing);
       throw new InvalidRefreshTokenException();
     }
 
-    refreshTokenService.markUsed(existing);
+    var rotated = refreshTokenService.rotate(existing);
 
-    String newAccessToken = jwtService.generateToken(user);
-    var newRefresh = refreshTokenService.issueFor(user);
-
-    return new AuthResponse(newAccessToken, newRefresh.rawToken());
+    return new AuthResponse(jwtService.generateToken(user), rotated.rawToken());
   }
 
-  public void logout(LogoutRequest request) {
-    String hash = refreshTokenService.hash(request.refreshToken());
-    RefreshToken token = refreshTokenService.findByHashOrNull(hash);
+  @Transactional
+  public void logout(String rawRefreshToken) {
+    // Locked lookup: serializes with a concurrent rotation of this token, so revokeFamily
+    // below also revokes the successor that rotation inserted.
+    RefreshToken token = refreshTokenService.findForRotationOrNull(rawRefreshToken);
 
     if (token == null) {
       return;
     }
 
-    refreshTokenService.revoke(token);
+    refreshTokenService.revokeFamily(token);
   }
 }

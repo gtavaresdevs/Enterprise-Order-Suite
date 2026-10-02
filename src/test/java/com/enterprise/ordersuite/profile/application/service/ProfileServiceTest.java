@@ -431,13 +431,23 @@ class ProfileServiceTest {
     verify(avatarImageProcessor)
       .convertToWebp(file);
 
+    ArgumentCaptor<String> uploadedKeyCaptor =
+      ArgumentCaptor.forClass(String.class);
+
     verify(objectStorageService)
       .upload(
-        eq(avatarKey),
+        uploadedKeyCaptor.capture(),
         any(ByteArrayInputStream.class),
         eq((long) webpImage.length),
         eq("image/webp")
       );
+
+    // The key is a fresh UUID by design, so only its shape is assertable. What matters
+    // is asserted above: the profile stores the key upload() returned, not this one.
+    assertThat(uploadedKeyCaptor.getValue())
+      .as("avatar objects go to an unguessable key under the avatars/ prefix")
+      .startsWith("avatars/")
+      .endsWith(".webp");
 
     verify(userProfileRepository)
       .save(profile);
@@ -525,13 +535,24 @@ class ProfileServiceTest {
     verify(objectStorageService)
       .delete(oldAvatarKey);
 
+    ArgumentCaptor<String> uploadedKeyCaptor =
+      ArgumentCaptor.forClass(String.class);
+
     verify(objectStorageService)
       .upload(
-        eq(newAvatarKey),
+        uploadedKeyCaptor.capture(),
         any(ByteArrayInputStream.class),
         eq((long) webpImage.length),
         eq("image/webp")
       );
+
+    // A replacement gets a fresh random key, so only its shape is assertable - and it
+    // must not reuse the old one, which is about to be deleted.
+    assertThat(uploadedKeyCaptor.getValue())
+      .as("the replacement avatar goes to a new key, never the one being deleted")
+      .startsWith("avatars/")
+      .endsWith(".webp")
+      .isNotEqualTo(oldAvatarKey);
 
     verify(userProfileRepository)
       .save(profile);

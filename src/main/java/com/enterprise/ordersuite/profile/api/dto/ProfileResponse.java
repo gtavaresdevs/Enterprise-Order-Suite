@@ -1,6 +1,6 @@
 package com.enterprise.ordersuite.profile.api.dto;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record ProfileResponse(
   Long id,
@@ -15,7 +15,7 @@ public record ProfileResponse(
   String office,
   String bio,
   String avatarUrl,
-  LocalDateTime createdAt,
-  LocalDateTime updatedAt
+  Instant createdAt,
+  Instant updatedAt
 ) {
 }

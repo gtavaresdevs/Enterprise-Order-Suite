@@ -9,7 +9,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,44 +32,20 @@ class RefreshTokenCleanupServiceTest {
   }
 
   @Test
-  void cleanupNow_ShouldTriggerDeletions_WithCorrectCalculatedTimestamps() {
-    // Arrange
+  void cleanupNow_deletesOnlyExpiredTokens() {
     when(repo.deleteExpired(any())).thenReturn(3);
-    when(repo.deleteUsedOrRevokedBefore(any())).thenReturn(5);
 
-    // Act
     var result = service.cleanupNow();
 
-    // Assert
     assertThat(result.expiredDeleted()).isEqualTo(3);
-    assertThat(result.usedRevokedDeleted()).isEqualTo(5);
-
-    // Verify exact dates were calculated and passed to the repository.
-    // We use explicit expected values rather than recalculating `LocalDateTime.now(clock)`
-    // in the test, ensuring the math in the service is actually verified.
-    LocalDateTime expectedNow = LocalDateTime.of(2026, 1, 29, 12, 0, 0);
-    LocalDateTime expectedCutoff = LocalDateTime.of(2026, 1, 22, 12, 0, 0); // 7 days prior
-
-    verify(repo).deleteExpired(expectedNow);
-    verify(repo).deleteUsedOrRevokedBefore(expectedCutoff);
+    verify(repo).deleteExpired(Instant.parse("2026-01-29T12:00:00Z"));
     verifyNoMoreInteractions(repo);
   }
 
   @Test
-  void cleanupNow_WhenNoTokensMatch_ShouldReturnZeroCounts() {
-    // Arrange
+  void cleanupNow_whenNothingExpired_returnsZero() {
     when(repo.deleteExpired(any())).thenReturn(0);
-    when(repo.deleteUsedOrRevokedBefore(any())).thenReturn(0);
 
-    // Act
-    var result = service.cleanupNow();
-
-    // Assert
-    assertThat(result.expiredDeleted()).isZero();
-    assertThat(result.usedRevokedDeleted()).isZero();
-
-    verify(repo).deleteExpired(any());
-    verify(repo).deleteUsedOrRevokedBefore(any());
-    verifyNoMoreInteractions(repo);
+    assertThat(service.cleanupNow().expiredDeleted()).isZero();
   }
 }
