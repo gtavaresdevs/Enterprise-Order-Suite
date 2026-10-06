@@ -33,7 +33,7 @@
 - Never: turn order status changes, or the in-process events of ADR-0019, into outbound messages this run.
 - Never: build automatic WhatsApp on the backend `NotificationService` stub.
 - Must: keep `wa.me` links working when the WhatsApp number moves from `localStorage` into backend restaurant settings (ADR-0001, ADR-0014).
-- Must: take the storefront payment step without a PSP, per ADR-0005: pay on delivery or pickup (Q-65 a), plus the PIX prepayment of ADR-0020 (Accepted 2026-10-06).
+- Must: take the storefront payment step without a PSP, per ADR-0005: pay on delivery (Q-65 a; pickup only with PIX prepayment, Q-86 a), plus the PIX prepayment of ADR-0020 (Accepted 2026-10-06).
 - The roadmap's two "Blocked" rows are marked Out, with this ADR as the reason (superseded-docs list, S2 banners).
 
 ## Open questions

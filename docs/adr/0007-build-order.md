@@ -28,12 +28,12 @@
 | S3 | Readiness tooling (done 2026-10-01): version frontend `.claude/`, port/remove the PowerShell hook, `permissions.deny` git rules, SessionStart setup, frontend lint baseline, Vitest, CI running today's checks in both repos. | Claude (+ Gabriel for S1 push) | S2 |
 | S4 | Cross-cutting design: API conventions doc, finalize the Edge-ready constraints (ADR-0003), then **Tenancy & Identity** contract with Gabriel's question batch. | Claude + Gabriel | S2 |
 | S5 | Scope of this run (short PRD) + NFR page + audit backlog triage. Must be Reviewed before Build 1 (Q-08 b). | Claude + Gabriel | S4 |
-| Board | Project board setup (Q-83 b), following the runbook `docs/ops/github-projects-setup.md` (Draft). GitHub Projects since 2026-10-06 (ADR-0021): one project, an "In review" Status, the auto-add workflow and the labels. Docs and readiness work do not wait for it. | Gabriel (+ Claude: runbook) | nothing |
+| Board | Project board setup (Q-83 b), following the runbook `docs/ops/github-projects-setup.md` (Reviewed 2026-10-06; board set up 2026-10-06). GitHub Projects since 2026-10-06 (ADR-0021): one project, an "In review" Status, the auto-add workflow and the labels. Docs and readiness work do not wait for it. | Gabriel (+ Claude: runbook) | nothing |
 | **Build 1** | Tenant foundation (acceptance includes: ArchUnit tenant rule, cross-tenant tests, contract drift test, seed data, tenant id in logs). | Claude | Gate §7, including S5 Reviewed (Q-08 b) and the board setup (Q-83 b) |
 | Build 2–4 | Menu → Order Core → Storefront ↔ Order Core. Each contract is reviewed before its step. Small existing-feature fixes from the audit ride alongside; so do Phase 11's small polish items, with Build 3-4 (Q-82 a). | Claude | their contract |
 
 3. **Readiness gate before Build 1** (MASTER-PLAN §7, L97-107):
-   - ADRs and the amended architecture are Accepted by Gabriel (ADR-0000..ADR-0019; an ADR added later, such as ADR-0020, gates the build step that depends on it, here Build 4, not Build 1; Claude's reading, 2026-10-01, Gabriel may override).
+   - ADRs and the amended architecture are Accepted by Gabriel (ADR-0000..ADR-0019; an ADR added later, such as ADR-0020, gates the build step that depends on it, here Build 3 (its point 8) and Build 4, not Build 1; Claude's reading, 2026-10-01, Gabriel may override).
    - Docs live in one agreed place with a "where to look" map; legacy docs carry superseded banners.
    - Both `CLAUDE.md` files match the current decisions.
    - Frontend `.claude/` is in git; no Windows-only hooks; git rules enforced by `permissions.deny`.
@@ -65,7 +65,7 @@
 - Q-53: answered 2026-10-01, a: a minimal Table (id, name) enters Order Core, so staff dine-in orders are part of Build 3; QR self-ordering stays Later.
 - Q-81: answered 2026-10-01, a: Phase 10 comandas are Later, with QR/table and waiter. Q-82: answered 2026-10-01, a: Phase 11's small polish items ride alongside Build 3-4.
 - Q-08: answered 2026-10-01, b: S5 must be Reviewed before Build 1; S5 joins the gate (Decision 3). This resolves the earlier reviewer note that §6 placed S5 before Build 1 while §7 did not require it.
-- Q-83: answered 2026-10-01, b: the board setup comes first, before Build 1 (Decision 3). On 2026-10-06 Gabriel chose GitHub Projects instead of Plane (ADR-0021), so HTTPS exposure and off-box backups are moot; the `Refs #<n>` convention stays pending as an answer, with Claude's default in the runbook.
+- Q-83: answered 2026-10-01, b: the board setup comes first, before Build 1 (Decision 3). On 2026-10-06 Gabriel chose GitHub Projects instead of Plane (ADR-0021), so HTTPS exposure and off-box backups are moot; the `Refs #<n>` convention, Claude's default in the runbook, was confirmed by Gabriel with the runbook on 2026-10-06 (18:12Z).
 
 ## Sources
 Legend: PF = `/mnt/project-files/`.

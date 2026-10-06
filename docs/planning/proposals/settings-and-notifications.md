@@ -1,8 +1,8 @@
 # Settings and notifications: proposal for this run (Q-24)
 
 - Status: Reviewed
-- Updated: 2026-10-06 (Reviewed; open questions answered; Q-30, Q-86 and ADR-0020 settled)
-- Reviewed: Reviewed by Gabriel on 2026-10-06 (Gabriel, project thread, 2026-10-06T18:12Z: "4 - confirmed", "confirms all points as per recommended by claude", answering item 4 of Claude's 15:20Z list, which asked him to read and mark Reviewed ADR-0020, this proposal and the board runbook)
+- Updated: 2026-10-06 (E3 and the KDS scenario aligned with Gabriel's kitchen rule, ADR-0020 points 4 and 8; the Reviewed line and open questions say they rest on Claude's reading of his reply). Earlier the same day: Reviewed; open questions answered; Q-30, Q-86 and ADR-0020 settled
+- Reviewed: Reviewed by Gabriel on 2026-10-06 (Gabriel, project thread, 2026-10-06T18:12Z: "4 - confirmed", "confirms all points as per recommended by claude", answering item 4 of Claude's 15:20Z list, which asked him to read and mark Reviewed ADR-0020, this proposal and the board runbook). Claude's reading: this reply to item 4 stands in for the "Reviewed: <doc>" message of Q-09 a (ADR-0016); he did not post that exact form.
 - Roadmap step: S5 (feeds the scope-of-run page); the items land in Build 1-4 (`docs/roadmap.md`)
 - Related: ADR-0001, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0014, ADR-0019, ADR-0020 (Accepted 2026-10-06); register Q-16, Q-17, Q-18, Q-19, Q-21, Q-22, Q-24, Q-25, Q-26, Q-27, Q-28, Q-29, Q-30, Q-31, Q-42, Q-44, Q-52, Q-54, Q-57, Q-58, Q-61, Q-64, Q-66, Q-67, Q-81, Q-86
 
@@ -140,7 +140,7 @@ These preferences stay in browser storage: they belong to the user or device (Q-
 |---|---|---|---|---|---|
 | E1 | Restaurant feed. An after-commit listener on order events writes one entry per event: new order (number, channel, source, total, plus an "unpaid PIX" tag, ADR-0020) and order cancelled (number, who cancelled). Entries hold no customer name, phone or address. Proposed retention: 30 days. | 3 | OC | An order created in R1 shows in R1's feed only; a rolled-back create writes no entry. | Claude (Q-24 delegation): the 30-day retention and the entry fields; Q-57 a, Q-64 a; ADR-0019; Q-52 a (data minimization) |
 | E2 | The bell and `/notifications` show the feed, newest first; tapping an entry opens the order. The unread dot counts entries newer than this device's last view, kept in device storage. The feed is polled. It replaces F7 and F8. | 3 | OC | No B2B text remains; entries appear without a page reload. | Q-57 a (per-user read state waits), Q-61 a; business rule 90 |
-| E3 | New-order alert on the Orders and KDS screens: when polling returns a NEW order not seen before, play a short sound and highlight the card. Browsers block sound until the page is touched once, so the screen shows an "Ativar som" button until then. Frontend only; the Orders screen gains the KDS polling. | 3 | OC (the order list must make new orders detectable) | With the sound on, a new storefront order is heard within one polling interval. The KDS runs under a staff login. | Claude (Q-24 delegation); F21; constraints: polling (Q-61 a), KDS staff login (Q-54 a) |
+| E3 | New-order alert on the Orders and KDS screens: on the Orders screen, when polling returns a NEW order not seen before (including one in "PIX a confirmar"); on the KDS, when an accepted order first appears, because unaccepted orders never reach the KDS (Gabriel's kitchen rule, ADR-0020 points 4 and 8). Play a short sound and highlight the card. Browsers block sound until the page is touched once, so the screen shows an "Ativar som" button until then. Frontend only; the Orders screen gains the KDS polling. | 3 | OC (the order list must make new orders detectable) | With the sound on, a new storefront order is heard on the Orders screen within one polling interval, and on the KDS within one polling interval of its acceptance. The KDS runs under a staff login. | Claude (Q-24 delegation); F21; constraints: polling (Q-61 a), KDS staff login (Q-54 a) |
 | E4 | A "customer says PIX paid" entry from the "Já paguei" tap (ADR-0020; open question 1: yes, 2026-10-06). It is information, not payment state. | 4 | SF | The entry never changes `paymentStatus`. | ADR-0020 point 3, Must |
 | E5 | No outbound messages: order events never send email, WhatsApp or push. Transactional auth emails (invite, reset) stay. | all | OC | No email or messaging call in any order-event listener. | ADR-0006 Consequences; ADR-0019 |
 
@@ -177,12 +177,12 @@ Verdicts for today's mock controls and for nearby ideas. Verdicts are Claude's, 
 ## Acceptance scenario
 Given restaurant R1 with owner Ana, manager Bruno and staff Carla, and restaurant R2 with its own owner.
 - When Ana adds the bairro "Centro" with a fee in Restaurant settings, then a customer's checkout on another phone offers Centro with that fee.
-- When a storefront order arrives while Carla's KDS has the sound on, then the KDS plays the alert, and R1's feed shows "Novo pedido #12" in the bell for Ana, Bruno and Carla.
+- When a storefront order is accepted while Carla's KDS has the sound on, then the KDS plays the alert, and R1's feed shows "Novo pedido #12" in the bell for Ana, Bruno and Carla.
 - When Ana deactivates Bruno, then Bruno's next refresh gets 401, and R1's audit log records who did it and when.
 - When R2's owner opens Settings, the feed or the audit log, then nothing from R1 appears.
 
 ## Open questions
-Local to this proposal. Answered 2026-10-06 (Gabriel, project thread, 2026-10-06T18:12Z: "confirms all points as per recommended by claude"): each takes the recommended answer, yes.
+Local to this proposal. Answered 2026-10-06, by Claude's reading of Gabriel's reply to item 4, which named this proposal (project thread, 2026-10-06T18:12Z: "4 - confirmed", "confirms all points as per recommended by claude"): each takes the recommended answer, yes. He did not answer them one by one.
 1. Notifications: should the feed add a "customer says PIX paid" entry, so staff know to check the bank (E4)? yes / no. **Recommended: yes.** Answered: yes.
 2. My account: should Build 1 add "change password" (current and new password, C4)? Without it, a signed-in user can change their password only through the "forgot password" email. yes / no. **Recommended: yes.** Answered: yes.
 3. Profile: should the B2B fields (department, office, bio, country, timezone) be removed, keeping name, phone, email and photo (C1)? yes / no. **Recommended: yes.** Answered: yes.

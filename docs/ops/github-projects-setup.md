@@ -1,8 +1,8 @@
 # Project board setup runbook (GitHub Projects)
 
 - Status: Reviewed
-- Updated: 2026-10-06 (Reviewed by Gabriel, 18:12Z; earlier the same day: board set up by Gabriel, labels created, smoke-test note on workflow order; Gabriel ticked the optional `gh` item himself, commit `b709078`)
-- Reviewed: Reviewed by Gabriel on 2026-10-06 (project thread, 2026-10-06T18:12Z: "4 - confirmed", "confirms all points as per recommended by claude", answering item 4 of Claude's 15:20Z list, which asked him to read and mark Reviewed ADR-0020, the settings proposal and this runbook). Claude's defaults in section 0 stand, `Refs #<n>` included.
+- Updated: 2026-10-06 (Reviewed by Gabriel, 18:12Z, with Claude's reading of his reply stated in the Reviewed line; earlier the same day: board set up by Gabriel, labels created, smoke-test note on workflow order; Gabriel ticked the optional `gh` item himself, commit `b709078`)
+- Reviewed: Reviewed by Gabriel on 2026-10-06 (project thread, 2026-10-06T18:12Z: "4 - confirmed", "confirms all points as per recommended by claude", answering item 4 of Claude's 15:20Z list, which asked him to read and mark Reviewed ADR-0020, the settings proposal and this runbook). Claude's defaults in section 0 stand, `Refs #<n>` included. Claude's reading: this reply to item 4 stands in for the "Reviewed: <doc>" message of Q-09 a (ADR-0016); he did not post that exact form.
 - Roadmap step: Project board setup, before Build 1 (`docs/roadmap.md`)
 - Related: ADR-0021 (the decision), ADR-0011, ADR-0013, ADR-0016; register Q-83
 - Who runs it: Gabriel, on his GitHub account. Agents do not create the project, its fields, views, workflows or the labels until he says so (ADR-0021). Claude wrote this page from GitHub's docs and from what a cloud session could reach on 2026-10-06; it updates the page from what Gabriel reports.
