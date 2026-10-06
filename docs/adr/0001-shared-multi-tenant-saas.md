@@ -58,12 +58,12 @@ Tenancy & Identity batch (PF `planning/MASTER-PLAN.md` §8b L116, §5 L74). Ids 
 - Q-27: answered 2026-10-01, a: the restaurant/user settings split in Decision 5.
 - Q-28: answered 2026-10-01, a: IANA zone required at creation (default `America/Sao_Paulo`), no deployment-wide fallback.
 - Q-31: answered 2026-10-01, a: the platform admin sets the slug at creation; unique; unchanged this run.
-- Q-30 (open): where restaurant settings and delivery zones are built (Build 1 or Build 4).
+- Q-30: answered 2026-10-06, a (project thread, 2026-10-06T18:12Z: "2- Q30 - a"): Build 1 creates the restaurant, the typed settings schema and the timezone; branding, ordering settings and delivery zones land in Build 4.
 
 ## Sources
 Legend: PF = `/mnt/project-files/`; BE = backend repo `enterprise-order-suite` @ `feature/ai-agent` (`af2634e`), Java paths under `src/main/java/com/enterprise/ordersuite/`; FE = frontend repo `enterprise-order-suite-frontend/order-ui` @ `Claude-Assisted-Development` (`14a3cfd`).
 - PF `planning/MASTER-PLAN.md` §3 D-1 (L34), §4 (L63), §5 (L74, L81), §6 (L91, L93), §8b (L116)
-- `planning/open-questions.md` group 2 (Q-16..Q-22, Q-25..Q-28, Q-30, Q-31): Gabriel's answers of 2026-10-01 (project thread, 2026-10-01T16:25Z)
+- `planning/open-questions.md` group 2 (Q-16..Q-22, Q-25..Q-28, Q-30, Q-31): Gabriel's answers of 2026-10-01 (project thread, 2026-10-01T16:25Z); Q-30 on 2026-10-06 (project thread, 18:12Z)
 - PF `planning/pm-tool-recommendation.md` L59, L76-88, L123
 - PF `2026-09-09-restaurant-ops-redesign-design.md` L43-47, L309
 - PF `2026-09-24-restaurant-ops-phase-0-foundation-design.md` L120-146

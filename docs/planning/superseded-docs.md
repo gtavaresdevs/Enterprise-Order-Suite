@@ -1,7 +1,7 @@
 # Superseded and stale legacy docs (S2 banner list)
 
 - Status: Draft
-- Date: 2026-09-29 (updated after Q-01..Q-03 were answered; updated 2026-10-01 after Gabriel's answers: F1, F2, F3, F4, F5, F6, F9, F10, F11, B4, B6, B9, B11, B12, B13, §5, Open questions; updated 2026-10-06: B16, the Plane runbooks and scripts, deleted)
+- Date: 2026-09-29 (updated after Q-01..Q-03 were answered; updated 2026-10-01 after Gabriel's answers: F1, F2, F3, F4, F5, F6, F9, F10, F11, B4, B6, B9, B11, B12, B13, §5, Open questions; updated 2026-10-06: B16, the Plane runbooks and scripts, deleted; later the same day: F4 banner, B-rows and Reviewer note after ADR-0020 was accepted and Q-30 answered)
 - Written by: Claude (S0). Follows MASTER-PLAN §4 (L68), §6 S2 (L89-90) and ADR-0000.
 - Used in: S2 (banners, both `CLAUDE.md` rewrites) and S3 (skills, agents, tooling).
 
@@ -101,7 +101,7 @@ Update 2026-10-01: Gabriel's answers close the banner's "Open" line (the applied
 | L976 | `x-out-of-scope`: payment and WhatsApp as external dependencies, TBD | Out this run. | ADR-0005, ADR-0006 |
 | L982-985 | `x-open-decisions` `id-type` (int64) | ULIDs everywhere. | ADR-0009 |
 | L990-993 | `created-at-format`: zone falls back to deployment config, startup fails | Deployment config cannot hold a restaurant value. | ADR-0001 (ADR-0000 D10a) |
-| L994-996 | `payment-sequencing` "depends on the processor" | Closed by Q-55 a, Q-58 a and Q-65 (2026-10-01): an order starts UNPAID and becomes PAID when staff record the payment; storefront PIX prepayment: ADR-0020 (Proposed). | ADR-0005, ADR-0020 |
+| L994-996 | `payment-sequencing` "depends on the processor" | Closed by Q-55 a, Q-58 a and Q-65 (2026-10-01): an order starts UNPAID and becomes PAID when staff record the payment; storefront PIX prepayment: ADR-0020 (Accepted 2026-10-06). | ADR-0005, ADR-0020 |
 
 Still valid as seed: shapes for Menu, Tables, Orders, Delivery zones, RestaurantSettings and `/public/*` seed the backend drafts (ADR-0010 step 1).
 
@@ -123,7 +123,7 @@ Banner (comment lines at line 1, before `openapi: 3.0.3`):
 |---|---|---|---|
 | L7-10, L328-351 | Product grows into 10 separately sellable packages | Packages and pricing deferred; the list is reference only. | ADR-0018 |
 | L32-36 | Out of scope: "any backend/API change (blocked per roadmap)" | Backend work is now the build order. | ADR-0007 |
-| L109-143 | Payment: mock PIX "pay now" QR screen; payment counts as received when staff completes the order | The app records payments, never processes them. A payment record holds method, amount, who and when (Q-58 a), and an order is Paid when staff record the payment, not when it completes (Q-55 a), both 2026-10-01. PIX paid at checkout returns in another form in ADR-0020 (Proposed): a static PIX code with the order total, confirmed by staff recording the payment; no PSP. | ADR-0005, ADR-0006, ADR-0020 |
+| L109-143 | Payment: mock PIX "pay now" QR screen; payment counts as received when staff completes the order | The app records payments, never processes them. A payment record holds method, amount, who and when (Q-58 a), and an order is Paid when staff record the payment, not when it completes (Q-55 a), both 2026-10-01. PIX paid at checkout returns in another form in ADR-0020 (Accepted 2026-10-06): a static PIX code with the order total, confirmed by staff recording the payment; no PSP. | ADR-0005, ADR-0006, ADR-0020 |
 | L144-152, L348-351 | In-app card payment later through a PSP in "Package 10" | Out; integrate, never build. | ADR-0005, ADR-0006 |
 | L185-189 | `PreferencesState` gains `deliveryZones`, `whatsappNumber`, prep and delivery times | Restaurant settings live in a typed backend schema, not the browser. | ADR-0014 |
 | L222-226 | Notifications: mock WhatsApp channel | Automatic WhatsApp out; B2B Notifications content is audit item 88. | ADR-0006 |
@@ -145,6 +145,8 @@ Update 2026-10-01: Q-82 a moves Phase 11 out of Later, and ADR-0020 (Proposed) b
 > Superseded: the mock PIX "pay now" flow and in-app card payment through a PSP (ADR-0005, ADR-0006); restaurant settings kept in the browser's `PreferencesState` (ADR-0014); "no backend/API change" as a scope rule (ADR-0007). PIX paid at checkout is proposed again as a static PIX code that staff confirm by recording the payment, with no PSP (ADR-0020, Proposed).
 > Not scheduled: the 10-package product plan (ADR-0018: reference only) and Phase 10 comandas (Later, Q-81 a). Phase 11's small polish items ride alongside Build 3-4 (Q-82 a, 2026-10-01).
 ```
+
+Update 2026-10-06: Gabriel accepted ADR-0020. The banner's last sentence of the first line becomes, applied 2026-10-06 in the frontend repo: "PIX paid at checkout comes back as a static PIX code that staff confirm by recording the payment, with no PSP (ADR-0020, Accepted 2026-10-06)."
 
 ### F5. `docs/superpowers/specs/2026-09-15-dev-tooling-workflow-design.md` (Low)
 
@@ -595,5 +597,5 @@ Handled by the S0 memory cleanup, not this list.
 
 ## Reviewer notes
 
-- Reviewer note: MASTER-PLAN §4 (L68) names salvage only for backend phases 5 and 6. Backend phase 3 (Tables, DeliveryZones, RestaurantSettings; PF `2026-09-20-...-migration-design.md` L163) has no named home in the D-7 build order, although delivery zones and restaurant settings are needed by Storefront ↔ Order Core (step 4) and by ADR-0014. MASTER-PLAN §5 (L76, the scope page) is the place to put them; flagged so S5 does not miss them. Register: Q-30.
+- Reviewer note: MASTER-PLAN §4 (L68) names salvage only for backend phases 5 and 6. Backend phase 3 (Tables, DeliveryZones, RestaurantSettings; PF `2026-09-20-...-migration-design.md` L163) has no named home in the D-7 build order, although delivery zones and restaurant settings are needed by Storefront ↔ Order Core (step 4) and by ADR-0014. MASTER-PLAN §5 (L76, the scope page) is the place to put them; flagged so S5 does not miss them. Register: Q-30, answered 2026-10-06 (a): Build 1 creates the restaurant, the typed settings schema and the timezone; the other settings and delivery zones land in Build 4.
 - Reviewer note: MASTER-PLAN §4 (L68) lists the frontend roadmap's "read first" and "what's next" as superseded, but its audit section (L230-241) also tells agents to plan from the pt-BR docs, which conflicts with D-10 / ADR-0012. It is included in F1 and in the banner.

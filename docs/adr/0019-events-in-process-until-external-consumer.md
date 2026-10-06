@@ -52,7 +52,7 @@ Accepted (Gabriel, 2026-09-29; Q-03 rows 3.5-3.6, "3 Yes"). Proposed by Claude i
 - Q-03 rows 3.5-3.6 (these §4 simplifications): answered 2026-09-29, accepted.
 - Q-64, Q-47, Q-34: answered 2026-10-01, a (Decision 6). Event names and payloads are written in the Order Core contract (MASTER-PLAN §8c L118).
 - Q-61: answered 2026-10-01, a: the KDS and track-order keep polling this run (Decision 6).
-- Q-57: answered 2026-10-01, a: a small per-restaurant notifications feed from in-process order events (Decision 6). Notification settings and screens: Claude's Q-24 proposal `docs/planning/proposals/settings-and-notifications.md` (Draft), awaiting Gabriel's review.
+- Q-57: answered 2026-10-01, a: a small per-restaurant notifications feed from in-process order events (Decision 6). Notification settings and screens: Claude's Q-24 proposal `docs/planning/proposals/settings-and-notifications.md`, Reviewed by Gabriel on 2026-10-06.
 - Q-80: answered 2026-10-01, b: the Edge build (the outbox trigger for Edge sync) is Gabriel's call, as an optional paid feature (Decision 6). Any other external consumer (a WhatsApp provider, a marketplace, a payment or fiscal integration) is Out this run (ADR-0006, ADR-0007) and brings the outbox ADR with it when scheduled.
 - Reviewer note: MASTER-PLAN §8a Q3 (L114) names "docs folder, Plane off the critical path, Edge reduced to a constraints ADR, packages deferred" but not the outbox or core-module deferrals (§4 L61-62). The register should make sure Gabriel's Q-03 answer explicitly covers these rows, or ask them separately. Addressed: the register's Q-03 lists all twelve §4 rows; these are rows 3.5 and 3.6 (PF `planning/open-questions.md`).
 

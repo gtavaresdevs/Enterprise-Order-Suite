@@ -23,7 +23,7 @@
 | Step | What | Owner | Blocks on |
 |---|---|---|---|
 | S0 | **Decisions baseline** (done 2026-09-29): ADRs (new + legacy triage), architecture amendment proposal, open-questions register, superseded-docs list, memory cleanup. | Claude | nothing |
-| S1 | Gabriel's review (done 2026-10-01): accepts ADRs and the architecture amendment; answers register Q-01..Q-10; pushes the frontend `.claude/` (FE `c4a7309`). Still open in the register: Q-30 and Q-86. | Gabriel | S0 |
+| S1 | Gabriel's review (done 2026-10-01): accepts ADRs and the architecture amendment; answers register Q-01..Q-10; pushes the frontend `.claude/` (FE `c4a7309`). The last open register rows, Q-30 and Q-86, were answered on 2026-10-06. | Gabriel | S0 |
 | S2 | Docs skeleton (done 2026-09-29; the parts that waited on Q-04, Q-05, Q-09, Q-10 done 2026-10-01): `docs/README.md` (map + current phase), `docs/roadmap.md`, ADRs, glossary seed, doc templates (with Status and Open questions), superseded banners on legacy docs; both `CLAUDE.md` files rewritten to match. | Claude | S1 |
 | S3 | Readiness tooling (done 2026-10-01): version frontend `.claude/`, port/remove the PowerShell hook, `permissions.deny` git rules, SessionStart setup, frontend lint baseline, Vitest, CI running today's checks in both repos. | Claude (+ Gabriel for S1 push) | S2 |
 | S4 | Cross-cutting design: API conventions doc, finalize the Edge-ready constraints (ADR-0003), then **Tenancy & Identity** contract with Gabriel's question batch. | Claude + Gabriel | S2 |
@@ -61,7 +61,7 @@
 
 ## Open questions
 - Q-01 docs location, Q-02 never-merge scope, Q-03 the §4 simplifications: answered 2026-09-29 (PF `planning/MASTER-PLAN.md` §8a; ADR-0011, ADR-0013). S1, S2 and S3 are done (2026-10-01).
-- Where do existing features outside Build 1-4 land? Tables/QR, delivery zones, restaurant settings, track-order, KDS, Administration, Home, Analytics, i18n and Notifications are placed in the S5 scope-of-run page (MASTER-PLAN §5 L76). Restaurant settings and delivery zones: Q-30.
+- Where do existing features outside Build 1-4 land? Tables/QR, delivery zones, restaurant settings, track-order, KDS, Administration, Home, Analytics, i18n and Notifications are placed in the S5 scope-of-run page (MASTER-PLAN §5 L76). Restaurant settings and delivery zones: Q-30 a (2026-10-06): Build 1 creates the restaurant, the typed settings schema and the timezone; the other settings and delivery zones land in Build 4.
 - Q-53: answered 2026-10-01, a: a minimal Table (id, name) enters Order Core, so staff dine-in orders are part of Build 3; QR self-ordering stays Later.
 - Q-81: answered 2026-10-01, a: Phase 10 comandas are Later, with QR/table and waiter. Q-82: answered 2026-10-01, a: Phase 11's small polish items ride alongside Build 3-4.
 - Q-08: answered 2026-10-01, b: S5 must be Reviewed before Build 1; S5 joins the gate (Decision 3). This resolves the earlier reviewer note that §6 placed S5 before Build 1 while §7 did not require it.
@@ -70,7 +70,7 @@
 ## Sources
 Legend: PF = `/mnt/project-files/`.
 - PF `planning/MASTER-PLAN.md` §1 (L15), §3 D-7 (L40), D-13 (L46), D-14 (L47), §4 (L64, L68), §5 (L76), §6 (L83-95), §7 (L97-107), §8 (L111-120)
-- `planning/open-questions.md` Q-08, Q-53, Q-80, Q-81, Q-82, Q-83 (Gabriel's answers of 2026-10-01, project thread, 2026-10-01T16:25Z); Q-30 (open)
+- `planning/open-questions.md` Q-08, Q-53, Q-80, Q-81, Q-82, Q-83 (Gabriel's answers of 2026-10-01, project thread, 2026-10-01T16:25Z); Q-30 (answered 2026-10-06, project thread, 18:12Z)
 - PF `architecture/RESTAURANT-OPS-ARCHITECTURE.md` L320-341
 - PF `planning/pm-tool-recommendation.md` L42, L117, L119-131
 - PF `planning/ai-ready-development-plan.md` L6, L72-91

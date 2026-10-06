@@ -194,6 +194,8 @@ Brand name, menu presentation, product images, descriptions, categories and prom
 
 > Note 2026-10-01 (pointer; the text above is unchanged): Gabriel has since fixed the exact list (Q-66 a; ADR-0014 Decision). Storefront: logo, cover, one brand color (text contrast computed), a font from a list of about five, one of two or three layout presets. Menu: category order and item photos. Nothing else this run, so promotional content stays out. The Storefront contract names the fonts and presets.
 
+> Note 2026-10-06 (pointer; the text above is unchanged): Gabriel answered Q-30 a and Q-86 a (project thread, 2026-10-06T18:12Z). Build 1 creates the restaurant, the typed settings schema and the timezone; branding, ordering settings and delivery zones land in Build 4 (Q-30 a). This run, pickup is offered only when the customer prepays by PIX and is inside a delivery zone; outside every zone there is no pickup until in-app payment exists; the street address and the "Continuar no WhatsApp" link stay in Build 4 (Q-86 a). Storefront PIX prepayment: ADR-0020 (Accepted 2026-10-06).
+
 It is a restaurant-specific digital storefront, not a generic ordering page.
 
 ## 10. QR and table experience
@@ -334,6 +336,8 @@ They influence the architecture now but must not expand the current implementati
 
 For payments, fiscal and delivery marketplaces, "not yet" means: when an integration is scheduled, integrate with an existing system; never build one (§26). None of them is integrated this run (ADR-0006, ADR-0007).
 
+> Note 2026-10-06 (pointer; the text above is unchanged): ADR-0020 (Accepted by Gabriel on 2026-10-06) brings one PIX feature into this run without an integration: the storefront shows a static PIX code that the backend builds from the restaurant's own PIX key, and staff confirm the payment by recording it. No PSP, no bank API, no reconciliation; card payments and automatic PIX confirmation stay "not yet".
+
 ## 22. Current development boundary
 
 ```text
@@ -377,7 +381,7 @@ The Tenancy & Identity contract defines the rest; this document does not:
 
 Until that contract is Reviewed, no tenant-resolution scheme, role model or row-level-security mechanism is assumed.
 
-> Note 2026-10-01 (pointer; the text above is unchanged): Gabriel has since answered most of this list in the register (Q-16..Q-31; Q-30 is still open). ADR-0001 Decision 5 records the answers and the Tenancy & Identity contract records the detail. Isolation is application-level scoping, `restaurant_id` on every tenant-owned table, with no row-level security (Q-25 a). A user belongs to one restaurant for now, through a membership table (Q-16 a). A platform admin is separate from the per-restaurant roles owner, manager and staff (Q-17 a) and has full read access for support (Q-18 b). Signup is invite-only (Q-19 a). A public page finds its restaurant by the path `/r/{slug}` (Q-20 a). A staff request's restaurant comes from the signed-in user's membership, never from the path or body (Q-26 a, decided by Claude at Gabriel's request). The rule above still holds until that contract is Reviewed.
+> Note 2026-10-01 (pointer; the text above is unchanged): Gabriel has since answered most of this list in the register (Q-16..Q-31; Q-30 followed on 2026-10-06). ADR-0001 Decision 5 records the answers and the Tenancy & Identity contract records the detail. Isolation is application-level scoping, `restaurant_id` on every tenant-owned table, with no row-level security (Q-25 a). A user belongs to one restaurant for now, through a membership table (Q-16 a). A platform admin is separate from the per-restaurant roles owner, manager and staff (Q-17 a) and has full read access for support (Q-18 b). Signup is invite-only (Q-19 a). A public page finds its restaurant by the path `/r/{slug}` (Q-20 a). A staff request's restaurant comes from the signed-in user's membership, never from the path or body (Q-26 a, decided by Claude at Gabriel's request). The rule above still holds until that contract is Reviewed.
 
 ## 26. Payments and external systems
 
@@ -385,6 +389,8 @@ Until that contract is Reviewed, no tenant-resolution scheme, role model or row-
 - The platform integrates with existing payment, fiscal and marketplace systems. It never builds one (ADR-0005).
 - An integration writes through the Order Core like any other consumer (§23). If the external system cannot be reached, the result is pending, never a faked success (§17).
 - This run integrates no external payment, fiscal, marketplace or messaging system. The PSP gateway and automatic WhatsApp messages are out; manual `wa.me` links stay (ADR-0006).
+
+> Note 2026-10-06 (pointer; the text above is unchanged): storefront PIX prepayment (ADR-0020, Accepted 2026-10-06) keeps to this section. The payment happens between the customer's and the restaurant's banks; the platform builds a static code and records the payment only when staff confirm it, and the customer's "Já paguei" tap is never treated as success.
 
 ## Derived documents
 
@@ -433,9 +439,9 @@ Current order of work: `planning/MASTER-PLAN.md` §6 and ADR-0007. Claude's orig
 ## Open questions
 
 Cross-doc questions live in `planning/open-questions.md` (ADR-0016). Those that touch this document:
-- Q-30: where restaurant settings and delivery zones are built (§9, §25). Blocks: S5 scope page, Build 1 scope. Open.
-- Q-86: confirms Gabriel's Q-70 pickup answer, which ends mid-sentence, and whether street address and the "Continuar no WhatsApp" link (rules 54, 56) stay in Build 4 (§9). Blocks: Storefront contract. Open.
-- ADR-0020 (Proposed, awaiting Gabriel; Q-65): storefront PIX prepayment through a static PIX code that staff confirm by hand, with no PSP. §21 lists PIX under payments not built yet; whether §21 and §26 need a note or an amendment waits for Gabriel's decision on ADR-0020. Blocks: Storefront contract.
+- Q-30: where restaurant settings and delivery zones are built (§9, §25). Answered 2026-10-06, a (pointer note under §9).
+- Q-86: confirms Gabriel's Q-70 pickup answer, which ends mid-sentence, and whether street address and the "Continuar no WhatsApp" link (rules 54, 56) stay in Build 4 (§9). Answered 2026-10-06, a (pointer note under §9).
+- ADR-0020 (Q-65): storefront PIX prepayment through a static PIX code that staff confirm by hand, with no PSP. Accepted by Gabriel on 2026-10-06; §21 and §26 carry pointer notes. Rewording them would need a new amendment ticked by Gabriel.
 
 ## Amendment log
 
@@ -456,5 +462,6 @@ Cross-doc questions live in `planning/open-questions.md` (ADR-0016). Those that 
   - A-14: shorter derived-documents list; Edge docs deferred.
   - A-15: original implementation order marked superseded by ADR-0007.
 - 2026-10-01: pointer notes, not amendments. Gabriel's register answers of the same day are noted under §7 (Q-34, Q-47, Q-49, Q-51, Q-53), §9 (Q-66), §12 (Q-80) and §25 (Q-16..Q-20, Q-25; Q-26 decided by Claude at Gabriel's request), and an "Open questions" block is added (ADR-0016). The text above each note is unchanged; rewording it to match needs a new amendment ticked by Gabriel.
+- 2026-10-06: pointer notes, not amendments, under §9 (Q-30 a, Q-86 a) and §21 and §26 (ADR-0020 Accepted), from Gabriel's message of 2026-10-06T18:12Z. The text above each note is unchanged.
 - Text marked "(Proposed)" follows an ADR that is not yet Accepted.
 - Where this document disagrees with an Accepted ADR, the ADR wins until this document is amended again.

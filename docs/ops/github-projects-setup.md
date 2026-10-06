@@ -1,8 +1,8 @@
 # Project board setup runbook (GitHub Projects)
 
-- Status: Draft
-- Updated: 2026-10-06 (board set up by Gabriel; earlier the same day: labels created, smoke-test note on workflow order)
-- Reviewed: not yet
+- Status: Reviewed
+- Updated: 2026-10-06 (Reviewed by Gabriel, 18:12Z; earlier the same day: board set up by Gabriel, labels created, smoke-test note on workflow order; Gabriel ticked the optional `gh` item himself, commit `b709078`)
+- Reviewed: Reviewed by Gabriel on 2026-10-06 (project thread, 2026-10-06T18:12Z: "4 - confirmed", "confirms all points as per recommended by claude", answering item 4 of Claude's 15:20Z list, which asked him to read and mark Reviewed ADR-0020, the settings proposal and this runbook). Claude's defaults in section 0 stand, `Refs #<n>` included.
 - Roadmap step: Project board setup, before Build 1 (`docs/roadmap.md`)
 - Related: ADR-0021 (the decision), ADR-0011, ADR-0013, ADR-0016; register Q-83
 - Who runs it: Gabriel, on his GitHub account. Agents do not create the project, its fields, views, workflows or the labels until he says so (ADR-0021). Claude wrote this page from GitHub's docs and from what a cloud session could reach on 2026-10-06; it updates the page from what Gabriel reports.
@@ -16,7 +16,7 @@ The board is a GitHub Project on Gabriel's account. Its cards are issues in the 
 
 ## 0. Claude's defaults (change any of them)
 
-These are Claude's choices, not Gabriel's answers. To change one, say so in the project thread.
+These were Claude's choices; Gabriel confirmed them when he reviewed this page on 2026-10-06. To change one, say so in the project thread.
 
 | Topic | Claude's default | Why |
 |---|---|---|
@@ -139,5 +139,5 @@ Read 2026-10-06. Nothing on this page was run against a real project: Claude has
 ## Inputs needed from Gabriel
 
 - ~~Sections 2 to 4, the smoke test and the outcome message.~~ Done by Gabriel on 2026-10-06. ~~The labels (section 5).~~ Done by Claude on 2026-10-06.
-- Optional: give `gh` the `project` scope on your PC (section 6).
-- Mark this page Reviewed when you have read it (ADR-0016).
+- ~~Optional: give `gh` the `project` scope on your PC (section 6).~~ Done by Gabriel on 2026-10-06 ("6-done").
+- ~~Mark this page Reviewed when you have read it (ADR-0016).~~ Done on 2026-10-06.

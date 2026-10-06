@@ -1,14 +1,14 @@
 # Settings and notifications: proposal for this run (Q-24)
 
-- Status: Draft
-- Updated: 2026-10-01
-- Reviewed: not yet
+- Status: Reviewed
+- Updated: 2026-10-06 (Reviewed; open questions answered; Q-30, Q-86 and ADR-0020 settled)
+- Reviewed: Reviewed by Gabriel on 2026-10-06 (Gabriel, project thread, 2026-10-06T18:12Z: "4 - confirmed", "confirms all points as per recommended by claude", answering item 4 of Claude's 15:20Z list, which asked him to read and mark Reviewed ADR-0020, this proposal and the board runbook)
 - Roadmap step: S5 (feeds the scope-of-run page); the items land in Build 1-4 (`docs/roadmap.md`)
-- Related: ADR-0001, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0014, ADR-0019, ADR-0020 (Proposed); register Q-16, Q-17, Q-18, Q-19, Q-21, Q-22, Q-24, Q-25, Q-26, Q-27, Q-28, Q-29, Q-30, Q-31, Q-42, Q-44, Q-52, Q-54, Q-57, Q-58, Q-61, Q-64, Q-66, Q-67, Q-81, Q-86
+- Related: ADR-0001, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0014, ADR-0019, ADR-0020 (Accepted 2026-10-06); register Q-16, Q-17, Q-18, Q-19, Q-21, Q-22, Q-24, Q-25, Q-26, Q-27, Q-28, Q-29, Q-30, Q-31, Q-42, Q-44, Q-52, Q-54, Q-57, Q-58, Q-61, Q-64, Q-66, Q-67, Q-81, Q-86
 
 Claude's proposal, written because Gabriel answered Q-24 (2026-10-01, project thread 2026-10-01T16:25Z) with none of the options: "Q24 - none of the options, they were added there as a mock from AI no planning, no goal, not setup for it, so we should rethink those to repurpose them for our app, because I feel like they dont really make sense. We should still have notification and settings, but it should be more in tune with out app build. So please think about this in our app context and provide the needed."
 
-Nothing is built from this page before Gabriel reviews it (ADR-0014 Open questions). Rows and verdicts whose Source starts with "Claude" are Claude's proposals under the Q-24 delegation; Gabriel can change any of them at review.
+Nothing was to be built from this page before Gabriel reviewed it (ADR-0014 Open questions); he did on 2026-10-06. Rows and verdicts whose Source starts with "Claude" are Claude's proposals under the Q-24 delegation; Gabriel can change any of them at review.
 
 ## Goal
 - Every restaurant member gets settings and notifications that fit a restaurant ops SaaS:
@@ -82,15 +82,15 @@ Frontend: `order-ui` @ `c4a7309` (`Claude-Assisted-Development`). Backend: `feat
 Columns: Build = the build step that delivers the item (ADR-0007). Contract = the contract doc that specifies it: T&I = Tenancy & Identity (S4); OC = Order Core; SF = Storefront; Menu.
 
 ### A. Restaurant settings (`/settings`, owner and manager)
-Q-30 is open. The Build column for A2-A5 follows its recommendation a: Build 1 creates the restaurant, the typed settings schema and the timezone; the other settings land in Build 4.
+Q-30 a (Gabriel, 2026-10-06) confirms the Build column for A2-A5: Build 1 creates the restaurant, the typed settings schema and the timezone; the other settings land in Build 4.
 
 | # | Requirement | Build | Contract | Acceptance criteria (testable) | Source |
 |---|---|---|---|---|---|
 | A1 | General: restaurant name (store name, editable). Read-only: the slug with the full storefront link and a copy button; the IANA timezone (set at creation, Q-28 a; read-only for the owner is Claude's default; the T&I contract says whether the platform admin can correct it); currency BRL. Storefront default language (editable). | 1 (language: 4) | T&I | Values come from the backend; another restaurant's owner never reads them (cross-tenant test); the slug cannot be changed; the copied link is an absolute URL. | Q-27 a, Q-28 a, Q-31 a, Q-21 a, Q-67 a; business rule 81 |
-| A2 | Ordering: an open/closed switch with weekly opening hours, pickup on/off, delivery on/off, minimum delivery order, pickup ETA and accepted payment methods. These replace F17's hardcoded values. | 4 | SF | A change shows on the storefront on another device; the server rejects invalid values. Pickup eligibility follows Q-86. | Q-67 a; ADR-0014 |
+| A2 | Ordering: an open/closed switch with weekly opening hours, pickup on/off, delivery on/off, minimum delivery order, pickup ETA and accepted payment methods. These replace F17's hardcoded values. | 4 | SF | A change shows on the storefront on another device; the server rejects invalid values. Pickup eligibility follows Q-86 a: pickup only with PIX prepayment inside a delivery zone. | Q-67 a; ADR-0014 |
 | A3 | Delivery zones: bairro, fee, ETA, active (today's shape, F16), moved to the backend | 4 | SF | A zone the owner adds appears in another device's checkout. | Q-27 a; ADR-0014 |
 | A4 | Storefront appearance: logo and cover (uploaded), one brand color with computed text contrast, one font from a list, one layout preset. WhatsApp number. | 4 | SF | Only storage keys or URLs are stored, never data URLs; there is no free CSS or HTML field; `wa.me` links keep working. | Q-66 a, Q-44 a, Q-27 a; ADR-0014, ADR-0006 |
-| A5 | Payments: the PIX key (and its type) plus the merchant name and city for the static PIX code. Owner only. Only if Gabriel confirms ADR-0020. | 4 | SF | PIX prepayment stays hidden unless PIX is accepted and a key is set; every key change is written to the audit log (B5). | ADR-0020 (Proposed) points 2 and Consequences |
+| A5 | Payments: the PIX key (and its type) plus the merchant name and city for the static PIX code. Owner only. ADR-0020 (Accepted 2026-10-06) says which key types are accepted and where the merchant name and city come from. | 4 | SF | PIX prepayment stays hidden unless PIX is accepted and a key is set; every key change is written to the audit log (B5). | ADR-0020 points 2 and 7 and Consequences |
 | A6 | Menu presentation (category order, item photos) stays on the Menu screen, not in Settings. | 2 | Menu | Covered by the Menu contract. | Q-66 a, Q-44 a |
 
 - A0, permission default (Claude; the T&I contract settles it):
@@ -115,10 +115,10 @@ Q-30 is open. The Build column for A2-A5 follows its recommendation a: Build 1 c
 
 | # | Requirement | Build | Contract | Acceptance criteria (testable) | Source |
 |---|---|---|---|---|---|
-| C1 | Profile: name (editable), phone (optional), email (read-only). Remove department, office, bio, country and timezone (open question 3). | 1 | T&I | The name saves through the backend; the removed fields are gone from the API and the UI. | `PATCH /me`; Q-28 a (the timezone belongs to the restaurant); ADR-0008 |
+| C1 | Profile: name (editable), phone (optional), email (read-only). Remove department, office, bio, country and timezone (open question 3: yes, 2026-10-06). | 1 | T&I | The name saves through the backend; the removed fields are gone from the API and the UI. | `PATCH /me`; Q-28 a (the timezone belongs to the restaurant); ADR-0008 |
 | C2 | Avatar upload made real against `POST /me/profile/avatar`. | 1 | T&I | After a reload the photo is still there. | Business rule 71 |
 | C3 | The account card shows restaurant, role and member-since. Remove "2FA Enabled", "Account Tier" and "USR-0000n". | 1 | T&I | No hardcoded security claim remains. | F12; business rule 72 |
-| C4 | Change password: current and new password. Same password rules and no-reuse history as reset; on success, the user's other devices are signed out. New endpoint (open question 2). | 1 | T&I | A wrong current password is rejected with a SCREAMING_SNAKE error code (D14); a reused password is rejected; the other devices' refresh gets 401. | `PasswordResetService.java` L161-192 (reuse) |
+| C4 | Change password: current and new password. Same password rules and no-reuse history as reset; on success, the user's other devices are signed out. New endpoint (open question 2: yes, 2026-10-06). | 1 | T&I | A wrong current password is rejected with a SCREAMING_SNAKE error code (D14); a reused password is rejected; the other devices' refresh gets 401. | `PasswordResetService.java` L161-192 (reuse) |
 | C5 | "Sign out of other devices": revokes every refresh-token family of the user except the current one. There is no device list. | 1 | T&I | The current session continues; a refresh from another browser gets 401; the screen says the other devices stop when their current access expires. | Claude (Q-24 delegation; replaces F5); mechanism `RefreshTokenService.java` L53-63; Q-29 a covers only revocation on deactivation and role/membership change |
 
 - Forgot password stays on the login page (it exists today).
@@ -138,10 +138,10 @@ These preferences stay in browser storage: they belong to the user or device (Q-
 
 | # | Requirement | Build | Contract | Acceptance criteria (testable) | Source |
 |---|---|---|---|---|---|
-| E1 | Restaurant feed. An after-commit listener on order events writes one entry per event: new order (number, channel, source, total, plus, only if Gabriel confirms ADR-0020, an "unpaid PIX" tag) and order cancelled (number, who cancelled). Entries hold no customer name, phone or address. Proposed retention: 30 days. | 3 | OC | An order created in R1 shows in R1's feed only; a rolled-back create writes no entry. | Claude (Q-24 delegation): the 30-day retention and the entry fields; Q-57 a, Q-64 a; ADR-0019; Q-52 a (data minimization) |
+| E1 | Restaurant feed. An after-commit listener on order events writes one entry per event: new order (number, channel, source, total, plus an "unpaid PIX" tag, ADR-0020) and order cancelled (number, who cancelled). Entries hold no customer name, phone or address. Proposed retention: 30 days. | 3 | OC | An order created in R1 shows in R1's feed only; a rolled-back create writes no entry. | Claude (Q-24 delegation): the 30-day retention and the entry fields; Q-57 a, Q-64 a; ADR-0019; Q-52 a (data minimization) |
 | E2 | The bell and `/notifications` show the feed, newest first; tapping an entry opens the order. The unread dot counts entries newer than this device's last view, kept in device storage. The feed is polled. It replaces F7 and F8. | 3 | OC | No B2B text remains; entries appear without a page reload. | Q-57 a (per-user read state waits), Q-61 a; business rule 90 |
 | E3 | New-order alert on the Orders and KDS screens: when polling returns a NEW order not seen before, play a short sound and highlight the card. Browsers block sound until the page is touched once, so the screen shows an "Ativar som" button until then. Frontend only; the Orders screen gains the KDS polling. | 3 | OC (the order list must make new orders detectable) | With the sound on, a new storefront order is heard within one polling interval. The KDS runs under a staff login. | Claude (Q-24 delegation); F21; constraints: polling (Q-61 a), KDS staff login (Q-54 a) |
-| E4 | If Gabriel confirms ADR-0020: a "customer says PIX paid" entry from the "Já paguei" tap (open question 1). It is information, not payment state. | 4 | SF | The entry never changes `paymentStatus`. | ADR-0020 point 3, Must |
+| E4 | A "customer says PIX paid" entry from the "Já paguei" tap (ADR-0020; open question 1: yes, 2026-10-06). It is information, not payment state. | 4 | SF | The entry never changes `paymentStatus`. | ADR-0020 point 3, Must |
 | E5 | No outbound messages: order events never send email, WhatsApp or push. Transactional auth emails (invite, reset) stay. | all | OC | No email or messaging call in any order-event listener. | ADR-0006 Consequences; ADR-0019 |
 
 ## Later and Out
@@ -182,20 +182,20 @@ Given restaurant R1 with owner Ana, manager Bruno and staff Carla, and restauran
 - When R2's owner opens Settings, the feed or the audit log, then nothing from R1 appears.
 
 ## Open questions
-Local to this proposal, for Gabriel. Each takes one word.
-1. Notifications: if you confirm ADR-0020, should the feed add a "customer says PIX paid" entry, so staff know to check the bank (E4)? yes / no. **Recommended: yes.** Blocks: Storefront contract (E4).
-2. My account: should Build 1 add "change password" (current and new password, C4)? Without it, a signed-in user can change their password only through the "forgot password" email. yes / no. **Recommended: yes.** Blocks: T&I contract, Build 1 (C4).
-3. Profile: should the B2B fields (department, office, bio, country, timezone) be removed, keeping name, phone, email and photo (C1)? yes / no. **Recommended: yes.** Blocks: T&I contract, Build 1 (C1).
+Local to this proposal. Answered 2026-10-06 (Gabriel, project thread, 2026-10-06T18:12Z: "confirms all points as per recommended by claude"): each takes the recommended answer, yes.
+1. Notifications: should the feed add a "customer says PIX paid" entry, so staff know to check the bank (E4)? yes / no. **Recommended: yes.** Answered: yes.
+2. My account: should Build 1 add "change password" (current and new password, C4)? Without it, a signed-in user can change their password only through the "forgot password" email. yes / no. **Recommended: yes.** Answered: yes.
+3. Profile: should the B2B fields (department, office, bio, country, timezone) be removed, keeping name, phone, email and photo (C1)? yes / no. **Recommended: yes.** Answered: yes.
 
 What this proposal depends on (no new register rows):
-- Q-30 (open): Build placement of A1's language and of A2-A5, B5's settings events and D3.
-- Q-86 (open): pickup eligibility in A2.
-- ADR-0020 (Proposed): A5, E4 and E1's "unpaid PIX" tag.
+- Q-30 (answered 2026-10-06, a): Build placement of A1's language and of A2-A5, B5's settings events and D3.
+- Q-86 (answered 2026-10-06, a): pickup eligibility in A2.
+- ADR-0020 (Accepted 2026-10-06): A5, E4 and E1's "unpaid PIX" tag.
 - T&I contract: access-token lifetime (today 24 h, `application.yml` L40; the JWT filter does not re-check `active`). It bounds B4, C4 and C5.
 
 ## Sources
-- Gabriel's Q-24 answer, project thread, 2026-10-01T16:25Z (quoted above); `planning/open-questions.md` rows Q-16..Q-31, Q-42, Q-44, Q-52, Q-54, Q-57, Q-58, Q-61, Q-64, Q-66, Q-67, Q-81, Q-86
-- ADR-0001, ADR-0005, ADR-0006 (Decision 1, Consequences), ADR-0007 (Later, Out), ADR-0008, ADR-0014 (Decision, Consequences, Open questions), ADR-0019 (Decision 6, Consequences), ADR-0020 (Proposed)
+- Gabriel's Q-24 answer, project thread, 2026-10-01T16:25Z (quoted above); `planning/open-questions.md` rows Q-16..Q-31, Q-42, Q-44, Q-52, Q-54, Q-57, Q-58, Q-61, Q-64, Q-66, Q-67, Q-81, Q-86; Gabriel's review and answers, project thread, 2026-10-06T18:12Z
+- ADR-0001, ADR-0005, ADR-0006 (Decision 1, Consequences), ADR-0007 (Later, Out), ADR-0008, ADR-0014 (Decision, Consequences, Open questions), ADR-0019 (Decision 6, Consequences), ADR-0020 (Accepted 2026-10-06)
 - FE business rules master `order-ui/docs/superpowers/specs/2026-09-16-business-rules-master-en.md`: rules 71, 72, 81, 88, 89, 90
 - FE `order-ui` @ `c4a7309`: paths in "What exists today"
 - BE `feature/ai-agent` @ `c8bf761`: paths in "What exists today"; `src/main/resources/application.yml` L40; `security/jwt/JwtAuthenticationFilter.java` L47-75 (no `active` re-check)

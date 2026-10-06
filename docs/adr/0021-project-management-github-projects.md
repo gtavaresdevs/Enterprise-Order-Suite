@@ -1,7 +1,7 @@
 # ADR-0021: Project management: GitHub Projects, set up before Build 1
 - Status: Accepted
 - Date: 2026-10-06
-- Decided by: Gabriel (project thread, 2026-10-06T14:02Z). The board design below (where issues live, Status values, labels, the reference convention) is Claude's default; Gabriel may change any of it.
+- Decided by: Gabriel (project thread, 2026-10-06T14:02Z). The board design below (where issues live, Status values, labels, the reference convention) was Claude's default; Gabriel confirmed it on 2026-10-06 (18:12Z) when he reviewed the runbook, and may still change any of it.
 - Supersedes: ADR-0017 (Plane), in full. The parts of ADR-0017 that carry over are restated below.
 - Related: ADR-0007, ADR-0011, ADR-0013, ADR-0015, ADR-0016
 
@@ -37,7 +37,7 @@
   - put any of the data listed above into an issue.
 
 ## Open questions
-- Q-83: the 2026-10-06 change is recorded in its row. HTTPS exposure and off-box backups are moot (they were already closed under Plane Cloud). The reference convention (`#<n>` with `Refs`) is Claude's default, still pending as an answer, like the `EOS-<n>` default it replaces.
+- Q-83: the 2026-10-06 change is recorded in its row. HTTPS exposure and off-box backups are moot (they were already closed under Plane Cloud). The reference convention (`#<n>` with `Refs`) was Claude's default; Gabriel confirmed it with the runbook on 2026-10-06 (project thread, 18:12Z: "4 - confirmed", "confirms all points as per recommended by claude"), together with the rest of the board design in section 0.
 - What agents may do on issues once the board is the tracker: decided then (carried over from ADR-0017). The board exists since 2026-10-06; the tracker has not moved yet.
 
 ## Sources

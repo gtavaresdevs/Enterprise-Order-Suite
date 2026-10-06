@@ -1,7 +1,7 @@
 # ADR-0013: Git rules for agents: working branches only, push allowed, never merge
 - Status: Accepted
 - Date: 2026-09-29
-- Decided by: Gabriel (D-11; scope: Q-02 option a; enforcement and extended rules: Q-03 row 3.9; both answered 2026-09-29; branch protection: Q-72 a, answered 2026-10-01)
+- Decided by: Gabriel (D-11; scope: Q-02 option a; enforcement and extended rules: Q-03 row 3.9; both answered 2026-09-29; branch protection: Q-72 a, answered 2026-10-01, confirmed done 2026-10-06)
 - Supersedes: the legacy frontend finishing step "merge to Claude-Assisted-Development locally" (`order-ui/docs/superpowers/plans/RESTAURANT-OPS-ROADMAP.md` L8-14); the ai-ready R14 custom git-guard hook (`planning/ai-ready-development-plan.md` L55), replaced by `permissions.deny` (MASTER-PLAN §4 L65)
 - Related: ADR-0011, ADR-0015
 
@@ -26,7 +26,7 @@ Accepted with D-11's enforcement (Q-03 row 3.9, 2026-09-29; MASTER-PLAN §4 L65)
 5. Enforcement is `permissions.deny` in each repo's committed `.claude/settings.json`, added in S3. The frontend needs `.claude/` versioned first (Gabriel's S1 push, MASTER-PLAN §6 L88). Done 2026-10-01: Gabriel versioned the frontend `.claude/` (FE commit `c4a7309`), and Claude added these deny rules to `order-ui/.claude/settings.json` and the repo-root `.claude/settings.json` the same day (FE commit `30bc172`).
 
 Accepted (Gabriel, 2026-10-01; Q-72 a, "Q71 - 72 a"):
-6. Gabriel turns on GitHub branch protection for `main` in both repos. It is his action in the GitHub settings; not yet confirmed done.
+6. Gabriel turns on GitHub branch protection for `main` in both repos. It is his action in the GitHub settings. Confirmed done on 2026-10-06 (project thread, 2026-10-06T18:12Z: "5 - done"); GitHub REST reports `main` as protected in both repos, and the backend repo has an active ruleset "Request PR for Main".
 
 Q-02 answer (MASTER-PLAN §8a Q2): (a) agents commit straight to the working branch and push, as the frontend already does; no agent runs `git merge` at all. Not chosen: (b) agents push feature branches that Gabriel merges; (c) local worktree-to-working-branch merges allowed.
 
@@ -66,19 +66,19 @@ Q-02 answer (MASTER-PLAN §8a Q2): (a) agents commit straight to the working bra
 - S2 rewrites both `CLAUDE.md` files with the same git section: working branch name, the rules above, and `git pull --ff-only` (a plain `git pull` can create a merge commit; prefix rules cannot deny "pull without a flag", so this stays a written rule).
 - The legacy worktree finishing step (merge locally) is not used by agents.
 - Deny rules match the command text by prefix. They do not catch every spelling (for example flags placed after the branch name, `git -C <dir> merge`, or a push through another tool). They are a guardrail, not a security boundary.
-- Until Gabriel confirms branch protection is on (Decision 6), the deny rules remain the only guard against a push to `main`, and they cover Claude sessions only.
+- Until Gabriel confirmed branch protection on 2026-10-06 (Decision 6), the deny rules were the only guard against a push to `main`, and they cover Claude sessions only. Branch protection is now the hard guard; the deny rules stay as the agents' guardrail.
 - Before S3 writes them, the pattern syntax is checked against the Claude Code version in use (older docs show a `:*` suffix form).
 - The rules apply to any Claude session in the repo, including Gabriel's own.
 - Agents must never: merge; push to `main`; force push; stash; commit without an explicit pathspec; let a subagent run a git write command; read `main` as the reference branch.
 
 ## Open questions
 - Q-02 (never-merge scope): answered 2026-09-29, option a (Decision 3). Parallel worktree work lands by `git cherry-pick`; `git merge` in any form, including `--ff-only`, is out. Whether `git rebase` counts as allowed is not decided; ask Gabriel if an S3 workflow needs it. Local to this ADR.
-- Q-72: answered 2026-10-01, a: Gabriel turns on GitHub branch protection for `main` in both repos (Decision 6); his action, not yet confirmed done.
+- Q-72: answered 2026-10-01, a: Gabriel turns on GitHub branch protection for `main` in both repos (Decision 6); confirmed done 2026-10-06 ("5 - done").
 - Q-03 row 3.9 (`permissions.deny` over the custom hook; rules extended to the backend): answered 2026-09-29, accepted.
 
 ## Sources
 - Gabriel's S1 answer, project thread, 2026-09-29T16:34Z ("2 - commit to working branch and push. 3 Yes."); PF `planning/open-questions.md` Q-02, Q-03 row 3.9
-- Gabriel's answers, project thread, 2026-10-01T16:25Z ("Q71 - 72 a"; Q6 and Q7 lines); `planning/open-questions.md` Q-06, Q-07, Q-72
+- Gabriel's answers, project thread, 2026-10-01T16:25Z ("Q71 - 72 a"; Q6 and Q7 lines); `planning/open-questions.md` Q-06, Q-07, Q-72; Gabriel's confirmation, project thread, 2026-10-06T18:12Z ("5 - done"); GitHub REST `repos/gtavaresdevs/<repo>/branches/main` and `.../rulesets`, read 2026-10-06
 - `/mnt/project-files/planning/MASTER-PLAN.md` §3 D-11 (L44), §4 git-guard row (L65), §6 S1/S3 (L88, L90), §7 (L102), §8a Q2 (L113)
 - `/mnt/project-files/planning/pm-tool-recommendation.md` L63
 - `/mnt/project-files/planning/ai-ready-development-plan.md` §1 hooks row (L19), R14 (L55), gate L87

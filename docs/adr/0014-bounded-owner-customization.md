@@ -1,7 +1,7 @@
 # ADR-0014: Bounded owner customization through a typed, backend-owned settings schema
 - Status: Accepted
 - Date: 2026-09-29
-- Decided by: Gabriel. Decision details of 2026-10-01: his register answers (Q-21, Q-27, Q-44, Q-66, Q-67); the PIX key setting is part of ADR-0020 (Proposed)
+- Decided by: Gabriel. Decision details of 2026-10-01: his register answers (Q-21, Q-27, Q-44, Q-66, Q-67); the PIX key setting is part of ADR-0020 (Accepted 2026-10-06)
 - Supersedes: the open-ended "Restaurant-customizable" list in architecture §9 (`architecture/RESTAURANT-OPS-ARCHITECTURE.md` L171), through the architecture amendment (MASTER-PLAN §5 L73); restaurant settings stored in the owner's browser (`localStorage['preferences']`)
 - Related: ADR-0001, ADR-0002, ADR-0007, ADR-0010, ADR-0018, ADR-0020
 
@@ -29,7 +29,7 @@ Accepted (D-12).
   - Q-27 a: restaurant settings are the IANA timezone, currency, storefront default language, branding, WhatsApp number, delivery zones and the ordering settings (Q-67). Theme, font size, sidebar, dense tables and UI language belong to the user or device.
   - Q-67 a: the ordering settings, each one typed field: store name, weekly opening hours with an open/closed switch, pickup on/off, delivery on/off, minimum delivery order, accepted payment methods, pickup ETA.
   - Q-21 a: Brazil only for now: BRL, pt-BR default (EN kept), Brazilian address, +55 phone numbers, an IANA timezone per restaurant; fields stay extensible.
-- Proposed (ADR-0020, Claude under Gabriel's Q-65 delegation, 2026-10-01; awaits his confirmation): the restaurant's PIX key (and its type) is one more typed restaurant setting, used to generate the storefront's static PIX code for prepayment. The code also carries a merchant name and city; where they come from is an ADR-0020 open question.
+- Accepted with ADR-0020 (Gabriel, 2026-10-06; proposed by Claude under his Q-65 delegation, 2026-10-01): the restaurant's PIX key (and its type) is one more typed restaurant setting, used to generate the storefront's static PIX code for prepayment. The code also carries a merchant name and city; ADR-0020 says where they come from and which key types are accepted (Claude's decisions under Gabriel's 2026-10-06 delegation).
 
 ## Consequences
 - Restaurant-level settings move from `localStorage` to the backend settings schema when their feature is wired to the backend (order per ADR-0007).
@@ -37,7 +37,7 @@ Accepted (D-12).
 - Font and layout preset are closed value sets in the schema; the frontend maps each value to its own implementation.
 - Colors are stored as validated color values, never as CSS text.
 - Settings hold logo and cover as URLs or storage keys, never data URLs. The upload endpoint is built this run (Q-44 a, 2026-10-01): it validates on the server and reuses the avatar pipeline (object storage, WebP), for logo, cover and menu item photos.
-- The PIX key (ADR-0020) is restaurant data like any other setting: stored per restaurant, validated on the server, never kept in browser storage. No code depends on it until Gabriel confirms ADR-0020.
+- The PIX key (ADR-0020) is restaurant data like any other setting: stored per restaurant, validated on the server, never kept in browser storage. It is Build 4 work (ADR-0007, Q-30 a).
 - Agents must never:
   - add a free-text styling field, CSS override, HTML block or script slot;
   - render owner-entered text as HTML;
@@ -49,13 +49,13 @@ Accepted (D-12).
 - Q-44: answered 2026-10-01, a: one upload pattern for menu item photos, logo and cover, reusing the avatar pipeline.
 - Q-27: answered 2026-10-01, a: the restaurant/user settings split in Decision. Q-21: answered 2026-10-01, a: Brazil only for now. The Tenancy & Identity contract records the schema detail (for example whether date format is a restaurant setting).
 - Q-67: answered 2026-10-01, a: all seven ordering settings become restaurant settings.
-- Q-30 (open): which build creates the settings schema and which adds branding, ordering settings and delivery zones (Build 1 or Build 4).
-- Q-24: answered 2026-10-01 with none of the options. Gabriel: "Q24 - none of the options, they were added there as a mock from AI no planning, no goal, not setup for it, so we should rethink those to repurpose them for our app, because I feel like they dont really make sense. We should still have notification and settings, but it should be more in tune with out app build. So please think about this in our app context and provide the needed." Claude's proposal for settings and notification screens that fit this app: `docs/planning/proposals/settings-and-notifications.md` (Draft), awaiting Gabriel's review. Nothing is built from it before he reviews it.
-- PIX key setting: ADR-0020 (Proposed).
+- Q-30: answered 2026-10-06, a: Build 1 creates the restaurant, the typed settings schema and the timezone; branding, ordering settings and delivery zones land in Build 4.
+- Q-24: answered 2026-10-01 with none of the options. Gabriel: "Q24 - none of the options, they were added there as a mock from AI no planning, no goal, not setup for it, so we should rethink those to repurpose them for our app, because I feel like they dont really make sense. We should still have notification and settings, but it should be more in tune with out app build. So please think about this in our app context and provide the needed." Claude's proposal for settings and notification screens that fit this app: `docs/planning/proposals/settings-and-notifications.md`, Reviewed by Gabriel on 2026-10-06. Nothing is built from it before he reviews it.
+- PIX key setting: ADR-0020 (Accepted 2026-10-06).
 
 ## Sources
 - `/mnt/project-files/planning/MASTER-PLAN.md` §2 (L22, L24), §3 D-12 (L45), §5 amendment (L73), §8b (L116), §8c (L118)
-- `planning/open-questions.md` Q-21, Q-24, Q-27, Q-30, Q-44, Q-66, Q-67: Gabriel's answers of 2026-10-01 (project thread, 2026-10-01T16:25Z); ADR-0020
+- `planning/open-questions.md` Q-21, Q-24, Q-27, Q-30, Q-44, Q-66, Q-67: Gabriel's answers of 2026-10-01 (project thread, 2026-10-01T16:25Z); Q-30 on 2026-10-06 (project thread, 18:12Z); ADR-0020
 - `/mnt/project-files/architecture/RESTAURANT-OPS-ARCHITECTURE.md` §9 (L167-171)
 - `/mnt/project-files/2026-09-14-backend-integration-manifest.openapi.yaml` `settings-images` L997-999
 - Backend `enterprise-order-suite/CLAUDE.md` L87 (`feature/ai-agent` @ `af2634e`)
