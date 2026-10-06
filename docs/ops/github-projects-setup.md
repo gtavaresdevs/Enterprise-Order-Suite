@@ -1,7 +1,7 @@
 # Project board setup runbook (GitHub Projects)
 
 - Status: Draft
-- Updated: 2026-10-06 (labels created)
+- Updated: 2026-10-06 (labels created; smoke-test note on workflow order)
 - Reviewed: not yet
 - Roadmap step: Project board setup, before Build 1 (`docs/roadmap.md`)
 - Related: ADR-0021 (the decision), ADR-0011, ADR-0013, ADR-0016; register Q-83
@@ -92,7 +92,8 @@ gh label create "needs-human" --repo gtavaresdevs/Enterprise-Order-Suite --color
 
 ## 6. Smoke test, and Claude Code on your PC
 
-1. In the backend repo, create an issue titled `Board smoke test`. It should appear on the board under **Todo** within a few seconds, numbered #26.
+1. Check that the section 4 workflows are on first. Then, in the backend repo, create an issue titled `Board smoke test`. It should appear on the board under **Todo** within a few seconds.
+   - If it does not: auto-add ignores issues that existed before it was switched on and adds them only when they are next edited [G2]. Edit the issue (add a label, for example) or add it by hand from its right sidebar (Projects > `Enterprise Order Suite`), then create one fresh issue to test auto-add on its own.
 2. Close it. Its card should move to **Done**. Leave it closed.
 3. Optional, for Claude Code on your PC to read and move cards (cloud sessions cannot, section 1):
    ```bash
