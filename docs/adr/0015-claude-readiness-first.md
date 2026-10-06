@@ -25,7 +25,7 @@ Accepted (D-13).
   - CI runs `./gradlew test` and `yarn lint && yarn build && yarn test` on the working branches, green.
   - API conventions + Tenancy & Identity contract are Reviewed.
 - Added by Gabriel on 2026-10-01 (Q-08 b, "Q8- b"): S5 (scope of this run, NFR page, audit triage) must be Reviewed before Build 1. S5 joins the gate.
-- Added by Gabriel on 2026-10-01 (Q-83 b, "this is the first thing we do before begin working on the actual app"): Plane set up (ADR-0017; runbook `docs/ops/plane-setup.md`; on Plane Cloud's free plan since 2026-10-06). The Plane setup joins the gate. Docs and readiness tooling do not wait for it.
+- Added by Gabriel on 2026-10-01 (Q-83 b, "this is the first thing we do before begin working on the actual app"): Plane set up (ADR-0017). The setup joins the gate. Since 2026-10-06 the tool is GitHub Projects (ADR-0021; runbook `docs/ops/github-projects-setup.md`), and the gate item reads "project board set up". Docs and readiness tooling do not wait for it.
 - Documentation (S0-S2, S4-S5) and readiness tooling (S3: versioning frontend `.claude/`, port or removal of the PowerShell hook, `permissions.deny`, SessionStart setup, frontend lint baseline, Vitest, CI) are not software development and proceed before the gate (MASTER-PLAN §6 L87-92).
 - Jev is not used. Tooling is Claude Code only.
 - Decided later (Gabriel, 2026-10-01):
@@ -35,7 +35,7 @@ Accepted (D-13).
 
 ## Consequences
 - Before starting Build 1, an agent lists the §7 items and their state; any unchecked item stops the start.
-- Gabriel-owned items on the gate path: accepting ADRs and the architecture amendment; marking the gate docs and S5 Reviewed (Q-08 b); the Plane setup (Q-83 b, ADR-0017). Pushing the frontend `.claude/` from his machine (MASTER-PLAN §6 S1, L88) is done (2026-10-01, FE commit `c4a7309`).
+- Gabriel-owned items on the gate path: accepting ADRs and the architecture amendment; marking the gate docs and S5 Reviewed (Q-08 b); the project board setup (Q-83 b, ADR-0021). Pushing the frontend `.claude/` from his machine (MASTER-PLAN §6 S1, L88) is done (2026-10-01, FE commit `c4a7309`).
 - The "no test suite" statements (`order-ui/CLAUDE.md` L7, L94-95; `RESTAURANT-OPS-ROADMAP.md` L25-26) are updated when Vitest lands in S3.
 - Small existing-feature fixes from the audit ride alongside Build 2-4 (MASTER-PLAN §6 L94), after the gate.
 - Agents must never: start Tenant foundation code before the gate passes; propose Jev again unless Gabriel asks; add a readiness item that guards code which does not exist yet (MASTER-PLAN §4 L64).

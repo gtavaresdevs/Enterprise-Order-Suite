@@ -1,9 +1,11 @@
 # ADR-0017: Project management: Plane (Cloud free plan since 2026-10-06), set up before Build 1
-- Status: Accepted
+- Status: Superseded by ADR-0021 (Gabriel, 2026-10-06T14:02Z: GitHub Projects instead of Plane)
 - Date: 2026-09-29
 - Decided by: Gabriel (D-15; Q-03 row 3.10, 2026-09-29; changed by Q-83 b, 2026-10-01; changed again 2026-10-06: Plane Cloud instead of self-hosting)
 - Supersedes: the Plane-dependent parts of the earlier plans (§4 simplification accepted 2026-09-29, Q-03 row 3.10): history import and forward cycles (`planning/pm-tool-recommendation.md` L40-42), pre-created future modules (L135), GitHub Action automation (L22); every readiness item as a Plane work item, `EOS-<n>` plan ids and Plane updates in `finish-task` (`planning/ai-ready-development-plan.md` L43, L54, L56)
 - Related: ADR-0011, ADR-0013, ADR-0015
+
+> **Superseded by ADR-0021 on 2026-10-06.** Gabriel: "Ok, so lets redesign our plan around github projects instead of plane, much simpler, free and AI can access it." ADR-0021 restates the parts of this ADR that carry over (docs stay in git, setup before Build 1, `docs/roadmap.md` until the board is in use, no history import, no empty future modules, no automation code). Everything Plane-specific below is history. The runbooks it names now live at `docs/ops/superseded/plane-cloud-setup.md` (Plane Cloud) and `docs/ops/superseded/plane-selfhost-oracle.md` (self-hosted); `docs/ops/plane-setup.md` no longer exists.
 
 ## Context
 - D-15 (MASTER-PLAN L48): project management is Plane Community Edition on a free VPS (Oracle Always Free recommended). `planning/pm-tool-recommendation.md` L58: "Hosting: Plane on a free VPS."

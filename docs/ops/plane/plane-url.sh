@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# SUPERSEDED 2026-10-06: the project uses Plane Cloud's free plan (ADR-0017), so this script is not run.
-# Kept in case Plane is ever self-hosted. See README.md in this folder and ../plane-setup.md.
+# SUPERSEDED 2026-10-06: Plane is not self-hosted (ADR-0017); the project uses GitHub Projects (ADR-0021).
+# Not run. Kept in case Plane is ever self-hosted. See README.md in this folder.
 # plane-url.sh: point an installed Plane at its public HTTPS name and restart it.
 #
-# Part of docs/ops/plane-setup.md (Enterprise Order Suite), section 6. Run it as root once you know
+# Part of docs/ops/superseded/plane-selfhost-oracle.md (Enterprise Order Suite), section 6. Run it as root once you know
 # the name Plane will be reached at, for example the Tailscale name:
 #     tailscale status --json | jq -r .Self.DNSName        # plane.tail1234.ts.net.
 #     sudo ./plane-url.sh plane.tail1234.ts.net
@@ -95,7 +95,7 @@ if [ "${PLANE_URL_SKIP_CHECK:-0}" != "1" ]; then
   case "$state" in
     "true false") echo "Check passed: the instance admin is claimed and public sign-up is off." ;;
     "true true") die "public sign-up is still on. In God mode > Authentication, turn off \"Allow anyone to sign up even without an invite\", then run this again." ;;
-    "false "*|"null "*) die "the instance admin is not claimed yet. Claim it at /god-mode/ through the SSH port forward (docs/ops/plane-setup.md), turn off public sign-up, then run this again." ;;
+    "false "*|"null "*) die "the instance admin is not claimed yet. Claim it at /god-mode/ through the SSH port forward (docs/ops/superseded/plane-selfhost-oracle.md), turn off public sign-up, then run this again." ;;
     *) die "cannot read Plane's state from http://localhost:$port/api/instances/ (got '${state:-nothing}'). Is Plane running? (docker ps)" ;;
   esac
 fi

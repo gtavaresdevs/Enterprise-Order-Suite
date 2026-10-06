@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# SUPERSEDED 2026-10-06: the project uses Plane Cloud's free plan (ADR-0017), so this script is not run.
-# Kept in case Plane is ever self-hosted. See README.md in this folder and ../plane-setup.md.
+# SUPERSEDED 2026-10-06: Plane is not self-hosted (ADR-0017); the project uses GitHub Projects (ADR-0021).
+# Not run. Kept in case Plane is ever self-hosted. See README.md in this folder.
 # install-plane.sh: install Plane Community Edition without questions, with fresh secrets, and start it.
 #
-# Part of docs/ops/plane-setup.md (Enterprise Order Suite). cloud-init.yaml runs it on the first
+# Part of docs/ops/superseded/plane-selfhost-oracle.md (Enterprise Order Suite). cloud-init.yaml runs it on the first
 # boot (section 2); by hand (Appendix A), run it after bootstrap-host.sh, as root:
 #     sudo ./install-plane.sh                               # Plane answers on http://localhost
 #     sudo ./install-plane.sh --host plane.tail1234.ts.net  # the public HTTPS name, if already known
@@ -406,6 +406,6 @@ Copy plane.env into your password manager now: a rebuild or restore needs exactl
 passwords. Show it once with:  sudo cat $ENV_FILE
 Never paste it into a chat, a commit or the repo.
 
-Next (docs/ops/plane-setup.md, section 5): claim the instance admin at /god-mode/ and turn off
+Next (docs/ops/superseded/plane-selfhost-oracle.md, section 5): claim the instance admin at /god-mode/ and turn off
 public sign-up before Plane is public.
 EOF

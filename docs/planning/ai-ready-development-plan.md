@@ -1,6 +1,6 @@
 # Claude readiness plan
 
-> **Superseded where it differs from `planning/MASTER-PLAN.md` (2026-09-29).** The order of work and the readiness gate are MASTER-PLAN §6-§7 (ADR-0015). Superseded: the docs-hub repo (ADR-0011), Plane-dependent items (ADR-0017), the custom git-guard hook (ADR-0013), ArchUnit and Playwright as gate items (ADR-0015), ULIDs only on offline-capable entities (ADR-0009), the cross-repo contract export (ADR-0010).
+> **Superseded where it differs from `planning/MASTER-PLAN.md` (2026-09-29).** The order of work and the readiness gate are MASTER-PLAN §6-§7 (ADR-0015). Superseded: the docs-hub repo (ADR-0011), Plane-dependent items (ADR-0017; since 2026-10-06 the tool is GitHub Projects, ADR-0021, so R7's `EOS-42` becomes `Refs #<n>` and R15 updates the issue, not a Plane item), the custom git-guard hook (ADR-0013), ArchUnit and Playwright as gate items (ADR-0015), ULIDs only on offline-capable entities (ADR-0009), the cross-repo contract export (ADR-0010).
 
 Status: Draft, iterated with Gabriel until he calls it done. Updated 2026-09-29.
 Jev was evaluated and **dropped** (new signups paused, paid per call). This plan uses Claude Code only.

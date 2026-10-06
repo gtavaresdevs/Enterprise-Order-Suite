@@ -1,6 +1,6 @@
 # Self-hosted Plane scripts - superseded, not run
 
-> **Superseded on 2026-10-06 (Gabriel, project thread 2026-10-06T13:49Z): "lets readjust our plan so that we use the plane free tier in their cloud."** The project uses Plane Cloud's free plan (ADR-0017), so there is no server and none of these scripts is run. The current runbook is `../plane-setup.md`; this folder belongs to the superseded one, `../superseded/plane-selfhost-oracle.md`.
+> **Superseded on 2026-10-06 (Gabriel, project thread 2026-10-06T13:49Z): "lets readjust our plan so that we use the plane free tier in their cloud."** The project first moved to Plane Cloud's free plan (ADR-0017), then the same day to GitHub Projects (ADR-0021), so there is no server and none of these scripts is run. The current runbook is `../github-projects-setup.md`; this folder belongs to the superseded `../superseded/plane-selfhost-oracle.md`.
 
 Kept in case Plane is ever self-hosted. They were written and tested for Plane Community Edition v1.4.2 on 2026-10-01 and 2026-10-02, on linux/amd64 in a cloud container, and never run on an Oracle VM (the "Tested" section of the superseded runbook lists exactly what was and was not tested). Re-check the sources and the Plane release before using them.
 

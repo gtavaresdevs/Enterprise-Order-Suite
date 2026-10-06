@@ -1,8 +1,8 @@
 #cloud-config
-# SUPERSEDED 2026-10-06: the project uses Plane Cloud's free plan (ADR-0017), so this script is not run.
-# Kept in case Plane is ever self-hosted. See README.md in this folder and ../plane-setup.md.
+# SUPERSEDED 2026-10-06: Plane is not self-hosted (ADR-0017); the project uses GitHub Projects (ADR-0021).
+# Not run. Kept in case Plane is ever self-hosted. See README.md in this folder.
 # cloud-init.yaml: first-boot setup of the Oracle Ampere A1 instance "plane" (Enterprise Order Suite,
-# docs/ops/plane-setup.md). Ubuntu 24.04 aarch64, VM.Standard.A1.Flex, 2 OCPU / 12 GB.
+# docs/ops/superseded/plane-selfhost-oracle.md). Ubuntu 24.04 aarch64, VM.Standard.A1.Flex, 2 OCPU / 12 GB.
 #
 # Where it goes: Oracle console > Compute > Instances > Create instance > 1. Basic information >
 # Advanced options > Management > Initialization script: upload this file (browse to it, or drag it
@@ -46,7 +46,7 @@ write_files:
     owner: root:root
     permissions: '0644'
     content: |
-      // Written by cloud-init for the Plane instance (docs/ops/plane-setup.md).
+      // Written by cloud-init for the Plane instance (docs/ops/superseded/plane-selfhost-oracle.md).
       DPkg::Lock::Timeout "900";
       Dpkg::Options { "--force-confdef"; "--force-confold"; };
 
@@ -159,7 +159,7 @@ write_files:
         echo "Updates need a reboot. After the steps below, or now: sudo reboot (Plane starts again by itself)."
       fi
       cat <<'EOF'
-      Next (docs/ops/plane-setup.md), in this order:
+      Next (docs/ops/superseded/plane-selfhost-oracle.md), in this order:
         1. sudo cat /opt/plane-selfhost/plane-app/plane.env   -> copy it into your password manager
         2. From your PC: ssh -L 8080:127.0.0.1:80 ubuntu@<public IP>, open
            http://localhost:8080/god-mode/ and claim the instance admin; then in God mode

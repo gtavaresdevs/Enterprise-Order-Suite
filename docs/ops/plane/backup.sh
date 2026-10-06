@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# SUPERSEDED 2026-10-06: the project uses Plane Cloud's free plan (ADR-0017), so this script is not run.
-# Kept in case Plane is ever self-hosted. See README.md in this folder and ../plane-setup.md.
+# SUPERSEDED 2026-10-06: Plane is not self-hosted (ADR-0017); the project uses GitHub Projects (ADR-0021).
+# Not run. Kept in case Plane is ever self-hosted. See README.md in this folder.
 # backup.sh: nightly backup of a Plane Community Edition install, copied off the server.
 #
-# Part of docs/ops/plane-setup.md (Enterprise Order Suite), section 8 (Backups).
+# Part of docs/ops/superseded/plane-selfhost-oracle.md (Enterprise Order Suite), section 8 (Backups).
 # Run as the owner of the Plane folder (the "ubuntu" user, member of the docker group), never with
 # sudo, by hand or from cron:
 #     ~/plane-ops/backup.sh
@@ -61,7 +61,7 @@ command -v rclone >/dev/null 2>&1 || fail "rclone is not installed"
 remote_name="${RCLONE_REMOTE%%:*}"
 remote_type="$(rclone listremotes --long | awk -v n="$remote_name:" '$1 == n { t = $2 } END { print t }')"
 [ "$remote_type" = "crypt" ] \
-  || fail "RCLONE_REMOTE=$RCLONE_REMOTE is not an rclone crypt remote (type: ${remote_type:-no such remote}). Nothing was copied. See docs/ops/plane-setup.md, section 8.1."
+  || fail "RCLONE_REMOTE=$RCLONE_REMOTE is not an rclone crypt remote (type: ${remote_type:-no such remote}). Nothing was copied. See docs/ops/superseded/plane-selfhost-oracle.md, section 8.1."
 rclone mkdir "$RCLONE_REMOTE" || fail "cannot reach the remote $RCLONE_REMOTE (run 'rclone config')"
 
 # Dated backup folder names (YYYYMMDD-HHMM), oldest first (glob order).

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# SUPERSEDED 2026-10-06: the project uses Plane Cloud's free plan (ADR-0017), so this script is not run.
-# Kept in case Plane is ever self-hosted. See README.md in this folder and ../plane-setup.md.
+# SUPERSEDED 2026-10-06: Plane is not self-hosted (ADR-0017); the project uses GitHub Projects (ADR-0021).
+# Not run. Kept in case Plane is ever self-hosted. See README.md in this folder.
 # bootstrap-host.sh: prepare a fresh Ubuntu 24.04 (arm64) Oracle Ampere A1 VM for Plane Community Edition.
 #
-# Part of docs/ops/plane-setup.md (Enterprise Order Suite). cloud-init.yaml runs it on the first
+# Part of docs/ops/superseded/plane-selfhost-oracle.md (Enterprise Order Suite). cloud-init.yaml runs it on the first
 # boot (section 2); by hand (Appendix A), run it once as the default user, with sudo:
 #     sudo ./bootstrap-host.sh
 # Optional settings, passed on the sudo line:

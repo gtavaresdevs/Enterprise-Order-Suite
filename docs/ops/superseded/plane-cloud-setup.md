@@ -1,12 +1,14 @@
-# Plane setup runbook (Plane Cloud, free plan)
+# Plane setup runbook (Plane Cloud, free plan) - superseded
 
-- Status: Draft
+> **Superseded on 2026-10-06 (Gabriel, project thread 2026-10-06T14:02Z): "Ok, so lets redesign our plan around github projects instead of plane, much simpler, free and AI can access it."** The project uses GitHub Projects (ADR-0021); nothing on this page is run. The current runbook is `../github-projects-setup.md`. Kept as the record of the 13-minute Plane Cloud plan and of the Plane free-plan facts checked that day.
+
+- Status: Superseded (was Draft)
 - Updated: 2026-10-06
 - Reviewed: not yet
 - Roadmap step: Plane setup, before Build 1 (`docs/roadmap.md`)
 - Related: ADR-0017, ADR-0011, ADR-0013, ADR-0016; register Q-83
 - Who runs it: Gabriel, on his own Plane account. Agents never sign up for a service and never create Plane structure, automations, tokens or secrets (ADR-0017). Claude wrote this page from Plane's own docs and updates it from what Gabriel reports.
-- Replaces: `superseded/plane-selfhost-oracle.md` (self-hosted Plane CE on an Oracle Always Free VM), with its tested scripts in `plane/`. Nothing there is run any more.
+- Replaces: `plane-selfhost-oracle.md` (self-hosted Plane CE on an Oracle Always Free VM), with its tested scripts in `../plane/`. Nothing there is run any more.
 
 Gabriel's answer to Q-83 (2026-10-01) put the Plane setup before Build 1. On 2026-10-06 he changed where Plane runs: Oracle had no Always Free A1 capacity, only a 1 GB `VM.Standard.E2.1.Micro`, which cannot run Plane (its self-host docs ask for 4 GB). After being told the free plan's seat limit does not matter with one user ("bro the only sit I need is mine"), he wrote: "Ok, so lets readjust our plan so that we use the plane free tier in their cloud."
 

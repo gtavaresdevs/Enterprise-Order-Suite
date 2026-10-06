@@ -1,22 +1,22 @@
 # Roadmap (interim tracker)
 
 - Status: Draft
-- Updated: 2026-10-06 (Plane setup row: Plane Cloud's free plan replaces the Oracle VPS). Earlier: 2026-10-02 (Plane setup row: runbook ready; its defaults are Claude's). Earlier: 2026-10-01 (Gabriel's register answers of 2026-10-01: S1, S2, S3 done; Plane setup step added; gate items 1, 2 and 4 ticked, two items added; item 3 unticked until the `CLAUDE.md` corrections are committed)
-- Role: the project tracker until Gabriel sets up Plane (ADR-0017). Order of work and gate: `planning/MASTER-PLAN.md` §6-§7 (ADR-0007, ADR-0015). Where this file and MP disagree, MP wins; fix this file in the same commit.
-- Related: `README.md`, `planning/open-questions.md`, ADR-0007, ADR-0015, ADR-0016, ADR-0017
+- Updated: 2026-10-06 (board setup row: GitHub Projects replaces Plane, ADR-0021; earlier the same day Plane Cloud had replaced the Oracle VPS). Earlier: 2026-10-02 (Plane setup row: runbook ready; its defaults are Claude's). Earlier: 2026-10-01 (Gabriel's register answers of 2026-10-01: S1, S2, S3 done; Plane setup step added; gate items 1, 2 and 4 ticked, two items added; item 3 unticked until the `CLAUDE.md` corrections are committed)
+- Role: the project tracker until Gabriel sets up the GitHub Project (ADR-0021). Order of work and gate: `planning/MASTER-PLAN.md` §6-§7 (ADR-0007, ADR-0015). Where this file and MP disagree, MP wins; fix this file in the same commit.
+- Related: `README.md`, `planning/open-questions.md`, ADR-0007, ADR-0015, ADR-0016, ADR-0021 (was ADR-0017)
 
 ## Order of work
 
 | Step | What | Owner | Blocks on | Status |
 |---|---|---|---|---|
 | S0 | Decisions baseline: ADRs (new + legacy triage), architecture amendment proposal, open-questions register, superseded-docs list, memory cleanup | Claude | none | Done 2026-09-29 |
-| S1 | Gabriel's review: accept the ADRs and the architecture amendments; answer register Q-01..Q-10; push the frontend `.claude/` (Q-06, Q-07). (The Plane signup is now its own step below, Q-83 b.) | Gabriel | S0 | Done 2026-10-01: Q-01..Q-03 answered 2026-09-29; Q-04..Q-10 answered 2026-10-01, in a batch that answered every other open register question except Q-30 (not in the batch); Q-70 partly answered, clarification asked as Q-86; Q-30 and Q-86 still open |
+| S1 | Gabriel's review: accept the ADRs and the architecture amendments; answer register Q-01..Q-10; push the frontend `.claude/` (Q-06, Q-07). (The project board setup is now its own step below, Q-83 b.) | Gabriel | S0 | Done 2026-10-01: Q-01..Q-03 answered 2026-09-29; Q-04..Q-10 answered 2026-10-01, in a batch that answered every other open register question except Q-30 (not in the batch); Q-70 partly answered, clarification asked as Q-86; Q-30 and Q-86 still open |
 | S2 | Docs skeleton in the backend repo `docs/` (ADR-0011): `README.md`, `roadmap.md`, ADRs, glossary seed, templates, superseded banners on legacy docs; rewrite both `CLAUDE.md` files | Claude | S1 Q-01..Q-03 (answered). Parts waited on Q-04, Q-05, Q-09, Q-10 (answered 2026-10-01) | Done 2026-10-01: skeleton, ADRs, banners and both `CLAUDE.md` rewrites pushed 2026-09-29; on 2026-10-01 the amendments were applied to the architecture doc (Q-04), ADR-0000 became Accepted (Q-05), the Reviewed signal was defined (Q-09 a) and both public READMEs got their note (Q-10 a; BE `c8bf761`, FE `30bc172`) |
 | S3 | Readiness tooling: version the frontend `.claude/`, port or remove the PowerShell hook, `permissions.deny` git rules, SessionStart setup, frontend lint baseline, Vitest, CI running today's checks in both repos | Claude (+ Gabriel for the S1 push) | S2 | Done 2026-10-01: everything except the frontend `.claude/` (hook port, git rules, SessionStart check, Vitest, CI in both repos, skills aligned) on 2026-09-29; the frontend `.claude/` versioned by Gabriel on 2026-10-01 (FE `c4a7309`, Q-06 a, Q-07) and its `permissions.deny` git rules added the same day (FE `30bc172`) |
 | S4 | Cross-cutting design: API conventions doc, finalize the Edge-ready constraints (drafted in ADR-0003), then the Tenancy & Identity contract with Gabriel's question batch (register group 2) | Claude + Gabriel | S2 | Not started |
 | S5 | Scope of this run (short PRD) + NFR page + audit backlog triage. Input also: `planning/proposals/settings-and-notifications.md` (Q-24). Must be Reviewed before Build 1 (Q-08 b) | Claude + Gabriel | S4 | Not started |
-| Plane setup | Plane on its own free plan (Gabriel, 2026-10-06; Q-83 b, 2026-10-01), following the runbook `ops/plane-setup.md` (Draft): sign-up, one workspace, one project, states and labels, and a token for the agents. No server, so no HTTPS setup and no backup job; `EOS-<n>` ids stay Claude's default, changeable by Gabriel. Then Plane replaces this file as the tracker (ADR-0017). Docs and readiness work do not wait for it | Gabriel (+ Claude: runbook) | none | Not started. The runbook is ready (2026-10-06); Gabriel runs it. The self-hosted Oracle runbook it replaces is kept, superseded, in `ops/superseded/` |
-| Build 1 | Tenant foundation. Acceptance includes: ArchUnit tenant rule, cross-tenant tests, contract drift test, dev/test seed data, tenant id in logs | Claude | Readiness gate below, which includes S5 Reviewed (Q-08 b) and the Plane setup (Q-83 b) | Not started |
+| Board setup | GitHub Projects (Gabriel, 2026-10-06; ADR-0021; the step itself is Q-83 b, 2026-10-01), following the runbook `ops/github-projects-setup.md` (Draft): one project on his account, an "In review" Status, the auto-add workflow and the labels. Work items are issues in this repo, cited as `Refs #<n>`. Then the board replaces this file as the tracker. Docs and readiness work do not wait for it | Gabriel (+ Claude: runbook) | none | Not started. The runbook is ready (2026-10-06); Gabriel runs it. The Plane runbooks it replaces are kept, superseded, in `ops/superseded/` |
+| Build 1 | Tenant foundation. Acceptance includes: ArchUnit tenant rule, cross-tenant tests, contract drift test, dev/test seed data, tenant id in logs | Claude | Readiness gate below, which includes S5 Reviewed (Q-08 b) and the board setup (Q-83 b) | Not started |
 | Build 2 | Menu | Claude | Menu contract Reviewed | Not started |
 | Build 3 | Order Core | Claude | Order Core contract Reviewed | Not started |
 | Build 4 | Storefront <-> Order Core | Claude | Storefront contract Reviewed | Not started |
@@ -37,7 +37,7 @@ From MP §7. Tick an item only when it holds (repo items: on the working branche
 - [x] CI runs `./gradlew test` and `yarn lint && yarn build && yarn test` on the working branches, green. Evidence (2026-09-29): backend CI run 36604877944 on `72cef45`; frontend CI run 36603662582 on `06de42e`. Re-checked 2026-10-01 after BE `c8bf761` removed the CI JDK override and `gradle.properties` (Q-84 a): backend CI run 36894501564 on `c8bf761`, frontend CI run 36894477010 on `30bc172`, both green.
 - [ ] API conventions + Tenancy & Identity contract are Reviewed. (Menu and Order Core contracts gate their own steps, not this one.)
 - [ ] S5 (scope of this run, NFR page, audit triage) Reviewed. Added 2026-10-01 (Q-08 b).
-- [ ] Plane set up (Plane Cloud free plan since 2026-10-06). Added 2026-10-01 (Q-83 b: "the first thing we do before begin working on the actual app"); runbook `ops/plane-setup.md` (Draft).
+- [ ] Project board set up (GitHub Projects since 2026-10-06, ADR-0021). Added 2026-10-01 (Q-83 b: "the first thing we do before begin working on the actual app"); runbook `ops/github-projects-setup.md` (Draft).
 
 "Reviewed" = Gabriel read it and no open question blocks the next build step. Only Gabriel sets it (ADR-0016), with a message in the project thread ("Reviewed: <doc>") that Claude records (Q-09 a).
 
@@ -52,19 +52,19 @@ Ideas that are not scheduled this run. Add new ones here with date and source; n
 | Edge build (also schedules the outbox and the core-module split) | MP §8d; ADR-0003, ADR-0019 | Q-80 b: built when Gabriel decides; an optional paid feature. Until then the work makes everything functional and keeps the Edge-ready constraints (ADR-0003) |
 | Phase 10 comandas | MP §8d | Q-81 a: Later, with QR/table and waiter |
 | Phase 11 polish | MP §8d | Q-82 a: moved out of Later; its small items ride alongside Build 3-4 as existing-feature fixes |
-| Plane setup details | ADR-0017 | Q-83 b: moved out of Later into the plan; the "Plane setup" step before Build 1 (Order of work) |
+| Board setup details | ADR-0021 (was ADR-0017, Plane) | Q-83 b: moved out of Later into the plan; the "Board setup" step before Build 1 (Order of work) |
 
 ## How to update this file
 
-- Update a step's Status in the same commit as the work that changes it (ADR-0017). Status values: `Not started`, `In progress (started YYYY-MM-DD)`, `Partially done: <what>`, `Blocked: <Q-id or reason>`, `Done YYYY-MM-DD`, `Not scheduled`, `Out`.
+- Update a step's Status in the same commit as the work that changes it (ADR-0021, carried over from ADR-0017). Status values: `Not started`, `In progress (started YYYY-MM-DD)`, `Partially done: <what>`, `Blocked: <Q-id or reason>`, `Done YYYY-MM-DD`, `Not scheduled`, `Out`.
 - When a gate item is ticked, add the evidence on the same line (commit, doc and its status, or Gabriel's message date).
 - Keep this file in line with MP §6-§7. The order of work and the gate are changed in MP §6-§7 and ADR-0007 (ADR-0007 Consequences), then mirrored here.
-- Never invent or cite `EOS-<n>` ids before Plane exists (ADR-0017).
-- Plane replaces this file only when Gabriel sets Plane up (ADR-0017; Q-83). No history import, no empty future modules, no automations.
+- Never invent or cite an issue number that does not exist; cite issues as `Refs #<n>`, never with a closing keyword (ADR-0021).
+- The GitHub Project replaces this file only when Gabriel has set it up (ADR-0021; Q-83). No history import, no empty future milestones, no automation code.
 
 ## Open questions
 
 - Q-04..Q-10 (S1, MP §8a): answered 2026-10-01; Q-08 b put S5 in the gate, so Build 1 waits for S5 Reviewed.
 - Q-13 (decided by Claude 2026-09-29, Gabriel may override): gate item 1's "amended architecture Accepted" is met when every amendment checklist line is ticked (accept, change or reject). Met on 2026-10-01 (commit `6a60b6d`).
 - Still open in the register: Q-30 (where restaurant settings and delivery zones are built; blocks the S5 scope page and Build 1 scope) and Q-86 (clarifies the Q-70 pickup answer; blocks the Storefront contract).
-- Waiting for Gabriel's review: ADR-0020 (Proposed), `planning/proposals/settings-and-notifications.md` (Draft, Q-24), `ops/plane-setup.md` (Draft, Q-83).
+- Waiting for Gabriel's review: ADR-0020 (Proposed), `planning/proposals/settings-and-notifications.md` (Draft, Q-24), `ops/github-projects-setup.md` (Draft, Q-83, ADR-0021).

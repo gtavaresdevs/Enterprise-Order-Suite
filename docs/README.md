@@ -1,7 +1,7 @@
 # Enterprise Order Suite docs: read first
 
 - Status: Draft
-- Updated: 2026-10-06 (Plane moves to Plane Cloud's free plan, ADR-0017). Earlier: 2026-10-02 (the Plane runbook states Claude's defaults). Earlier: 2026-10-01 (Gabriel's register answers of 2026-10-01; S1, S2 and S3 done). Earlier: 2026-09-29 (S2, docs skeleton)
+- Updated: 2026-10-06 (GitHub Projects replaces Plane, ADR-0021; earlier the same day Plane had moved to Plane Cloud, ADR-0017). Earlier: 2026-10-02 (the Plane runbook states Claude's defaults). Earlier: 2026-10-01 (Gabriel's register answers of 2026-10-01; S1, S2 and S3 done). Earlier: 2026-09-29 (S2, docs skeleton)
 - Maintained by: Claude, in this repo on `feature/ai-agent` (ADR-0011). Only Gabriel sets Reviewed (ADR-0016).
 - Related: `planning/MASTER-PLAN.md`, `adr/README.md`, `roadmap.md`, `planning/open-questions.md`
 
@@ -14,9 +14,9 @@ This folder is the one shared place for project docs (ADR-0011): backend repo `g
   - backend: this repo, Spring Boot, `feature/ai-agent`;
   - frontend: `gtavaresdevs/enterprise-order-suite-frontend`, app in `order-ui/`, `Claude-Assisted-Development`.
 - People: Gabriel (solo developer; owns every product decision) and Claude agents.
-- Current phase (MP §1): **S1, S2 and S3 done** (S1 and S3 on 2026-10-01; S2's waiting parts on 2026-10-01). Next: S4 (API conventions, Tenancy & Identity). **The Plane setup comes before Build 1** (Q-83 b; runbook `ops/plane-setup.md`; on Plane Cloud's free plan since 2026-10-06, ADR-0017). Gabriel answered his batch on 2026-10-01; **still open: Q-30 and Q-86**. S0 done 2026-09-29.
+- Current phase (MP §1): **S1, S2 and S3 done** (S1 and S3 on 2026-10-01; S2's waiting parts on 2026-10-01). Next: S4 (API conventions, Tenancy & Identity). **The project board setup (GitHub Projects) comes before Build 1** (Q-83 b; ADR-0021, 2026-10-06; runbook `ops/github-projects-setup.md`). Gabriel answered his batch on 2026-10-01; **still open: Q-30 and Q-86**. S0 done 2026-09-29.
 - **No feature code for the new architecture until every item of the readiness gate (MP §7, mirrored in `roadmap.md`) is checked** (ADR-0015). Docs and readiness tooling (S2-S5) proceed before the gate.
-- After the gate: Build 1 Tenant foundation -> Build 2 Menu -> Build 3 Order Core -> Build 4 Storefront <-> Order Core (ADR-0007). Each build step waits for its contract to be Reviewed (ADR-0016). Since 2026-10-01 the gate also requires S5 Reviewed (Q-08 b) and Plane set up (Q-83 b; on Plane Cloud since 2026-10-06).
+- After the gate: Build 1 Tenant foundation -> Build 2 Menu -> Build 3 Order Core -> Build 4 Storefront <-> Order Core (ADR-0007). Each build step waits for its contract to be Reviewed (ADR-0016). Since 2026-10-01 the gate also requires S5 Reviewed (Q-08 b) and the project board set up (Q-83 b; GitHub Projects since 2026-10-06, ADR-0021).
 - Step status: `roadmap.md`.
 
 ## 2. Where to look
@@ -36,7 +36,7 @@ Read the rows in order. "Not written" = the doc is planned (MP §5-§6) but does
 | Payments, fiscal, marketplace, WhatsApp | ADR-0005 (record-only; integrate, never build) and ADR-0006 (PSP and automatic WhatsApp are Out this run; manual `wa.me` links stay); ADR-0007 Out list (fiscal, marketplaces, billing). No payment integration this run. Payment record: Q-55, Q-56, Q-58 (answered 2026-10-01). Online payment: Q-65 (answered 2026-10-01) and ADR-0020 (Proposed: storefront PIX prepayment with a static PIX code, confirmed by staff recording the payment; Build 4). | FE `2026-09-09-restaurant-ops-redesign-design.md` in-app payment and WhatsApp on status change: superseded. FE i18n spec PIX "pay now" and the PSP package: superseded. FE `order-ui/docs/superpowers/plans/RESTAURANT-OPS-ROADMAP.md` "Blocked" rows: now Out. |
 | Offline, Restaurant Edge | ADR-0003 (Edge optional, not built this run; constraints C1-C6), ADR-0004 (offline = orders only), ADR-0019; AMD A-08, A-09; register Q-38, Q-60, Q-80. Full Edge docs wait for a Reviewed Order Core contract. | Architecture §2-§4, §11-§17, §24 describe an Edge at every restaurant: follow ADR-0003/0004 where they differ (the amendments, applied 2026-10-01 per Q-04, align the text). `planning/pm-tool-recommendation.md` per-restaurant Edge: superseded. |
 | Owner customization, restaurant settings | ADR-0014 (bounded choices; typed backend-owned settings schema; no custom CSS or HTML), ADR-0001 (no restaurant values in deployment config), ADR-0018; register Q-27, Q-30, Q-44, Q-66, Q-67; settings and notification screens: `planning/proposals/settings-and-notifications.md` (Draft, Q-24). | FE i18n spec `PreferencesState` restaurant settings in the browser: superseded by ADR-0014. Architecture §9 open-ended customization: follow ADR-0014 (amendment A-06 applied 2026-10-01). |
-| Git, workflow, doc changes | ADR-0013 (commit straight to the working branch and push; never merge), ADR-0011, ADR-0016, ADR-0017 (update `roadmap.md` in the same commit; Plane runbook `ops/plane-setup.md`), ADR-0015; `templates/`; register Q-72, Q-83. | FE `RESTAURANT-OPS-ROADMAP.md` "merge to Claude-Assisted-Development locally": superseded by ADR-0013. Executed plans in `docs/superpowers/plans/` of both repos: historical, never re-execute. |
+| Git, workflow, doc changes | ADR-0013 (commit straight to the working branch and push; never merge), ADR-0011, ADR-0016, ADR-0021 (update `roadmap.md` in the same commit; board runbook `ops/github-projects-setup.md`; `Refs #<n>`, never closing keywords), ADR-0015; `templates/`; register Q-72, Q-83. | FE `RESTAURANT-OPS-ROADMAP.md` "merge to Claude-Assisted-Development locally": superseded by ADR-0013. Executed plans in `docs/superpowers/plans/` of both repos: historical, never re-execute. |
 | Tests, tooling, CI | ADR-0015, ADR-0013; `roadmap.md` S3; register group 7 (Q-72..Q-77). | `planning/ai-ready-development-plan.md`: superseded where it differs from MP. FE `order-ui/docs/superpowers/specs/2026-09-15-dev-tooling-workflow-design.md`: its "`.claude/` is git-ignored, machine-local" premise is out of date; Q-06 and Q-07 (2026-10-01) versioned the whole folder, Graphify, ponytail and wshobson included (FE `c4a7309`). |
 | A question only Gabriel can answer | `planning/open-questions.md`: check existing rows first and extend one instead of duplicating. A new row takes the next free id after the highest existing one, in the group of the step it blocks. Ask Gabriel in his language, record the answer in English (ADR-0012). Never record an answer he did not give. | none |
 | A legacy decision or doc | `adr/0000-legacy-decisions-triage.md` (per decision), `planning/superseded-docs.md` (per doc and section, with banner text). | as listed there |
@@ -93,12 +93,12 @@ Layout of `docs/` (ADR-0011):
 ```text
 docs/
   README.md          this map (read first)
-  roadmap.md         interim tracker (ADR-0017)
+  roadmap.md         interim tracker (ADR-0021)
   glossary.md        domain terms, legacy->new map, PT-BR UI vocabulary
   adr/               decision records; index and rules in adr/README.md
   architecture/      Gabriel's architecture + amendment proposal; contract docs land here (S4 onward)
   planning/          MASTER-PLAN, open-questions register, superseded-docs list, S0 evidence; proposals/ (Claude proposals for Gabriel's review)
-  ops/               runbooks (Plane setup)
+  ops/               runbooks (project board setup; superseded Plane runbooks in ops/superseded/)
   api/drafts/        design-first contract drafts (ADR-0010); api/openapi.yaml arrives in Build 1
   templates/         doc templates (Status line + Open questions, ADR-0016)
   contracts/         superseded 0.3.0 snapshot (ADR-0010); never re-sync
@@ -113,14 +113,14 @@ docs/
 - ADR statuses are separate: Proposed, Accepted, Superseded by ADR-XXXX. Only Gabriel moves an ADR to Accepted (`adr/README.md`).
 - Never renumber or reuse Q-ids or ADR numbers. Never delete a register row or an ADR; change its status.
 - When a register question is answered, update every ADR and doc that cites it in the same commit (`planning/open-questions.md`, "How to use this file").
-- Update `roadmap.md` in the same commit as the work that changes a step's status (ADR-0017).
+- Update `roadmap.md` in the same commit as the work that changes a step's status (ADR-0021).
 - New docs start from `templates/`. English only; questions to Gabriel in his language (ADR-0012).
 - These repo files are the shared docs (ADR-0011 point 1). The PF copies of `adr/`, `architecture/` and `planning/` stay as working copies under a pointer saying this repo wins (Q-15, decided by Claude): edit the file here first, then mirror it to PF. If a PF copy differs from the file here, the file here wins; report the difference.
 
 ## Open questions
 
 - Still open in the register: Q-30 (where restaurant settings and delivery zones are built; not in Gabriel's 2026-10-01 batch) and Q-86 (clarifies his Q-70 pickup answer, which ends mid-sentence).
-- Waiting for Gabriel's review: ADR-0020 (storefront PIX prepayment, Proposed), `planning/proposals/settings-and-notifications.md` (Draft, Q-24), `ops/plane-setup.md` (Draft, Q-83; rewritten 2026-10-06 for Plane Cloud's free plan, which drops HTTPS exposure and backups; `EOS-<n>` ids stay Claude's default, changeable by Gabriel).
+- Waiting for Gabriel's review: ADR-0020 (storefront PIX prepayment, Proposed), `planning/proposals/settings-and-notifications.md` (Draft, Q-24), `ops/github-projects-setup.md` (Draft, Q-83, ADR-0021; its board design is Claude's default, changeable by Gabriel).
 - Q-72: Gabriel turns on branch protection for `main` in both repos; not yet confirmed done.
 - Decided by Claude, Gabriel may override: Q-12 (Draft and Ready definitions), Q-13 (when the amended architecture counts as Accepted), Q-14 (business-rules master stays in FE until S5; pt-BR banner wording), Q-15 (PF copies), all 2026-09-29; Q-26 (where a request's restaurant comes from), 2026-10-01, on Gabriel's delegation.
 - ADR-0011 point 4: where an agreed frontend annotation lives (local to ADR-0011).

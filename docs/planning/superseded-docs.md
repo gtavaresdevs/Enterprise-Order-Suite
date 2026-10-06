@@ -1,7 +1,7 @@
 # Superseded and stale legacy docs (S2 banner list)
 
 - Status: Draft
-- Date: 2026-09-29 (updated after Q-01..Q-03 were answered; updated 2026-10-01 after Gabriel's answers: F1, F2, F3, F4, F5, F6, F9, F10, F11, B4, B6, B9, B11, B12, B13, §5, Open questions; updated 2026-10-06: B16, the self-hosted Plane runbook and scripts)
+- Date: 2026-09-29 (updated after Q-01..Q-03 were answered; updated 2026-10-01 after Gabriel's answers: F1, F2, F3, F4, F5, F6, F9, F10, F11, B4, B6, B9, B11, B12, B13, §5, Open questions; updated 2026-10-06: B16, the self-hosted Plane runbook and scripts; B17, the Plane Cloud runbook)
 - Written by: Claude (S0). Follows MASTER-PLAN §4 (L68), §6 S2 (L89-90) and ADR-0000.
 - Used in: S2 (banners, both `CLAUDE.md` rewrites) and S3 (skills, agents, tooling).
 
@@ -484,9 +484,17 @@ Not part of the S2 pass: these are Claude's own 2026-10-02 files, superseded fou
 
 | File | Text | Why stale | Replaced by |
 |---|---|---|---|
-| `docs/ops/superseded/plane-selfhost-oracle.md` (whole file, banner at L3) | The Oracle instance, Tailscale Funnel, `plane.env`, the god-mode claim, nightly encrypted backups, the restore drill, idle reclamation | There is no server: Plane Cloud serves and stores everything (ADR-0017, 2026-10-06) | `docs/ops/plane-setup.md` |
-| `docs/ops/plane/*` (banner at L2 of each file, plus `README.md`) | `cloud-init.yaml`, `bootstrap-host.sh`, `install-plane.sh`, `plane-url.sh`, `backup.sh`, `verify-backup.sh` | Nothing runs them | `docs/ops/plane-setup.md`, which has no scripts |
-| `docs/ops/superseded/plane-selfhost-oracle.md` section 10 | The MCP server over local stdio with `uvx plane-mcp-server stdio`, and `page`/`initiative` tools returning 404 on CE | Plane Cloud has a hosted MCP endpoint with OAuth, and the free plan includes project pages | `docs/ops/plane-setup.md` section 6 |
+| `docs/ops/superseded/plane-selfhost-oracle.md` (whole file, banner at L3) | The Oracle instance, Tailscale Funnel, `plane.env`, the god-mode claim, nightly encrypted backups, the restore drill, idle reclamation | There is no server: first Plane Cloud (ADR-0017), then GitHub Projects (ADR-0021), both 2026-10-06 | `docs/ops/github-projects-setup.md` |
+| `docs/ops/plane/*` (banner at L2 of each file, plus `README.md`) | `cloud-init.yaml`, `bootstrap-host.sh`, `install-plane.sh`, `plane-url.sh`, `backup.sh`, `verify-backup.sh` | Nothing runs them | `docs/ops/github-projects-setup.md` (ADR-0021), which has no scripts |
+| `docs/ops/superseded/plane-selfhost-oracle.md` section 10 | The MCP server over local stdio with `uvx plane-mcp-server stdio`, and `page`/`initiative` tools returning 404 on CE | Plane is no longer used (ADR-0021) | none: GitHub issues are reached through the repo's API |
+
+### B17. Plane Cloud runbook (Low; superseded 2026-10-06, not legacy)
+
+Written and superseded the same day: Gabriel chose Plane Cloud's free plan at 13:49Z and GitHub Projects at 14:02Z (ADR-0021).
+
+| File | Text | Why stale | Replaced by |
+|---|---|---|---|
+| `docs/ops/superseded/plane-cloud-setup.md` (whole file, banner at L3) | Plane Cloud sign-up, workspace `eos`, project `EOS`, `EOS-<n>` ids, the Plane token and hosted MCP server | Plane is not used | `docs/ops/github-projects-setup.md` |
 
 ## 3. Project files (`/mnt/project-files`)
 

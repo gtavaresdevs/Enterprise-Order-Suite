@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# SUPERSEDED 2026-10-06: the project uses Plane Cloud's free plan (ADR-0017), so this script is not run.
-# Kept in case Plane is ever self-hosted. See README.md in this folder and ../plane-setup.md.
+# SUPERSEDED 2026-10-06: Plane is not self-hosted (ADR-0017); the project uses GitHub Projects (ADR-0021).
+# Not run. Kept in case Plane is ever self-hosted. See README.md in this folder.
 # verify-backup.sh: non-destructive check that a Plane backup made by backup.sh can be restored.
 #
-# Part of docs/ops/plane-setup.md (Enterprise Order Suite), sections 8 and 11.
+# Part of docs/ops/superseded/plane-selfhost-oracle.md (Enterprise Order Suite), sections 8 and 11.
 # Usage, as the user that installed Plane (member of the docker group):
 #     ~/plane-ops/verify-backup.sh                  # newest backup on the off-box remote
 #     ~/plane-ops/verify-backup.sh <local-folder>   # a backup folder already on disk
