@@ -1,7 +1,7 @@
 # Project board setup runbook (GitHub Projects)
 
 - Status: Draft
-- Updated: 2026-10-06 (labels created; smoke-test note on workflow order)
+- Updated: 2026-10-06 (board set up by Gabriel; earlier the same day: labels created, smoke-test note on workflow order)
 - Reviewed: not yet
 - Roadmap step: Project board setup, before Build 1 (`docs/roadmap.md`)
 - Related: ADR-0021 (the decision), ADR-0011, ADR-0013, ADR-0016; register Q-83
@@ -9,6 +9,8 @@
 - Replaces: the Plane runbooks (Plane Cloud, and self-hosted Plane on Oracle), deleted on 2026-10-06 at Gabriel's request; they remain in git history up to commit `1092797`.
 
 Gabriel, 2026-10-06T14:02Z: "Ok, so lets redesign our plan around github projects instead of plane, much simpler, free and AI can access it."
+
+**Set up on 2026-10-06.** Gabriel, project chat 15:12Z: "Board setup done https://github.com/users/gtavaresdevs/projects/2". It is project number 2 on his account. His smoke-test issues are #26 to #29 in the backend repo, all closed. His message named no change to Claude's defaults (section 0), so they stand.
 
 The board is a GitHub Project on Gabriel's account. Its cards are issues in the backend repo. There is no server, no extra account, no backup and no token for cloud sessions. Plan for about 20 minutes.
 
@@ -99,9 +101,9 @@ gh label create "needs-human" --repo gtavaresdevs/Enterprise-Order-Suite --color
    ```bash
    gh auth refresh -s project
    gh project list --owner gtavaresdevs
-   gh project item-list <number> --owner gtavaresdevs --format json
+   gh project item-list 2 --owner gtavaresdevs --format json
    ```
-   `<number>` is the project number in its URL (`github.com/users/gtavaresdevs/projects/<number>`). No MCP server is needed: Claude Code runs `gh` directly.
+   `2` is the project number, from its URL (`github.com/users/gtavaresdevs/projects/2`). No MCP server is needed: Claude Code runs `gh` directly.
 
 Cloud sessions need no setup: they already reach the repo's issues.
 
@@ -109,13 +111,15 @@ How agents use issues (read, comment, label, close) is decided when the board re
 
 ## 7. Checklist
 
-- [ ] Project "Enterprise Order Suite" on `gtavaresdevs`, Board layout, Private, linked to both repos
-- [ ] Status: Todo, In Progress, In review, Done
-- [ ] Workflows: auto-add (`Enterprise-Order-Suite`, `is:issue`) on; "Item added" sets Todo; "Item closed" and "Pull request merged" on
+Ticked on Gabriel's word (project chat, 2026-10-06T15:12Z, "Board setup done https://github.com/users/gtavaresdevs/projects/2"); a cloud session cannot see the project itself (section 1).
+
+- [x] Project "Enterprise Order Suite" on `gtavaresdevs`, Board layout, Private, linked to both repos
+- [x] Status: Todo, In Progress, In review, Done
+- [x] Workflows: auto-add (`Enterprise-Order-Suite`, `is:issue`) on; "Item added" sets Todo; "Item closed" and "Pull request merged" on
 - [x] The eleven labels in section 5 exist in the backend repo (created by Claude 2026-10-06)
-- [ ] Smoke-test issue appeared under Todo and moved to Done when closed
+- [x] Smoke-test issue appeared under Todo and moved to Done when closed (issues #26 to #29, all closed)
 - [ ] Optional: `gh project list --owner gtavaresdevs` works on your PC
-- [ ] Gabriel posted the outcome in the project thread (section 8)
+- [x] Gabriel posted the outcome in the project thread (section 8): 2026-10-06T15:12Z
 
 ## 8. After setup
 
@@ -134,9 +138,6 @@ Read 2026-10-06. Nothing on this page was run against a real project: Claude has
 
 ## Inputs needed from Gabriel
 
-- Create the project, set it Private and link both repos (section 2).
-- Add "In review" to Status (section 3).
-- Turn on the auto-add and "Item added" workflows (section 4).
-- ~~Create the labels, or ask Claude to (section 5).~~ Done by Claude on 2026-10-06.
-- Run the smoke test (section 6), and optionally give `gh` the `project` scope on your PC.
-- When done: the outcome message in section 8.
+- ~~Sections 2 to 4, the smoke test and the outcome message.~~ Done by Gabriel on 2026-10-06. ~~The labels (section 5).~~ Done by Claude on 2026-10-06.
+- Optional: give `gh` the `project` scope on your PC (section 6).
+- Mark this page Reviewed when you have read it (ADR-0016).

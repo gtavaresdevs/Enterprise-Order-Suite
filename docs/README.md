@@ -1,7 +1,7 @@
 # Enterprise Order Suite docs: read first
 
 - Status: Draft
-- Updated: 2026-10-06 (GitHub Projects replaces Plane, ADR-0021, and the Plane runbooks and scripts are deleted; earlier the same day Plane had moved to Plane Cloud, ADR-0017). Earlier: 2026-10-02 (the Plane runbook states Claude's defaults). Earlier: 2026-10-01 (Gabriel's register answers of 2026-10-01; S1, S2 and S3 done). Earlier: 2026-09-29 (S2, docs skeleton)
+- Updated: 2026-10-06 (Gabriel set up the project board, 15:12Z). Earlier the same day: GitHub Projects replaced Plane (ADR-0021) and the Plane runbooks and scripts were deleted; before that, Plane had moved to Plane Cloud (ADR-0017). Earlier: 2026-10-02 (the Plane runbook states Claude's defaults). Earlier: 2026-10-01 (Gabriel's register answers of 2026-10-01; S1, S2 and S3 done). Earlier: 2026-09-29 (S2, docs skeleton)
 - Maintained by: Claude, in this repo on `feature/ai-agent` (ADR-0011). Only Gabriel sets Reviewed (ADR-0016).
 - Related: `planning/MASTER-PLAN.md`, `adr/README.md`, `roadmap.md`, `planning/open-questions.md`
 
@@ -14,7 +14,7 @@ This folder is the one shared place for project docs (ADR-0011): backend repo `g
   - backend: this repo, Spring Boot, `feature/ai-agent`;
   - frontend: `gtavaresdevs/enterprise-order-suite-frontend`, app in `order-ui/`, `Claude-Assisted-Development`.
 - People: Gabriel (solo developer; owns every product decision) and Claude agents.
-- Current phase (MP §1): **S1, S2 and S3 done** (S1 and S3 on 2026-10-01; S2's waiting parts on 2026-10-01). Next: S4 (API conventions, Tenancy & Identity). **The project board setup (GitHub Projects) comes before Build 1** (Q-83 b; ADR-0021, 2026-10-06; runbook `ops/github-projects-setup.md`). Gabriel answered his batch on 2026-10-01; **still open: Q-30 and Q-86**. S0 done 2026-09-29.
+- Current phase (MP §1): **S1, S2 and S3 done** (S1 and S3 on 2026-10-01; S2's waiting parts on 2026-10-01). Next: S4 (API conventions, Tenancy & Identity). **The project board (GitHub Projects) is set up** (Gabriel, 2026-10-06; Q-83 b; ADR-0021; runbook `ops/github-projects-setup.md`; https://github.com/users/gtavaresdevs/projects/2). `roadmap.md` stays the tracker until its open steps move onto the board. Gabriel answered his batch on 2026-10-01; **still open: Q-30 and Q-86**. S0 done 2026-09-29.
 - **No feature code for the new architecture until every item of the readiness gate (MP §7, mirrored in `roadmap.md`) is checked** (ADR-0015). Docs and readiness tooling (S2-S5) proceed before the gate.
 - After the gate: Build 1 Tenant foundation -> Build 2 Menu -> Build 3 Order Core -> Build 4 Storefront <-> Order Core (ADR-0007). Each build step waits for its contract to be Reviewed (ADR-0016). Since 2026-10-01 the gate also requires S5 Reviewed (Q-08 b) and the project board set up (Q-83 b; GitHub Projects since 2026-10-06, ADR-0021).
 - Step status: `roadmap.md`.

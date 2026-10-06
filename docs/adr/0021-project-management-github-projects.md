@@ -29,6 +29,7 @@
 - Cloud sessions see and change issues, not board fields. Anything an agent must know (ready for it, blocked, needs a person) is a label on the issue. Moving cards between Todo, In Progress and In review is Gabriel's, or a local session's with `gh project`.
 - A commit with "closes #N" on `feature/ai-agent` leaves the issue open (ADR-0013 keeps `main` untouched); use `Refs #N` and close by hand.
 - Every Plane runbook and script (the Plane Cloud runbook, the self-hosted Oracle runbook, and `docs/ops/plane/`) was deleted on 2026-10-06 (Gabriel, 2026-10-06T14:10Z: "u can delete what's related to plane, we wont use it"). They remain in git history up to commit `1092797`. ADR-0017 stays as the superseded decision record: an ADR is never deleted, only superseded (`adr/README.md`, Conventions).
+- Set up by Gabriel on 2026-10-06 (project chat, 15:12Z): "Board setup done https://github.com/users/gtavaresdevs/projects/2". The Build 1 gate item for the board is met. `docs/roadmap.md` stays the tracker until its open steps move onto the board as issues; that move, and what agents may do on issues, is the next board step (Open questions).
 - Agents must never:
   - invent or cite an issue number that does not exist;
   - create the project, its fields, views or workflows, or the labels, before Gabriel says so;
@@ -37,7 +38,7 @@
 
 ## Open questions
 - Q-83: the 2026-10-06 change is recorded in its row. HTTPS exposure and off-box backups are moot (they were already closed under Plane Cloud). The reference convention (`#<n>` with `Refs`) is Claude's default, still pending as an answer, like the `EOS-<n>` default it replaces.
-- What agents may do on issues once the board is the tracker: decided then (carried over from ADR-0017).
+- What agents may do on issues once the board is the tracker: decided then (carried over from ADR-0017). The board exists since 2026-10-06; the tracker has not moved yet.
 
 ## Sources
 - Gabriel, project thread 2026-10-06T14:02Z (this decision) and 13:48Z-13:49Z (Plane Cloud, ADR-0017).

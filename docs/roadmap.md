@@ -1,8 +1,8 @@
 # Roadmap (interim tracker)
 
 - Status: Draft
-- Updated: 2026-10-06 (board setup row: GitHub Projects replaces Plane, ADR-0021, Plane runbooks deleted; earlier the same day Plane Cloud had replaced the Oracle VPS). Earlier: 2026-10-02 (Plane setup row: runbook ready; its defaults are Claude's). Earlier: 2026-10-01 (Gabriel's register answers of 2026-10-01: S1, S2, S3 done; Plane setup step added; gate items 1, 2 and 4 ticked, two items added; item 3 unticked until the `CLAUDE.md` corrections are committed)
-- Role: the project tracker until Gabriel sets up the GitHub Project (ADR-0021). Order of work and gate: `planning/MASTER-PLAN.md` §6-§7 (ADR-0007, ADR-0015). Where this file and MP disagree, MP wins; fix this file in the same commit.
+- Updated: 2026-10-06 (Gabriel set up the board, 15:12Z: board setup step Done, its gate item ticked). Earlier the same day: board setup row: GitHub Projects replaces Plane, ADR-0021, Plane runbooks deleted; earlier the same day Plane Cloud had replaced the Oracle VPS). Earlier: 2026-10-02 (Plane setup row: runbook ready; its defaults are Claude's). Earlier: 2026-10-01 (Gabriel's register answers of 2026-10-01: S1, S2, S3 done; Plane setup step added; gate items 1, 2 and 4 ticked, two items added; item 3 unticked until the `CLAUDE.md` corrections are committed)
+- Role: the project tracker until its open steps move onto the GitHub Project as issues (ADR-0021). Gabriel set the project up on 2026-10-06; the move has not happened yet. Order of work and gate: `planning/MASTER-PLAN.md` §6-§7 (ADR-0007, ADR-0015). Where this file and MP disagree, MP wins; fix this file in the same commit.
 - Related: `README.md`, `planning/open-questions.md`, ADR-0007, ADR-0015, ADR-0016, ADR-0021 (was ADR-0017)
 
 ## Order of work
@@ -15,8 +15,8 @@
 | S3 | Readiness tooling: version the frontend `.claude/`, port or remove the PowerShell hook, `permissions.deny` git rules, SessionStart setup, frontend lint baseline, Vitest, CI running today's checks in both repos | Claude (+ Gabriel for the S1 push) | S2 | Done 2026-10-01: everything except the frontend `.claude/` (hook port, git rules, SessionStart check, Vitest, CI in both repos, skills aligned) on 2026-09-29; the frontend `.claude/` versioned by Gabriel on 2026-10-01 (FE `c4a7309`, Q-06 a, Q-07) and its `permissions.deny` git rules added the same day (FE `30bc172`) |
 | S4 | Cross-cutting design: API conventions doc, finalize the Edge-ready constraints (drafted in ADR-0003), then the Tenancy & Identity contract with Gabriel's question batch (register group 2) | Claude + Gabriel | S2 | Not started |
 | S5 | Scope of this run (short PRD) + NFR page + audit backlog triage. Input also: `planning/proposals/settings-and-notifications.md` (Q-24). Must be Reviewed before Build 1 (Q-08 b) | Claude + Gabriel | S4 | Not started |
-| Board setup | GitHub Projects (Gabriel, 2026-10-06; ADR-0021; the step itself is Q-83 b, 2026-10-01), following the runbook `ops/github-projects-setup.md` (Draft): one project on his account, an "In review" Status, the auto-add workflow and the labels. Work items are issues in this repo, cited as `Refs #<n>`. Then the board replaces this file as the tracker. Docs and readiness work do not wait for it | Gabriel (+ Claude: runbook) | none | Partially done: the eleven labels exist in the backend repo (created by Claude at Gabriel's request, 2026-10-06). The project, its Status column and the auto-add workflow are Gabriel's (runbook sections 2-4). The Plane runbooks it replaced were deleted on 2026-10-06 at Gabriel's request |
-| Build 1 | Tenant foundation. Acceptance includes: ArchUnit tenant rule, cross-tenant tests, contract drift test, dev/test seed data, tenant id in logs | Claude | Readiness gate below, which includes S5 Reviewed (Q-08 b) and the board setup (Q-83 b) | Not started |
+| Board setup | GitHub Projects (Gabriel, 2026-10-06; ADR-0021; the step itself is Q-83 b, 2026-10-01), following the runbook `ops/github-projects-setup.md` (Draft): one project on his account, an "In review" Status, the auto-add workflow and the labels. Work items are issues in this repo, cited as `Refs #<n>`. Then the board replaces this file as the tracker. Docs and readiness work do not wait for it | Gabriel (+ Claude: runbook) | none | Done 2026-10-06: Gabriel set up the project (project chat, 15:12Z: "Board setup done https://github.com/users/gtavaresdevs/projects/2") and ran the smoke test (issues #26 to #29, all closed); Claude created the eleven labels at his request the same day. The Plane runbooks it replaced were deleted on 2026-10-06 at Gabriel's request. Next board step: move this file's open steps onto the board as issues; until then this file stays the tracker |
+| Build 1 | Tenant foundation. Acceptance includes: ArchUnit tenant rule, cross-tenant tests, contract drift test, dev/test seed data, tenant id in logs | Claude | Readiness gate below, which includes S5 Reviewed (Q-08 b) and the board setup (Q-83 b, done 2026-10-06) | Not started |
 | Build 2 | Menu | Claude | Menu contract Reviewed | Not started |
 | Build 3 | Order Core | Claude | Order Core contract Reviewed | Not started |
 | Build 4 | Storefront <-> Order Core | Claude | Storefront contract Reviewed | Not started |
@@ -37,7 +37,7 @@ From MP §7. Tick an item only when it holds (repo items: on the working branche
 - [x] CI runs `./gradlew test` and `yarn lint && yarn build && yarn test` on the working branches, green. Evidence (2026-09-29): backend CI run 36604877944 on `72cef45`; frontend CI run 36603662582 on `06de42e`. Re-checked 2026-10-01 after BE `c8bf761` removed the CI JDK override and `gradle.properties` (Q-84 a): backend CI run 36894501564 on `c8bf761`, frontend CI run 36894477010 on `30bc172`, both green.
 - [ ] API conventions + Tenancy & Identity contract are Reviewed. (Menu and Order Core contracts gate their own steps, not this one.)
 - [ ] S5 (scope of this run, NFR page, audit triage) Reviewed. Added 2026-10-01 (Q-08 b).
-- [ ] Project board set up (GitHub Projects since 2026-10-06, ADR-0021). Added 2026-10-01 (Q-83 b: "the first thing we do before begin working on the actual app"); runbook `ops/github-projects-setup.md` (Draft).
+- [x] Project board set up (GitHub Projects since 2026-10-06, ADR-0021). Added 2026-10-01 (Q-83 b: "the first thing we do before begin working on the actual app"); runbook `ops/github-projects-setup.md` (Draft). Evidence: Gabriel, project chat 2026-10-06T15:12Z: "Board setup done https://github.com/users/gtavaresdevs/projects/2"; his smoke-test issues #26 to #29 in the backend repo, all closed.
 
 "Reviewed" = Gabriel read it and no open question blocks the next build step. Only Gabriel sets it (ADR-0016), with a message in the project thread ("Reviewed: <doc>") that Claude records (Q-09 a).
 
@@ -60,7 +60,7 @@ Ideas that are not scheduled this run. Add new ones here with date and source; n
 - When a gate item is ticked, add the evidence on the same line (commit, doc and its status, or Gabriel's message date).
 - Keep this file in line with MP §6-§7. The order of work and the gate are changed in MP §6-§7 and ADR-0007 (ADR-0007 Consequences), then mirrored here.
 - Never invent or cite an issue number that does not exist; cite issues as `Refs #<n>`, never with a closing keyword (ADR-0021).
-- The GitHub Project replaces this file only when Gabriel has set it up (ADR-0021; Q-83). No history import, no empty future milestones, no automation code.
+- The GitHub Project replaces this file once the open steps are moved onto it as issues (ADR-0021; Q-83). Gabriel set it up on 2026-10-06; the move has not happened yet. No history import, no empty future milestones, no automation code.
 
 ## Open questions
 
