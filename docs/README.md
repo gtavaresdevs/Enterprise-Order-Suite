@@ -14,7 +14,7 @@ This folder is the one shared place for project docs (ADR-0011): backend repo `g
   - backend: this repo, Spring Boot, `feature/ai-agent`;
   - frontend: `gtavaresdevs/enterprise-order-suite-frontend`, app in `order-ui/`, `Claude-Assisted-Development`.
 - People: Gabriel (solo developer; owns every product decision) and Claude agents.
-- Current phase (MP §1): **S1, S2 and S3 done** (S1 and S3 on 2026-10-01; S2's waiting parts on 2026-10-01). Next: S4 (API conventions, Tenancy & Identity). **The project board (GitHub Projects) is set up** (Gabriel, 2026-10-06; Q-83 b; ADR-0021; runbook `ops/github-projects-setup.md`; https://github.com/users/gtavaresdevs/projects/2). `roadmap.md` stays the tracker until its open steps move onto the board. Gabriel answered his batch on 2026-10-01 and the last two rows, Q-30 and Q-86, on 2026-10-06; **nothing is open in the register**. S0 done 2026-09-29.
+- Current phase (MP §1): **S1, S2 and S3 done** (S1 and S3 on 2026-10-01; S2's waiting parts on 2026-10-01). Next: S4 (API conventions, Tenancy & Identity). **The project board (GitHub Projects) is set up** (Gabriel, 2026-10-06; Q-83 b; ADR-0021; runbook `ops/github-projects-setup.md`; https://github.com/users/gtavaresdevs/projects/2). `roadmap.md` stays the tracker until its open steps move onto the board. Gabriel answered his batch on 2026-10-01 and the last two rows, Q-30 and Q-86, on 2026-10-06; **open: Q-87 and Q-88** (asked 2026-10-06 after his ADR-0020 answers). S0 done 2026-09-29.
 - **No feature code for the new architecture until every item of the readiness gate (MP §7, mirrored in `roadmap.md`) is checked** (ADR-0015). Docs and readiness tooling (S2-S5) proceed before the gate.
 - After the gate: Build 1 Tenant foundation -> Build 2 Menu -> Build 3 Order Core -> Build 4 Storefront <-> Order Core (ADR-0007). Each build step waits for its contract to be Reviewed (ADR-0016). Since 2026-10-01 the gate also requires S5 Reviewed (Q-08 b) and the project board set up (Q-83 b; GitHub Projects since 2026-10-06, ADR-0021).
 - Step status: `roadmap.md`.
@@ -119,7 +119,7 @@ docs/
 
 ## Open questions
 
-- Nothing is open in the register since 2026-10-06: Gabriel answered Q-30 a (where restaurant settings and delivery zones are built) and Q-86 a (pickup only with PIX prepayment inside a delivery zone) in the project thread at 18:12Z.
+- Open in the register: Q-87 (who may accept an order and who may release an unpaid PIX order; blocks the Order Core contract) and Q-88 (whether a "Já paguei" tap holds a PIX order past 5 minutes; blocks the Storefront contract), both asked on 2026-10-06. The same day Gabriel answered Q-30 a (where restaurant settings and delivery zones are built) and Q-86 a (pickup only with PIX prepayment inside a delivery zone) in the project thread at 18:12Z.
 - Nothing waits for Gabriel's review since 2026-10-06 (18:12Z): ADR-0020 (storefront PIX prepayment) Accepted; `planning/proposals/settings-and-notifications.md` (Q-24) and `ops/github-projects-setup.md` (Q-83, ADR-0021) Reviewed.
 - Q-72: branch protection for `main` is on in both repos (Gabriel confirmed 2026-10-06).
 - Decided by Claude, Gabriel may override: Q-12 (Draft and Ready definitions), Q-13 (when the amended architecture counts as Accepted), Q-14 (business-rules master stays in FE until S5; pt-BR banner wording), Q-15 (PF copies), all 2026-09-29; Q-26 (where a request's restaurant comes from), 2026-10-01, on Gabriel's delegation.
