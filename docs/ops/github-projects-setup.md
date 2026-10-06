@@ -1,7 +1,7 @@
 # Project board setup runbook (GitHub Projects)
 
 - Status: Draft
-- Updated: 2026-10-06
+- Updated: 2026-10-06 (labels created)
 - Reviewed: not yet
 - Roadmap step: Project board setup, before Build 1 (`docs/roadmap.md`)
 - Related: ADR-0021 (the decision), ADR-0011, ADR-0013, ADR-0016; register Q-83
@@ -70,6 +70,8 @@ Leave every other workflow off.
 
 ## 5. Labels
 
+**Done on 2026-10-06:** Claude created all eleven labels below in the backend repo at Gabriel's request ("create the board labels", project thread 14:39Z), and read them back: names, colours and descriptions match this block. Skip this section unless a label is missing or was changed.
+
 Pick one of these:
 - **Ask Claude.** Say "create the board labels" in the project thread. A cloud session can create them in the backend repo (it has repo access); it will not do so unprompted (ADR-0021).
 - **Paste it yourself.** With the GitHub CLI installed and logged in (`gh auth login`), paste these lines into PowerShell or Git Bash. `--force` updates a label that already exists, so the block is safe to re-run.
@@ -109,7 +111,7 @@ How agents use issues (read, comment, label, close) is decided when the board re
 - [ ] Project "Enterprise Order Suite" on `gtavaresdevs`, Board layout, Private, linked to both repos
 - [ ] Status: Todo, In Progress, In review, Done
 - [ ] Workflows: auto-add (`Enterprise-Order-Suite`, `is:issue`) on; "Item added" sets Todo; "Item closed" and "Pull request merged" on
-- [ ] The eleven labels in section 5 exist in the backend repo
+- [x] The eleven labels in section 5 exist in the backend repo (created by Claude 2026-10-06)
 - [ ] Smoke-test issue appeared under Todo and moved to Done when closed
 - [ ] Optional: `gh project list --owner gtavaresdevs` works on your PC
 - [ ] Gabriel posted the outcome in the project thread (section 8)
@@ -134,6 +136,6 @@ Read 2026-10-06. Nothing on this page was run against a real project: Claude has
 - Create the project, set it Private and link both repos (section 2).
 - Add "In review" to Status (section 3).
 - Turn on the auto-add and "Item added" workflows (section 4).
-- Create the labels, or ask Claude to (section 5).
+- ~~Create the labels, or ask Claude to (section 5).~~ Done by Claude on 2026-10-06.
 - Run the smoke test (section 6), and optionally give `gh` the `project` scope on your PC.
 - When done: the outcome message in section 8.
