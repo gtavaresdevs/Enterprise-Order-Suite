@@ -32,7 +32,7 @@ Accepted (Gabriel, 2026-09-29; register Q-01 option a and Q-03 row 3.1).
    ```text
    docs/
      README.md            where to look, current phase, what exists (read first)
-     roadmap.md           interim tracker (ADR-0017)
+     roadmap.md           interim tracker (ADR-0021)
      adr/NNNN-slug.md     decision records (numbering fixed in S0)
      architecture/        RESTAURANT-OPS-ARCHITECTURE.md + Tenancy & Identity, API conventions,
                           Order Core, Menu & Storefront

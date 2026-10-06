@@ -29,7 +29,7 @@
 | S4 | Cross-cutting design: API conventions doc, finalize the Edge-ready constraints (ADR-0003), then **Tenancy & Identity** contract with Gabriel's question batch. | Claude + Gabriel | S2 |
 | S5 | Scope of this run (short PRD) + NFR page + audit backlog triage. Must be Reviewed before Build 1 (Q-08 b). | Claude + Gabriel | S4 |
 | Board | Project board setup (Q-83 b), following the runbook `docs/ops/github-projects-setup.md` (Draft). GitHub Projects since 2026-10-06 (ADR-0021): one project, an "In review" Status, the auto-add workflow and the labels. Docs and readiness work do not wait for it. | Gabriel (+ Claude: runbook) | nothing |
-| **Build 1** | Tenant foundation (acceptance includes: ArchUnit tenant rule, cross-tenant tests, contract drift test, seed data, tenant id in logs). | Claude | Gate §7, including S5 Reviewed (Q-08 b) and the Plane setup (Q-83 b) |
+| **Build 1** | Tenant foundation (acceptance includes: ArchUnit tenant rule, cross-tenant tests, contract drift test, seed data, tenant id in logs). | Claude | Gate §7, including S5 Reviewed (Q-08 b) and the board setup (Q-83 b) |
 | Build 2–4 | Menu → Order Core → Storefront ↔ Order Core. Each contract is reviewed before its step. Small existing-feature fixes from the audit ride alongside; so do Phase 11's small polish items, with Build 3-4 (Q-82 a). | Claude | their contract |
 
 3. **Readiness gate before Build 1** (MASTER-PLAN §7, L97-107):
@@ -47,12 +47,12 @@
 5. **Out** (not this run): PSP, automatic WhatsApp, fiscal, marketplaces, billing.
 6. Provenance:
    - Rows Build 1-4 are D-7 (Accepted).
-   - Rows S0-S5 and the slimmed gate are Claude's plan in MASTER-PLAN §6-7, built on D-13 and D-14. Gabriel reviews them in S1. The simplifications behind them (MASTER-PLAN §4), including the slim gate (row 3.8), were accepted with Q-03 on 2026-09-29. Build 1 waits for S5 to be Reviewed (Q-08 b, 2026-10-01). The Plane row is Gabriel's (Q-83 b, 2026-10-01).
+   - Rows S0-S5 and the slimmed gate are Claude's plan in MASTER-PLAN §6-7, built on D-13 and D-14. Gabriel reviews them in S1. The simplifications behind them (MASTER-PLAN §4), including the slim gate (row 3.8), were accepted with Q-03 on 2026-09-29. Build 1 waits for S5 to be Reviewed (Q-08 b, 2026-10-01). The Board row is Gabriel's (Q-83 b, 2026-10-01; GitHub Projects since 2026-10-06, ADR-0021).
 
 ## Consequences
 - Never: start Build 1 code before every gate item in §7 is true. Docs and readiness tooling (S0-S5) may proceed before the gate (D-13).
 - Never: start Build 2, 3 or 4 before its contract (Menu, Order Core, Storefront) is Reviewed. Only Gabriel sets Reviewed (ADR-0016).
-- Never: schedule, design in detail or build Later or Out items this run. New ideas go to the Later list in `docs/roadmap.md` (ADR-0017).
+- Never: schedule, design in detail or build Later or Out items this run. New ideas go to the Later list in `docs/roadmap.md` (ADR-0021).
 - Never: follow the superseded orders listed above (architecture L320-339, legacy backend phases 2-6, the frontend roadmap's "What's next", the ai-ready plan §4-5).
 - Must: treat the ArchUnit tenant rule, cross-tenant tests, contract drift test, seed data and tenant id in logs as acceptance criteria of Build 1, not as readiness items (MASTER-PLAN §4 L64, §6 L93).
 - Must: fold small existing-feature fixes from the audit into the Build step they touch, as triaged in S5.

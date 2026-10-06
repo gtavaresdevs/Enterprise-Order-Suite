@@ -6,7 +6,7 @@
 - Roadmap step: Project board setup, before Build 1 (`docs/roadmap.md`)
 - Related: ADR-0021 (the decision), ADR-0011, ADR-0013, ADR-0016; register Q-83
 - Who runs it: Gabriel, on his GitHub account. Agents do not create the project, its fields, views, workflows or the labels until he says so (ADR-0021). Claude wrote this page from GitHub's docs and from what a cloud session could reach on 2026-10-06; it updates the page from what Gabriel reports.
-- Replaces: `superseded/plane-cloud-setup.md` (Plane Cloud, 2026-10-06) and `superseded/plane-selfhost-oracle.md` (self-hosted Plane on Oracle, 2026-10-02). Nothing there is run.
+- Replaces: the Plane runbooks (Plane Cloud, and self-hosted Plane on Oracle), deleted on 2026-10-06 at Gabriel's request; they remain in git history up to commit `1092797`.
 
 Gabriel, 2026-10-06T14:02Z: "Ok, so lets redesign our plan around github projects instead of plane, much simpler, free and AI can access it."
 

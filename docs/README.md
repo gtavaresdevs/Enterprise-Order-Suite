@@ -1,7 +1,7 @@
 # Enterprise Order Suite docs: read first
 
 - Status: Draft
-- Updated: 2026-10-06 (GitHub Projects replaces Plane, ADR-0021; earlier the same day Plane had moved to Plane Cloud, ADR-0017). Earlier: 2026-10-02 (the Plane runbook states Claude's defaults). Earlier: 2026-10-01 (Gabriel's register answers of 2026-10-01; S1, S2 and S3 done). Earlier: 2026-09-29 (S2, docs skeleton)
+- Updated: 2026-10-06 (GitHub Projects replaces Plane, ADR-0021, and the Plane runbooks and scripts are deleted; earlier the same day Plane had moved to Plane Cloud, ADR-0017). Earlier: 2026-10-02 (the Plane runbook states Claude's defaults). Earlier: 2026-10-01 (Gabriel's register answers of 2026-10-01; S1, S2 and S3 done). Earlier: 2026-09-29 (S2, docs skeleton)
 - Maintained by: Claude, in this repo on `feature/ai-agent` (ADR-0011). Only Gabriel sets Reviewed (ADR-0016).
 - Related: `planning/MASTER-PLAN.md`, `adr/README.md`, `roadmap.md`, `planning/open-questions.md`
 
@@ -98,7 +98,7 @@ docs/
   adr/               decision records; index and rules in adr/README.md
   architecture/      Gabriel's architecture + amendment proposal; contract docs land here (S4 onward)
   planning/          MASTER-PLAN, open-questions register, superseded-docs list, S0 evidence; proposals/ (Claude proposals for Gabriel's review)
-  ops/               runbooks (project board setup; superseded Plane runbooks in ops/superseded/)
+  ops/               runbooks (project board setup)
   api/drafts/        design-first contract drafts (ADR-0010); api/openapi.yaml arrives in Build 1
   templates/         doc templates (Status line + Open questions, ADR-0016)
   contracts/         superseded 0.3.0 snapshot (ADR-0010); never re-sync

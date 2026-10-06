@@ -28,7 +28,7 @@
 - Issues in a public repo are public, whatever the project's own visibility. Agents and people must never put restaurant, customer or order data, secrets, tokens, IP addresses or credentials into an issue, a comment or a project field.
 - Cloud sessions see and change issues, not board fields. Anything an agent must know (ready for it, blocked, needs a person) is a label on the issue. Moving cards between Todo, In Progress and In review is Gabriel's, or a local session's with `gh project`.
 - A commit with "closes #N" on `feature/ai-agent` leaves the issue open (ADR-0013 keeps `main` untouched); use `Refs #N` and close by hand.
-- `docs/ops/plane-setup.md` (Plane Cloud) moves to `docs/ops/superseded/plane-cloud-setup.md`; the self-hosted runbook and scripts stay superseded where they are (`docs/ops/superseded/plane-selfhost-oracle.md`, `docs/ops/plane/`).
+- Every Plane runbook and script (the Plane Cloud runbook, the self-hosted Oracle runbook, and `docs/ops/plane/`) was deleted on 2026-10-06 (Gabriel, 2026-10-06T14:10Z: "u can delete what's related to plane, we wont use it"). They remain in git history up to commit `1092797`. ADR-0017 stays as the superseded decision record: an ADR is never deleted, only superseded (`adr/README.md`, Conventions).
 - Agents must never:
   - invent or cite an issue number that does not exist;
   - create the project, its fields, views or workflows, or the labels, before Gabriel says so;
