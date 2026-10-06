@@ -1,7 +1,7 @@
 # Enterprise Order Suite docs: read first
 
 - Status: Draft
-- Updated: 2026-10-02 (the Plane runbook states Claude's defaults). Earlier: 2026-10-01 (Gabriel's register answers of 2026-10-01; S1, S2 and S3 done). Earlier: 2026-09-29 (S2, docs skeleton)
+- Updated: 2026-10-06 (Plane moves to Plane Cloud's free plan, ADR-0017). Earlier: 2026-10-02 (the Plane runbook states Claude's defaults). Earlier: 2026-10-01 (Gabriel's register answers of 2026-10-01; S1, S2 and S3 done). Earlier: 2026-09-29 (S2, docs skeleton)
 - Maintained by: Claude, in this repo on `feature/ai-agent` (ADR-0011). Only Gabriel sets Reviewed (ADR-0016).
 - Related: `planning/MASTER-PLAN.md`, `adr/README.md`, `roadmap.md`, `planning/open-questions.md`
 
@@ -14,9 +14,9 @@ This folder is the one shared place for project docs (ADR-0011): backend repo `g
   - backend: this repo, Spring Boot, `feature/ai-agent`;
   - frontend: `gtavaresdevs/enterprise-order-suite-frontend`, app in `order-ui/`, `Claude-Assisted-Development`.
 - People: Gabriel (solo developer; owns every product decision) and Claude agents.
-- Current phase (MP §1): **S1, S2 and S3 done** (S1 and S3 on 2026-10-01; S2's waiting parts on 2026-10-01). Next: S4 (API conventions, Tenancy & Identity). **The Plane setup on Gabriel's Oracle VPS comes before Build 1** (Q-83 b; runbook `ops/plane-setup.md`). Gabriel answered his batch on 2026-10-01; **still open: Q-30 and Q-86**. S0 done 2026-09-29.
+- Current phase (MP §1): **S1, S2 and S3 done** (S1 and S3 on 2026-10-01; S2's waiting parts on 2026-10-01). Next: S4 (API conventions, Tenancy & Identity). **The Plane setup comes before Build 1** (Q-83 b; runbook `ops/plane-setup.md`; on Plane Cloud's free plan since 2026-10-06, ADR-0017). Gabriel answered his batch on 2026-10-01; **still open: Q-30 and Q-86**. S0 done 2026-09-29.
 - **No feature code for the new architecture until every item of the readiness gate (MP §7, mirrored in `roadmap.md`) is checked** (ADR-0015). Docs and readiness tooling (S2-S5) proceed before the gate.
-- After the gate: Build 1 Tenant foundation -> Build 2 Menu -> Build 3 Order Core -> Build 4 Storefront <-> Order Core (ADR-0007). Each build step waits for its contract to be Reviewed (ADR-0016). Since 2026-10-01 the gate also requires S5 Reviewed (Q-08 b) and Plane set up on Gabriel's Oracle VPS (Q-83 b).
+- After the gate: Build 1 Tenant foundation -> Build 2 Menu -> Build 3 Order Core -> Build 4 Storefront <-> Order Core (ADR-0007). Each build step waits for its contract to be Reviewed (ADR-0016). Since 2026-10-01 the gate also requires S5 Reviewed (Q-08 b) and Plane set up (Q-83 b; on Plane Cloud since 2026-10-06).
 - Step status: `roadmap.md`.
 
 ## 2. Where to look
@@ -120,7 +120,7 @@ docs/
 ## Open questions
 
 - Still open in the register: Q-30 (where restaurant settings and delivery zones are built; not in Gabriel's 2026-10-01 batch) and Q-86 (clarifies his Q-70 pickup answer, which ends mid-sentence).
-- Waiting for Gabriel's review: ADR-0020 (storefront PIX prepayment, Proposed), `planning/proposals/settings-and-notifications.md` (Draft, Q-24), `ops/plane-setup.md` (Draft, Q-83; for HTTPS exposure, off-box backups and work-item ids it states Claude's defaults (Tailscale Funnel, encrypted Google Drive backups, `EOS-<n>` ids), which Gabriel can change).
+- Waiting for Gabriel's review: ADR-0020 (storefront PIX prepayment, Proposed), `planning/proposals/settings-and-notifications.md` (Draft, Q-24), `ops/plane-setup.md` (Draft, Q-83; rewritten 2026-10-06 for Plane Cloud's free plan, which drops HTTPS exposure and backups; `EOS-<n>` ids stay Claude's default, changeable by Gabriel).
 - Q-72: Gabriel turns on branch protection for `main` in both repos; not yet confirmed done.
 - Decided by Claude, Gabriel may override: Q-12 (Draft and Ready definitions), Q-13 (when the amended architecture counts as Accepted), Q-14 (business-rules master stays in FE until S5; pt-BR banner wording), Q-15 (PF copies), all 2026-09-29; Q-26 (where a request's restaurant comes from), 2026-10-01, on Gabriel's delegation.
 - ADR-0011 point 4: where an agreed frontend annotation lives (local to ADR-0011).

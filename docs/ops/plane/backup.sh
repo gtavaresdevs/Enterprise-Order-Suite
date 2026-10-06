@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SUPERSEDED 2026-10-06: the project uses Plane Cloud's free plan (ADR-0017), so this script is not run.
+# Kept in case Plane is ever self-hosted. See README.md in this folder and ../plane-setup.md.
 # backup.sh: nightly backup of a Plane Community Edition install, copied off the server.
 #
 # Part of docs/ops/plane-setup.md (Enterprise Order Suite), section 8 (Backups).

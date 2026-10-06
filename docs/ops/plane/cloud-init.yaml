@@ -1,4 +1,6 @@
 #cloud-config
+# SUPERSEDED 2026-10-06: the project uses Plane Cloud's free plan (ADR-0017), so this script is not run.
+# Kept in case Plane is ever self-hosted. See README.md in this folder and ../plane-setup.md.
 # cloud-init.yaml: first-boot setup of the Oracle Ampere A1 instance "plane" (Enterprise Order Suite,
 # docs/ops/plane-setup.md). Ubuntu 24.04 aarch64, VM.Standard.A1.Flex, 2 OCPU / 12 GB.
 #

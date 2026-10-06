@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SUPERSEDED 2026-10-06: the project uses Plane Cloud's free plan (ADR-0017), so this script is not run.
+# Kept in case Plane is ever self-hosted. See README.md in this folder and ../plane-setup.md.
 # install-plane.sh: install Plane Community Edition without questions, with fresh secrets, and start it.
 #
 # Part of docs/ops/plane-setup.md (Enterprise Order Suite). cloud-init.yaml runs it on the first

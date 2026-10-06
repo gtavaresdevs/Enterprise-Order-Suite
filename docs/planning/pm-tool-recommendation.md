@@ -1,6 +1,6 @@
 # Project management tool for Enterprise Order Suite
 
-> **Superseded where it differs from `planning/MASTER-PLAN.md` (2026-09-29).** Still current: the Plane choice and hosting notes (ADR-0017), the tenancy comparison (ADR-0001), the architecture review as background. Superseded: the per-restaurant Edge in "Scope" (ADR-0003), the docs-hub repo (ADR-0011), the cross-repo export Action (ADR-0010), packages as plans (ADR-0018), board modules, cycles and history import (ADR-0017), revised-order rows 3, 5 and 6 (ADR-0007, ADR-0019, ADR-0003).
+> **Superseded where it differs from `planning/MASTER-PLAN.md` (2026-09-29).** Still current: the Plane choice (ADR-0017), the tenancy comparison (ADR-0001), the architecture review as background. Superseded on 2026-10-06: self-hosting itself, with the hosting section ("Free VPS: Oracle Cloud Always Free") and the Community Edition notes (CE Pages/Intake 404s, GitHub sync as paid) - Plane now runs on Plane Cloud's free plan (ADR-0017, `ops/plane-setup.md`). Also superseded: the per-restaurant Edge in "Scope" (ADR-0003), the docs-hub repo (ADR-0011), the cross-repo export Action (ADR-0010), packages as plans (ADR-0018), board modules, cycles and history import (ADR-0017), revised-order rows 3, 5 and 6 (ADR-0007, ADR-0019, ADR-0003).
 
 Checked 2026-09-29. Research only: nothing installed or configured yet.
 

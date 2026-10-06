@@ -1,7 +1,7 @@
 # Roadmap (interim tracker)
 
 - Status: Draft
-- Updated: 2026-10-02 (Plane setup row: runbook ready; its defaults are Claude's). Earlier: 2026-10-01 (Gabriel's register answers of 2026-10-01: S1, S2, S3 done; Plane setup step added; gate items 1, 2 and 4 ticked, two items added; item 3 unticked until the `CLAUDE.md` corrections are committed)
+- Updated: 2026-10-06 (Plane setup row: Plane Cloud's free plan replaces the Oracle VPS). Earlier: 2026-10-02 (Plane setup row: runbook ready; its defaults are Claude's). Earlier: 2026-10-01 (Gabriel's register answers of 2026-10-01: S1, S2, S3 done; Plane setup step added; gate items 1, 2 and 4 ticked, two items added; item 3 unticked until the `CLAUDE.md` corrections are committed)
 - Role: the project tracker until Gabriel sets up Plane (ADR-0017). Order of work and gate: `planning/MASTER-PLAN.md` §6-§7 (ADR-0007, ADR-0015). Where this file and MP disagree, MP wins; fix this file in the same commit.
 - Related: `README.md`, `planning/open-questions.md`, ADR-0007, ADR-0015, ADR-0016, ADR-0017
 
@@ -15,7 +15,7 @@
 | S3 | Readiness tooling: version the frontend `.claude/`, port or remove the PowerShell hook, `permissions.deny` git rules, SessionStart setup, frontend lint baseline, Vitest, CI running today's checks in both repos | Claude (+ Gabriel for the S1 push) | S2 | Done 2026-10-01: everything except the frontend `.claude/` (hook port, git rules, SessionStart check, Vitest, CI in both repos, skills aligned) on 2026-09-29; the frontend `.claude/` versioned by Gabriel on 2026-10-01 (FE `c4a7309`, Q-06 a, Q-07) and its `permissions.deny` git rules added the same day (FE `30bc172`) |
 | S4 | Cross-cutting design: API conventions doc, finalize the Edge-ready constraints (drafted in ADR-0003), then the Tenancy & Identity contract with Gabriel's question batch (register group 2) | Claude + Gabriel | S2 | Not started |
 | S5 | Scope of this run (short PRD) + NFR page + audit backlog triage. Input also: `planning/proposals/settings-and-notifications.md` (Q-24). Must be Reviewed before Build 1 (Q-08 b) | Claude + Gabriel | S4 | Not started |
-| Plane setup | Plane CE on Gabriel's Oracle Always Free VPS (Q-83 b, 2026-10-01), following the runbook `ops/plane-setup.md` (Draft), which states Claude's defaults (Tailscale Funnel, encrypted Google Drive backups, `EOS-<n>` ids) for what Q-83 left open, each changeable by Gabriel; then Plane replaces this file as the tracker (ADR-0017). Docs and readiness work do not wait for it | Gabriel (+ Claude: runbook) | none (Gabriel's account exists) | Not started. The runbook and its tested scripts are ready (2026-10-02, BE `d5d039d`); Gabriel runs them |
+| Plane setup | Plane on its own free plan (Gabriel, 2026-10-06; Q-83 b, 2026-10-01), following the runbook `ops/plane-setup.md` (Draft): sign-up, one workspace, one project, states and labels, and a token for the agents. No server, so no HTTPS setup and no backup job; `EOS-<n>` ids stay Claude's default, changeable by Gabriel. Then Plane replaces this file as the tracker (ADR-0017). Docs and readiness work do not wait for it | Gabriel (+ Claude: runbook) | none | Not started. The runbook is ready (2026-10-06); Gabriel runs it. The self-hosted Oracle runbook it replaces is kept, superseded, in `ops/superseded/` |
 | Build 1 | Tenant foundation. Acceptance includes: ArchUnit tenant rule, cross-tenant tests, contract drift test, dev/test seed data, tenant id in logs | Claude | Readiness gate below, which includes S5 Reviewed (Q-08 b) and the Plane setup (Q-83 b) | Not started |
 | Build 2 | Menu | Claude | Menu contract Reviewed | Not started |
 | Build 3 | Order Core | Claude | Order Core contract Reviewed | Not started |
@@ -37,7 +37,7 @@ From MP §7. Tick an item only when it holds (repo items: on the working branche
 - [x] CI runs `./gradlew test` and `yarn lint && yarn build && yarn test` on the working branches, green. Evidence (2026-09-29): backend CI run 36604877944 on `72cef45`; frontend CI run 36603662582 on `06de42e`. Re-checked 2026-10-01 after BE `c8bf761` removed the CI JDK override and `gradle.properties` (Q-84 a): backend CI run 36894501564 on `c8bf761`, frontend CI run 36894477010 on `30bc172`, both green.
 - [ ] API conventions + Tenancy & Identity contract are Reviewed. (Menu and Order Core contracts gate their own steps, not this one.)
 - [ ] S5 (scope of this run, NFR page, audit triage) Reviewed. Added 2026-10-01 (Q-08 b).
-- [ ] Plane set up on Gabriel's Oracle Always Free VPS. Added 2026-10-01 (Q-83 b: "the first thing we do before begin working on the actual app"); runbook `ops/plane-setup.md` (Draft).
+- [ ] Plane set up (Plane Cloud free plan since 2026-10-06). Added 2026-10-01 (Q-83 b: "the first thing we do before begin working on the actual app"); runbook `ops/plane-setup.md` (Draft).
 
 "Reviewed" = Gabriel read it and no open question blocks the next build step. Only Gabriel sets it (ADR-0016), with a message in the project thread ("Reviewed: <doc>") that Claude records (Q-09 a).
 

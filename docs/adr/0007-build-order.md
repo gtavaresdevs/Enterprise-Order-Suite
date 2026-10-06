@@ -28,7 +28,7 @@
 | S3 | Readiness tooling (done 2026-10-01): version frontend `.claude/`, port/remove the PowerShell hook, `permissions.deny` git rules, SessionStart setup, frontend lint baseline, Vitest, CI running today's checks in both repos. | Claude (+ Gabriel for S1 push) | S2 |
 | S4 | Cross-cutting design: API conventions doc, finalize the Edge-ready constraints (ADR-0003), then **Tenancy & Identity** contract with Gabriel's question batch. | Claude + Gabriel | S2 |
 | S5 | Scope of this run (short PRD) + NFR page + audit backlog triage. Must be Reviewed before Build 1 (Q-08 b). | Claude + Gabriel | S4 |
-| Plane | Plane setup on Gabriel's Oracle VPS (Q-83 b), following the runbook `docs/ops/plane-setup.md` (Draft). Docs and readiness work do not wait for it. | Gabriel (+ Claude: runbook) | nothing (the account exists) |
+| Plane | Plane setup (Q-83 b), following the runbook `docs/ops/plane-setup.md` (Draft). On Plane Cloud's free plan since 2026-10-06, so it is sign-up, one workspace, one project and a token (ADR-0017). Docs and readiness work do not wait for it. | Gabriel (+ Claude: runbook) | nothing |
 | **Build 1** | Tenant foundation (acceptance includes: ArchUnit tenant rule, cross-tenant tests, contract drift test, seed data, tenant id in logs). | Claude | Gate §7, including S5 Reviewed (Q-08 b) and the Plane setup (Q-83 b) |
 | Build 2–4 | Menu → Order Core → Storefront ↔ Order Core. Each contract is reviewed before its step. Small existing-feature fixes from the audit ride alongside; so do Phase 11's small polish items, with Build 3-4 (Q-82 a). | Claude | their contract |
 
@@ -41,7 +41,7 @@
    - CI runs `./gradlew test` and `yarn lint && yarn build && yarn test` on the working branches, green.
    - API conventions + Tenancy & Identity contract are Reviewed. The Menu and Order Core contracts gate their own steps, not this one.
    - Added 2026-10-01 (Q-08 b): S5's output (scope of this run, NFR page, audit triage) is Reviewed. S5 joins the gate.
-   - Added 2026-10-01 (Q-83 b): Plane set up on Gabriel's Oracle VPS (ADR-0017; runbook `docs/ops/plane-setup.md`). It is the first thing done before work on the app starts; docs and readiness work do not wait for it. Gabriel: "other I already create the oracle free tier with always free account, its fresh and ready to begin the setup, so this is the first thing we do before begin working on the actual app."
+   - Added 2026-10-01 (Q-83 b): Plane set up (ADR-0017; runbook `docs/ops/plane-setup.md`). It is the first thing done before work on the app starts; docs and readiness work do not wait for it. Gabriel: "other I already create the oracle free tier with always free account, its fresh and ready to begin the setup, so this is the first thing we do before begin working on the actual app." Where Plane runs changed on 2026-10-06 to Plane Cloud's free plan (ADR-0017); the gate item itself is unchanged.
 4. **Later** (not scheduled this run): QR/table, waiter, KDS on Edge, POS, tablets, Edge build. Added 2026-10-01: Phase 10 comandas (seating, `/table-menu` cart, call waiter and request bill, waiter mobile ordering), with QR/table and waiter (Q-81 a). The Edge is built when Gabriel decides (Q-80 b, ADR-0003).
    - Phase 11 polish is not Later: its small items (one status-color map for KDS and Orders, elapsed time, Home card hierarchy, empty states) ride alongside Build 3-4 as existing-feature fixes (Q-82 a, 2026-10-01).
 5. **Out** (not this run): PSP, automatic WhatsApp, fiscal, marketplaces, billing.
@@ -65,7 +65,7 @@
 - Q-53: answered 2026-10-01, a: a minimal Table (id, name) enters Order Core, so staff dine-in orders are part of Build 3; QR self-ordering stays Later.
 - Q-81: answered 2026-10-01, a: Phase 10 comandas are Later, with QR/table and waiter. Q-82: answered 2026-10-01, a: Phase 11's small polish items ride alongside Build 3-4.
 - Q-08: answered 2026-10-01, b: S5 must be Reviewed before Build 1; S5 joins the gate (Decision 3). This resolves the earlier reviewer note that §6 placed S5 before Build 1 while §7 did not require it.
-- Q-83: answered 2026-10-01, b: Gabriel's Oracle Always Free account is created and fresh; the Plane setup comes first, before Build 1 (Decision 3). HTTPS exposure, off-box backups and `EOS-<n>` ids were not specified; they stay pending and are asked when the setup starts (ADR-0017).
+- Q-83: answered 2026-10-01, b: the Plane setup comes first, before Build 1 (Decision 3). On 2026-10-06 Gabriel moved Plane to Plane Cloud's free plan, which closes HTTPS exposure and off-box backups as moot; `EOS-<n>` ids stay pending as an answer, with Claude's default in the runbook (ADR-0017).
 
 ## Sources
 Legend: PF = `/mnt/project-files/`.

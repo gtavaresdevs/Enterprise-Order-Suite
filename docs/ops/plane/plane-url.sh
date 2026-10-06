@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SUPERSEDED 2026-10-06: the project uses Plane Cloud's free plan (ADR-0017), so this script is not run.
+# Kept in case Plane is ever self-hosted. See README.md in this folder and ../plane-setup.md.
 # plane-url.sh: point an installed Plane at its public HTTPS name and restart it.
 #
 # Part of docs/ops/plane-setup.md (Enterprise Order Suite), section 6. Run it as root once you know

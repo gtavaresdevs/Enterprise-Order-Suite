@@ -25,7 +25,7 @@ Accepted (D-13).
   - CI runs `./gradlew test` and `yarn lint && yarn build && yarn test` on the working branches, green.
   - API conventions + Tenancy & Identity contract are Reviewed.
 - Added by Gabriel on 2026-10-01 (Q-08 b, "Q8- b"): S5 (scope of this run, NFR page, audit triage) must be Reviewed before Build 1. S5 joins the gate.
-- Added by Gabriel on 2026-10-01 (Q-83 b, "this is the first thing we do before begin working on the actual app"): Plane set up on his Oracle Always Free account (ADR-0017; runbook `docs/ops/plane-setup.md`). The Plane setup joins the gate. Docs and readiness tooling do not wait for it.
+- Added by Gabriel on 2026-10-01 (Q-83 b, "this is the first thing we do before begin working on the actual app"): Plane set up (ADR-0017; runbook `docs/ops/plane-setup.md`; on Plane Cloud's free plan since 2026-10-06). The Plane setup joins the gate. Docs and readiness tooling do not wait for it.
 - Documentation (S0-S2, S4-S5) and readiness tooling (S3: versioning frontend `.claude/`, port or removal of the PowerShell hook, `permissions.deny`, SessionStart setup, frontend lint baseline, Vitest, CI) are not software development and proceed before the gate (MASTER-PLAN §6 L87-92).
 - Jev is not used. Tooling is Claude Code only.
 - Decided later (Gabriel, 2026-10-01):
