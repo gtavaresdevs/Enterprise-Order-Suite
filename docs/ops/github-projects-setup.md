@@ -118,7 +118,7 @@ Ticked on Gabriel's word (project chat, 2026-10-06T15:12Z, "Board setup done htt
 - [x] Workflows: auto-add (`Enterprise-Order-Suite`, `is:issue`) on; "Item added" sets Todo; "Item closed" and "Pull request merged" on
 - [x] The eleven labels in section 5 exist in the backend repo (created by Claude 2026-10-06)
 - [x] Smoke-test issue appeared under Todo and moved to Done when closed (issues #26 to #29, all closed)
-- [ ] Optional: `gh project list --owner gtavaresdevs` works on your PC
+- [x] Optional: `gh project list --owner gtavaresdevs` works on your PC
 - [x] Gabriel posted the outcome in the project thread (section 8): 2026-10-06T15:12Z
 
 ## 8. After setup
