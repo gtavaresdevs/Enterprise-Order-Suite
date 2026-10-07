@@ -42,6 +42,7 @@ storage:
 app:
   urls:
     password-reset: ${APP_PASSWORD_RESET_URL:http://localhost:3000/reset-password}
+    public-base: ${APP_PUBLIC_BASE_URL:http://localhost:3000}
   email:
     from: ${MAIL_USERNAME:test@example.com}
 

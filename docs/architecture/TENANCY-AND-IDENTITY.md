@@ -39,6 +39,7 @@ Leaves to other contracts: storefront settings, branding, ordering settings, del
 | D-16 | A restaurant always keeps at least one active owner; nobody changes their own role or deactivates themselves. | Gabriel (2026-10-07: "correct") | B4 (deactivation) |
 | D-17 | No restaurant suspension or deletion this run: there is no billing (ADR-0018). | **Claude** | ADR-0018 |
 | D-18 | Profile keeps name, phone, email (read-only) and avatar; department, office, bio, country and timezone are removed. `/me/profile` folds into `/me`. | Gabriel (proposal Q3 yes); folding: Claude | proposal C1 |
+| D-19 | The access token carries `sid`, the id of the refresh-token family it came from (stable across rotations). `POST /me/password` and `POST /me/sign-out-other-devices` keep that family and revoke the others: the refresh cookie is scoped to `/auth` and never reaches `/me/*`. A token without `sid` keeps no session. | Gabriel (2026-10-07, Build 1 slice 5: chose the `sid` claim over widening the cookie path) | Own account 2, 3 |
 
 ## Resources
 
@@ -146,11 +147,11 @@ Removed with no replacement: `GET /roles` (three fixed roles, proposal B6), `GET
 
 ### Own account (proposal C)
 1. `PATCH /me` edits `firstName`, `lastName`, `phone`. Email is read-only.
-2. `POST /me/password` takes `currentPassword` and `newPassword`. Wrong current password: 400 `INVALID_CURRENT_PASSWORD`; reused password: 409 `PASSWORD_REUSE_ERROR` (live code, today 400; becomes 409 per API conventions §10.3); the same password rules as reset. On success every other refresh-token family of the user is revoked; the current session continues.
-3. `POST /me/sign-out-other-devices` revokes every refresh-token family of the user except the one in the request's cookie (proposal C5).
+2. `POST /me/password` takes `currentPassword` and `newPassword`. Wrong current password: 400 `INVALID_CURRENT_PASSWORD`; reused password: 409 `PASSWORD_REUSE_ERROR` (live code, today 400; becomes 409 per API conventions §10.3); the same password rules as reset. On success every other refresh-token family of the user is revoked; the current session (the access token's `sid`, D-19) continues.
+3. `POST /me/sign-out-other-devices` revokes every refresh-token family of the user except the current one, named by the access token's `sid` (D-19; proposal C5).
 
 ### Tokens
-1. Access token: JWT, 15 minutes (D-11). Claims: `sub` (user ULID), `rid` (restaurant ULID, absent for a platform admin), `role` (`OWNER`, `MANAGER`, `STAFF` or `PLATFORM_ADMIN`). Display names leave the token; the client reads them from `GET /me` **(Claude)**.
+1. Access token: JWT, 15 minutes (D-11). Claims: `sub` (user ULID), `rid` (restaurant ULID, absent for a platform admin), `role` (`OWNER`, `MANAGER`, `STAFF` or `PLATFORM_ADMIN`), `sid` (refresh-token family, D-19). Display names leave the token; the client reads them from `GET /me` **(Claude)**.
 2. Refresh token: today's HttpOnly cookie with family rotation and reuse detection (D16-D24 kept), never in a body (D-10). Each rotation sets a new 30-day expiry (sliding; `RefreshTokenService.REFRESH_TTL` goes from 14 to 30 days in Build 1) (D-11).
 3. The claims are written from the membership when the token is issued. A membership change revokes the refresh tokens, so the next access token carries the new role.
 

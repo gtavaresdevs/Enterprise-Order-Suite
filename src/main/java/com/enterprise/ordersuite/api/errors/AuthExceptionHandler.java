@@ -1,6 +1,7 @@
 package com.enterprise.ordersuite.api.errors;
 
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidCredentialsException;
+import com.enterprise.ordersuite.auth.service.exceptions.InvalidCurrentPasswordException;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidPasswordResetTokenException;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidRefreshTokenException;
 import com.enterprise.ordersuite.auth.service.exceptions.PasswordReuseException; // Imported
@@ -50,6 +51,11 @@ public class AuthExceptionHandler {
   @ExceptionHandler(InvalidPasswordResetTokenException.class)
   public ResponseEntity<ApiErrorResponse> handleInvalidPasswordResetToken(InvalidPasswordResetTokenException ex) {
     return build(HttpStatus.BAD_REQUEST, "INVALID_RESET_TOKEN", "Invalid or expired reset token");
+  }
+
+  @ExceptionHandler(InvalidCurrentPasswordException.class)
+  public ResponseEntity<ApiErrorResponse> handleInvalidCurrentPassword(InvalidCurrentPasswordException ex) {
+    return build(HttpStatus.BAD_REQUEST, "INVALID_CURRENT_PASSWORD", ex.getMessage());
   }
 
   // 409, not 400: the request is well-formed but conflicts with the password history

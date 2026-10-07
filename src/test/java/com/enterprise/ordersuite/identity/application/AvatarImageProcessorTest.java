@@ -1,6 +1,6 @@
-package com.enterprise.ordersuite.profile.application.service;
+package com.enterprise.ordersuite.identity.application;
 
-import com.enterprise.ordersuite.profile.domain.exception.InvalidAvatarException;
+import com.enterprise.ordersuite.identity.domain.InvalidAvatarException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;

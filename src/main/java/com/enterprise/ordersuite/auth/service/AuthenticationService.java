@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 public class AuthenticationService {
@@ -37,10 +39,9 @@ public class AuthenticationService {
 
     meterRegistry.counter("app.login.attempt", "status", "success").increment();
 
-    String accessToken = accessTokenFor(user);
     var issuedRefresh = refreshTokenService.issueFor(user);
 
-    return new AuthTokens(accessToken, issuedRefresh.rawToken());
+    return new AuthTokens(accessTokenFor(user, issuedRefresh.familyId()), issuedRefresh.rawToken());
   }
 
   // noRollbackFor: the reuse branch revokes the family and then answers 401. If the
@@ -71,7 +72,7 @@ public class AuthenticationService {
 
     var rotated = refreshTokenService.rotate(existing);
 
-    return new AuthTokens(accessTokenFor(user), rotated.rawToken());
+    return new AuthTokens(accessTokenFor(user, rotated.familyId()), rotated.rawToken());
   }
 
   @Transactional
@@ -87,11 +88,12 @@ public class AuthenticationService {
     refreshTokenService.revokeFamily(token);
   }
 
-  private String accessTokenFor(User user) {
+  private String accessTokenFor(User user, UUID sessionId) {
     var acting = userRoleResolver.resolve(user);
     return jwtService.generateToken(
       user.getId(),
       acting.map(UserRoleResolver.ActingRole::restaurantId).orElse(null),
-      acting.map(UserRoleResolver.ActingRole::role).orElse(null));
+      acting.map(UserRoleResolver.ActingRole::role).orElse(null),
+      sessionId.toString());
   }
 }

@@ -60,8 +60,7 @@ class PasswordResetServiceTest {
     service = new PasswordResetService(
       userRepository,
       tokenRepository,
-      passwordHistoryRepository,
-      passwordEncoder,
+      new PasswordUpdater(userRepository, passwordHistoryRepository, passwordEncoder, clock),
       clock,
       emailService,
       linkBuilder,

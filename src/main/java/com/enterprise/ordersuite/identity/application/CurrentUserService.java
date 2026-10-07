@@ -17,9 +17,14 @@ public class CurrentUserService {
     private final UserRepository userRepository;
 
     public String getUserId() {
+        return principal().id();
+    }
+
+    // The access-token claims of the caller: user, restaurant, role and session (sid).
+    public JwtUserPrincipal principal() {
         Authentication auth = authenticationOrThrow();
         if (auth.getPrincipal() instanceof JwtUserPrincipal principal) {
-            return principal.id();
+            return principal;
         }
         throw new IllegalStateException("Authenticated principal is not an access-token user");
     }

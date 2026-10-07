@@ -1,17 +1,12 @@
 package com.enterprise.ordersuite.auth.service;
 
-import com.enterprise.ordersuite.auth.domain.PasswordHistory;
 import com.enterprise.ordersuite.auth.domain.PasswordResetToken;
 import com.enterprise.ordersuite.auth.domain.PasswordResetTokenPurpose;
-import com.enterprise.ordersuite.auth.persistence.PasswordHistoryRepository;
 import com.enterprise.ordersuite.auth.persistence.PasswordResetTokenRepository;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidPasswordResetTokenException;
-import com.enterprise.ordersuite.auth.service.exceptions.PasswordReuseException;
 import com.enterprise.ordersuite.identity.domain.User;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import com.enterprise.ordersuite.notifications.service.EmailService;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -25,7 +20,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -38,13 +32,11 @@ public class PasswordResetService {
 
   private static final int TOKEN_BYTES = 32; // Cryptographically strong 256-bit entropy
   private static final int EXPIRY_MINUTES = 15;
-  private static final int HISTORY_LIMIT = 5; // Track up to the last 5 passwords
   static final Duration INVITE_EXPIRY = Duration.ofDays(7);
 
   private final UserRepository userRepository;
   private final PasswordResetTokenRepository passwordResetTokenRepository;
-  private final PasswordHistoryRepository passwordHistoryRepository;
-  private final PasswordEncoder passwordEncoder;
+  private final PasswordUpdater passwordUpdater;
   private final Clock clock;
   private final EmailService emailService;
   private final PasswordResetLinkBuilder linkBuilder;
@@ -53,8 +45,7 @@ public class PasswordResetService {
   public PasswordResetService(
     UserRepository userRepository,
     PasswordResetTokenRepository passwordResetTokenRepository,
-    PasswordHistoryRepository passwordHistoryRepository,
-    PasswordEncoder passwordEncoder,
+    PasswordUpdater passwordUpdater,
     Clock clock,
     EmailService emailService,
     PasswordResetLinkBuilder linkBuilder,
@@ -62,8 +53,7 @@ public class PasswordResetService {
   ) {
     this.userRepository = userRepository;
     this.passwordResetTokenRepository = passwordResetTokenRepository;
-    this.passwordHistoryRepository = passwordHistoryRepository;
-    this.passwordEncoder = passwordEncoder;
+    this.passwordUpdater = passwordUpdater;
     this.clock = clock;
     this.emailService = emailService;
     this.linkBuilder = linkBuilder;
@@ -158,45 +148,8 @@ public class PasswordResetService {
       throw InvalidPasswordResetTokenException.generic();
     }
 
-    // ==========================================
-    // 1. EVALUATE PASSWORD REUSE RESTRICTIONS
-    // ==========================================
-
-    // Step A: Compare against current active password hash (if one exists)
-    if (user.getPassword() != null && !user.getPassword().isBlank() && passwordEncoder.matches(newPassword, user.getPassword())) {
-      throw new PasswordReuseException();
-    }
-
-    // Step B: Compare against recent historical snapshots (limited strictly to the policy context)
-    List<PasswordHistory> historyList = passwordHistoryRepository.findRecentByUserId(
-      user.getId(), PageRequest.of(0, HISTORY_LIMIT)
-    );
-
-    for (PasswordHistory oldEntry : historyList) {
-      if (passwordEncoder.matches(newPassword, oldEntry.getPasswordHash())) {
-        throw new PasswordReuseException();
-      }
-    }
-
-    // ==========================================
-    // 2. PERSIST NEW PASSWORD & ARCHIVE OLD HASH
-    // ==========================================
-
-    // Capture the existing active password into history before overwriting it
-    if (user.getPassword() != null && !user.getPassword().isBlank()) {
-      PasswordHistory newHistoryEntry = new PasswordHistory(user, user.getPassword(), now);
-      passwordHistoryRepository.save(newHistoryEntry);
-    }
-
-    // Safely map and hash raw password string using configured encoders
-    user.setPassword(passwordEncoder.encode(newPassword));
-
-    // Ensure that upon setting the password, the user is explicitly flagged active if they were a provisioned user
-    if (!Boolean.TRUE.equals(user.getActive())) {
-      user.setActive(true);
-    }
-
-    userRepository.save(user);
+    // Same reuse rules and history as a change from /me/password.
+    passwordUpdater.replace(user, newPassword);
 
     // D21: a reset says the credentials may be compromised - end every existing session.
     refreshTokenService.revokeAllFor(user);
@@ -204,13 +157,6 @@ public class PasswordResetService {
     // Consume token to guarantee it can never be used again
     prt.setUsedAt(now);
     passwordResetTokenRepository.save(prt);
-
-    // ==========================================
-    // 3. CAP COMPLIANCE CLEANUP (Housekeeping)
-    // ==========================================
-
-    // High-performance query truncation delegates pruning to database layer instantly
-    passwordHistoryRepository.pruneOldEntries(user.getId(), (long) HISTORY_LIMIT);
   }
 
   private String processTokenCreationAndDispatch(User user) {

@@ -24,11 +24,15 @@ public class JwtService {
 
   public static final String RESTAURANT_ID_CLAIM = "rid";
   public static final String ROLE_CLAIM = "role";
+  public static final String SESSION_ID_CLAIM = "sid";
 
   // Tenancy & Identity, Tokens: sub (user ULID), rid (restaurant ULID, absent for the
-  // platform admin), role. No display data: the client reads it from GET /me.
-  public String generateToken(String userId, String restaurantId, String role) {
+  // platform admin), role, sid (the refresh-token family the token came from, stable across
+  // rotations; lets /me/* spare the current session). No display data: the client reads it
+  // from GET /me.
+  public String generateToken(String userId, String restaurantId, String role, String sessionId) {
     Map<String, Object> claims = new HashMap<>();
+    claims.put(SESSION_ID_CLAIM, sessionId);
     if (restaurantId != null) {
       claims.put(RESTAURANT_ID_CLAIM, restaurantId);
     }
@@ -55,6 +59,10 @@ public class JwtService {
 
   public String extractRole(String token) {
     return extractClaim(token, claims -> claims.get(ROLE_CLAIM, String.class));
+  }
+
+  public String extractSessionId(String token) {
+    return extractClaim(token, claims -> claims.get(SESSION_ID_CLAIM, String.class));
   }
 
   public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {

@@ -1,6 +1,6 @@
-package com.enterprise.ordersuite.profile.application.service;
+package com.enterprise.ordersuite.identity.application;
 
-import com.enterprise.ordersuite.profile.domain.exception.InvalidAvatarException;
+import com.enterprise.ordersuite.identity.domain.InvalidAvatarException;
 import lombok.RequiredArgsConstructor;
 import org.apache.tika.Tika;
 import org.springframework.stereotype.Component;

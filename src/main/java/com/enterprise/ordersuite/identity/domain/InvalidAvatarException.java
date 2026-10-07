@@ -1,4 +1,4 @@
-package com.enterprise.ordersuite.profile.domain.exception;
+package com.enterprise.ordersuite.identity.domain;
 
 public class InvalidAvatarException extends RuntimeException {
 

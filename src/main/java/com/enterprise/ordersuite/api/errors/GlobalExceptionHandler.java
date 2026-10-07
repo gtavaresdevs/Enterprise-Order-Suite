@@ -1,7 +1,7 @@
 package com.enterprise.ordersuite.api.errors;
 
 import com.enterprise.ordersuite.common.tenancy.TenantContextMissingException;
-import com.enterprise.ordersuite.profile.domain.exception.InvalidAvatarException;
+import com.enterprise.ordersuite.identity.domain.InvalidAvatarException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -11,6 +11,7 @@ import org.springframework.transaction.TransactionSystemException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.lang.reflect.UndeclaredThrowableException;
 import java.time.Clock;
@@ -37,6 +38,18 @@ public class GlobalExceptionHandler {
                 null
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    // API conventions §10: an upload over the multipart limit.
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+        ApiErrorResponse body = new ApiErrorResponse(
+                "PAYLOAD_TOO_LARGE",
+                "The upload exceeds the size limit",
+                Instant.now(clock),
+                null
+        );
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(body);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

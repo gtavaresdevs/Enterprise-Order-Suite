@@ -63,6 +63,14 @@ public class RefreshTokenService {
         refreshTokenRepository.revokeAllForUser(user.getId(), Instant.now(clock));
     }
 
+    // Ends every session of the user except the one the caller is using (Tenancy & Identity,
+    // Own account 2 and 3). Same lock-then-update order as revokeAllFor.
+    @Transactional
+    public void revokeAllExcept(User user, UUID keptFamilyId) {
+        refreshTokenRepository.findUnrevokedByUserIdForUpdate(user.getId());
+        refreshTokenRepository.revokeAllForUserExceptFamily(user.getId(), keptFamilyId, Instant.now(clock));
+    }
+
     private IssuedRefreshToken issue(User user, UUID familyId) {
         String raw = refreshTokenGenerator.generate();
 
@@ -75,8 +83,8 @@ public class RefreshTokenService {
 
         refreshTokenRepository.save(token);
 
-        return new IssuedRefreshToken(raw, token.getExpiresAt());
+        return new IssuedRefreshToken(raw, token.getExpiresAt(), familyId);
     }
 
-    public record IssuedRefreshToken(String rawToken, Instant expiresAt) {}
+    public record IssuedRefreshToken(String rawToken, Instant expiresAt, UUID familyId) {}
 }

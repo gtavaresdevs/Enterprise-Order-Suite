@@ -47,6 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String userId = jwtService.extractUserId(jwt);
                 String restaurantId = jwtService.extractRestaurantId(jwt);
                 String role = jwtService.extractRole(jwt);
+                String sessionId = jwtService.extractSessionId(jwt);
 
                 if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     // The role claim becomes the only authority; RoleHierarchy expands it
@@ -55,7 +56,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             ? List.of()
                             : List.of(new SimpleGrantedAuthority("ROLE_" + role));
 
-                    JwtUserPrincipal principal = new JwtUserPrincipal(userId, restaurantId, role);
+                    JwtUserPrincipal principal = new JwtUserPrincipal(userId, restaurantId, role, sessionId);
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(
                                     principal,

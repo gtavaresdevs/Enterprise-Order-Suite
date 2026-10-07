@@ -50,6 +50,15 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Stri
     @Modifying
     @Transactional
     @Query("""
+            update RefreshToken rt
+            set rt.revokedAt = :now
+            where rt.user.id = :userId and rt.familyId <> :keptFamilyId and rt.revokedAt is null
+            """)
+    int revokeAllForUserExceptFamily(String userId, UUID keptFamilyId, Instant now);
+
+    @Modifying
+    @Transactional
+    @Query("""
             delete from RefreshToken rt
             where rt.expiresAt < :now
             """)

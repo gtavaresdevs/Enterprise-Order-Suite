@@ -15,25 +15,27 @@ class JwtServiceTest {
 
   private static final String USER = "01J0000000000000000000000U";
   private static final String RESTAURANT = "01J0000000000000000000000R";
+  private static final String SESSION = "6f1c2a52-6a3e-4b1f-9a55-2f4f0c7d8e91";
 
   private final JwtService jwtService = new JwtService(properties(), Clock.systemUTC());
 
   @Test
-  void generateToken_forMember_carriesSubRidAndRole_andNoDisplayData() {
-    String token = jwtService.generateToken(USER, RESTAURANT, "OWNER");
+  void generateToken_forMember_carriesSubRidRoleAndSid_andNoDisplayData() {
+    String token = jwtService.generateToken(USER, RESTAURANT, "OWNER", SESSION);
 
     assertThat(jwtService.extractUserId(token)).as("sub is the user ULID").isEqualTo(USER);
     assertThat(jwtService.extractRestaurantId(token)).isEqualTo(RESTAURANT);
     assertThat(jwtService.extractRole(token)).isEqualTo("OWNER");
+    assertThat(jwtService.extractSessionId(token)).as("sid is the refresh-token family").isEqualTo(SESSION);
     Set<String> claimNames = jwtService.extractClaim(token, (Claims claims) -> new HashSet<>(claims.keySet()));
     assertThat(claimNames)
       .as("display names and email leave the token; the client reads them from GET /me")
-      .containsExactlyInAnyOrder("sub", "rid", "role", "iat", "exp");
+      .containsExactlyInAnyOrder("sub", "rid", "role", "sid", "iat", "exp");
   }
 
   @Test
   void generateToken_forPlatformAdmin_hasNoRestaurantClaim() {
-    String token = jwtService.generateToken(USER, null, "PLATFORM_ADMIN");
+    String token = jwtService.generateToken(USER, null, "PLATFORM_ADMIN", SESSION);
 
     assertThat(jwtService.extractRestaurantId(token)).isNull();
     assertThat(jwtService.extractRole(token)).isEqualTo("PLATFORM_ADMIN");
