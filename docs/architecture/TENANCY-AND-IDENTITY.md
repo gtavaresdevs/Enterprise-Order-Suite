@@ -1,12 +1,12 @@
 # Tenancy & Identity contract
 
-- Status: Draft
+- Status: Reviewed
 - Updated: 2026-10-07
-- Reviewed: not yet
+- Reviewed: Reviewed by Gabriel on 2026-10-07 (project thread, 2026-10-07T01:26Z: "can you confirmed reviewed"; his answers on the four defaults are recorded in Decisions)
 - Roadmap step: Build 1, Tenant foundation (`docs/roadmap.md`)
 - Draft spec: `docs/api/drafts/tenancy-identity.yaml`
 - Seeded from: live endpoints (`/auth/*`, `/me`, `/me/profile`, `/users`, `/roles`, `/admin/users/*`, `/admin/identity-audit`); frontend manifest 0.4.0 seeds nothing here (its auth paths mirror the live ones)
-- API conventions: `architecture/API-CONVENTIONS.md` (Draft)
+- API conventions: `architecture/API-CONVENTIONS.md` (Reviewed 2026-10-07)
 - Related: ADR-0001, ADR-0008, ADR-0009, ADR-0010, ADR-0014, ADR-0018; register Q-16..Q-31 (all answered); `planning/proposals/settings-and-notifications.md` (Reviewed 2026-10-06; sections A1, B, C, D2); legacy auth decisions D16-D24 (in force)
 
 Rows marked **(Claude)** are Claude's defaults where neither the register nor the settings proposal decided; Gabriel may override any of them when he reviews this contract. Everything else cites Gabriel's answer.
@@ -31,12 +31,12 @@ Leaves to other contracts: storefront settings, branding, ordering settings, del
 | D-8 | Isolation is application-level: `restaurant_id` on every restaurant-owned table, a fail-closed tenant context, an ArchUnit rule and a cross-tenant test per endpoint. | Gabriel | Q-25 a |
 | D-9 | Every restaurant has an IANA timezone, required at creation, default `America/Sao_Paulo`; there is no deployment-wide fallback. Currency is BRL. | Gabriel | Q-28 a, Q-21 a |
 | D-10 | Build 1 auth follow-ups: revoke refresh tokens on deactivation and on role or membership change; drop `refreshToken` from response bodies and the body fallback; check `Origin` unconditionally on cookie-borne calls; the frontend keeps the access token in memory only. | Gabriel | Q-29 a |
-| D-11 | Access tokens live 15 minutes (today 24 h). This bounds how long a deactivated, demoted or signed-out member keeps access (proposal B4, C4, C5). The refresh flow already renews them silently. | **Claude** | proposal "the T&I contract sets the access-token lifetime" |
+| D-11 | Sessions follow the usual web-app convention: a short access token (15 minutes, today 24 h) renewed silently by the refresh cookie, and a sliding refresh token of 30 days (today 14). A member who uses the app at least once every 30 days never signs in again; they sign in after 30 days without use, after signing out, or after a password change, deactivation or role change. The 15 minutes bound how long a deactivated, demoted or signed-out member keeps access (proposal B4, C4, C5). | Gabriel delegated ("follow the usual convention ... we dont want user having to constantly login", 2026-10-07); values: Claude | proposal "the T&I contract sets the access-token lifetime" |
 | D-12 | Permission matrix (§5.3): the owner edits everything; the manager manages staff; staff manage nothing; only an owner or the platform admin grants `OWNER`. | Claude (proposal A0, B3) | proposal A0, B3 |
-| D-13 | Date and number format follows the viewer's UI language; it is not a restaurant setting. Instants are shown in the restaurant's timezone. | **Claude** | proposal D2 ("the T&I contract decides") |
+| D-13 | Date and number format follows the viewer's UI language; users cannot change the date format. Instants are shown in the restaurant's timezone. | Gabriel (2026-10-07: "we dont need to allow user to change date format right? so ok") | proposal D2 ("the T&I contract decides") |
 | D-14 | The owner sees the timezone read-only; the platform admin may correct it. | **Claude** | proposal A1 ("the T&I contract says whether the platform admin can correct it") |
-| D-15 | Platform admin support reads use the `X-Support-Restaurant-Id` header on `GET` requests to restaurant paths; any write with it is refused. | **Claude** | Q-18 b; §5.4 |
-| D-16 | A restaurant always keeps at least one active owner. | **Claude** | B4 (deactivation) |
+| D-15 | Platform admin support reads use the `X-Support-Restaurant-Id` header on `GET` requests to restaurant paths; any write with it is refused. | Gabriel delegated ("apply best practices", 2026-10-07); design: Claude | Q-18 b; §5.4 |
+| D-16 | A restaurant always keeps at least one active owner; nobody changes their own role or deactivates themselves. | Gabriel (2026-10-07: "correct") | B4 (deactivation) |
 | D-17 | No restaurant suspension or deletion this run: there is no billing (ADR-0018). | **Claude** | ADR-0018 |
 | D-18 | Profile keeps name, phone, email (read-only) and avatar; department, office, bio, country and timezone are removed. `/me/profile` folds into `/me`. | Gabriel (proposal Q3 yes); folding: Claude | proposal C1 |
 
@@ -151,7 +151,7 @@ Removed with no replacement: `GET /roles` (three fixed roles, proposal B6), `GET
 
 ### Tokens
 1. Access token: JWT, 15 minutes (D-11). Claims: `sub` (user ULID), `rid` (restaurant ULID, absent for a platform admin), `role` (`OWNER`, `MANAGER`, `STAFF` or `PLATFORM_ADMIN`). Display names leave the token; the client reads them from `GET /me` **(Claude)**.
-2. Refresh token: today's HttpOnly cookie with family rotation and reuse detection (D16-D24 kept), never in a body (D-10).
+2. Refresh token: today's HttpOnly cookie with family rotation and reuse detection (D16-D24 kept), never in a body (D-10). Each rotation sets a new 30-day expiry (sliding; `RefreshTokenService.REFRESH_TTL` goes from 14 to 30 days in Build 1) (D-11).
 3. The claims are written from the membership when the token is issued. A membership change revokes the refresh tokens, so the next access token carries the new role.
 
 ## Tenancy and security
@@ -259,7 +259,7 @@ Build 1 is the single pre-launch re-baseline (ADR-0009): it rewrites the identit
 
 ## Open questions
 
-None in the register. Gabriel may override any **(Claude)** row (D-11, D-13 to D-17, the slug pattern and reserved list, invite expiry, the token claims) when he reviews this contract.
+None. Reviewed by Gabriel on 2026-10-07: he answered D-11, D-13, D-15 and D-16 and accepted the other **(Claude)** rows (D-14, D-17, the slug pattern and reserved list, invite expiry, the token claims).
 
 ## Sources
 

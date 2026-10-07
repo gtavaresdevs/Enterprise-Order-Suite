@@ -1,11 +1,11 @@
 # API conventions
 
-- Status: Draft
+- Status: Reviewed
 - Updated: 2026-10-07
-- Reviewed: not yet
+- Reviewed: Reviewed by Gabriel on 2026-10-07 (project thread, 2026-10-07T01:26Z: "can you confirmed reviewed"; the **(Claude)** rules are accepted)
 - Roadmap step: S4 (`docs/roadmap.md`); gate item "API conventions + Tenancy & Identity contract are Reviewed" (MP §7)
 - Applies to: every endpoint of the backend, live (`docs/api/openapi.yaml`, from Build 1) and drafted (`docs/api/drafts/`)
-- Related: ADR-0001, ADR-0003 (C1-C3), ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0016; register Q-25, Q-26, Q-32..Q-40 (all answered); `architecture/TENANCY-AND-IDENTITY.md`
+- Related: ADR-0001, ADR-0003 (C1-C3), ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0016; register Q-25, Q-26, Q-32..Q-40 (all answered); `architecture/TENANCY-AND-IDENTITY.md` (Reviewed 2026-10-07)
 
 This page is the rulebook for request and response shapes. Contract docs (Tenancy & Identity, Menu, Order Core, Storefront) follow it and record only what is specific to their area. Where a contract needs an exception, it states the exception and the reason in its Decisions table. Rules marked **(Claude)** are Claude's defaults where the register gave no answer; Gabriel may override any of them when he reviews this page.
 
@@ -192,7 +192,7 @@ Every operation in a draft has:
 
 ## Open questions
 
-None. Gabriel may override any **(Claude)** rule when he reviews this page.
+None. Reviewed by Gabriel on 2026-10-07 with every **(Claude)** rule accepted.
 
 ## Sources
 

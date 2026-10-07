@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
   title: Enterprise Order Suite - Tenancy & Identity (draft)
-  version: 0.1.0-draft
+  version: 0.1.0-reviewed
   description: >
-    Design-first draft for Build 1 (Tenant foundation). Status: Draft, same as
+    Design-first draft for Build 1 (Tenant foundation). Status: Reviewed (2026-10-07), same as
     docs/architecture/TENANCY-AND-IDENTITY.md, which holds the rules, the permission
     matrix and the decisions. Conventions: docs/architecture/API-CONVENTIONS.md.
     Paths are relative to the /api context path.

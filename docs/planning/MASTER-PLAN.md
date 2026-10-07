@@ -124,7 +124,7 @@ These are the parts of the earlier plans that did not make sense for a solo deve
 - [ ] Frontend `.claude/` is in git; no Windows-only hooks; git rules enforced by `permissions.deny`.
 - [ ] A fresh cloud session can run the full verification in both repos.
 - [ ] CI runs `./gradlew test` and `yarn lint && yarn build && yarn test` on the working branches, green.
-- [ ] API conventions + Tenancy & Identity contract are Reviewed. (Menu and Order Core contracts gate their own steps, not this one.)
+- [x] API conventions + Tenancy & Identity contract are Reviewed (Gabriel, 2026-10-07). (Menu and Order Core contracts gate their own steps, not this one.)
 - [ ] S5 (scope of this run, NFR page, audit triage) Reviewed. (Added 2026-10-01, Q-08 b.)
 - [ ] Project board set up. (Added 2026-10-01, Q-83 b: "the first thing we do before begin working on the actual app"; GitHub Projects since 2026-10-06, ADR-0021; runbook `docs/ops/github-projects-setup.md`.)
 

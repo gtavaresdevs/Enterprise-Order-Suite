@@ -1,7 +1,7 @@
 # API contract drafts
 
 - Status: Draft
-- Updated: 2026-10-07 (first draft: `tenancy-identity.yaml`; conventions now in `architecture/API-CONVENTIONS.md`, Draft)
+- Updated: 2026-10-07 (first draft: `tenancy-identity.yaml`; conventions in `architecture/API-CONVENTIONS.md`; both Reviewed 2026-10-07)
 - Related: ADR-0010 (the backend owns the API contract), ADR-0011, ADR-0016, ADR-0007; register Q-32..Q-40, Q-76
 
 This folder holds design-first OpenAPI 3 drafts: API shapes designed before the code exists (ADR-0010 step 1). The springdoc live spec only describes implemented endpoints, so Tenancy & Identity, Menu, Order Core and Storefront are designed here first.
