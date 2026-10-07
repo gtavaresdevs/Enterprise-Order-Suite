@@ -21,7 +21,11 @@
   - Status: Todo, In Progress, In review, Done (GitHub's three plus "In review" for Gabriel's review). Agent-relevant flags are labels, because cloud sessions cannot read Status: `ready-for-agent`, `blocked`, `needs-human`, plus `area:*`, `type:*` and `contract-change`.
   - Workflows: auto-add every issue from the backend repo; "item added" sets Todo; the two default "Done" workflows stay on.
   - References: commit messages and plan files cite `#<n>` in the backend repo, or `gtavaresdevs/Enterprise-Order-Suite#<n>` from the frontend repo, with `Refs`, never a closing keyword. This replaces the `EOS-<n>` ids of ADR-0017. Issues are closed by hand; closing one moves its card to Done.
-- What agents may do on issues (read, comment, label, close) is decided when the board replaces `docs/roadmap.md`, as ADR-0017 had it for Plane.
+- **Agents create issues for build work on their own** (Gabriel, project thread 2026-10-07T01:45Z: "please add that rule to the docs, consider it reviewed and approaved by me."). This answers the open point "what agents may do on issues" for issue creation:
+  - When a build step, or a piece of build work with no issue yet, starts, the agent searches the backend repo's open issues for one that covers it. If none does, it creates one in the backend repo (frontend work too, labelled `area:frontend`) with one `area:*` and one `type:*` label, a short title and a body that links the canonical doc (plan, roadmap step, ADR). Canonical text stays in git (ADR-0011).
+  - Every commit for that work cites it with `Refs #<n>` (from the frontend repo, `Refs gtavaresdevs/Enterprise-Order-Suite#<n>`). The agent may comment on and label its issues; it closes the issue by hand when the work is done, with a comment naming the commits. Closing moves the card to Done.
+  - `docs/roadmap.md` steps move to issues as they start: the step's Status gets the issue number. The roadmap keeps the order of work and the gate until every open step has its issue.
+  - Moving cards between Todo, In Progress and In review stays Gabriel's, or a local session's with `gh project` (cloud sessions cannot reach board fields).
 
 ## Consequences
 - The setup is Gabriel's, about 20 minutes: create the project, add the Status option, switch on the auto-add workflow, and paste one `gh label create` block. No server, no backups, no token for cloud sessions.
@@ -29,18 +33,19 @@
 - Cloud sessions see and change issues, not board fields. Anything an agent must know (ready for it, blocked, needs a person) is a label on the issue. Moving cards between Todo, In Progress and In review is Gabriel's, or a local session's with `gh project`.
 - A commit with "closes #N" on `feature/ai-agent` leaves the issue open (ADR-0013 keeps `main` untouched); use `Refs #N` and close by hand.
 - Every Plane runbook and script (the Plane Cloud runbook, the self-hosted Oracle runbook, and `docs/ops/plane/`) was deleted on 2026-10-06 (Gabriel, 2026-10-06T14:10Z: "u can delete what's related to plane, we wont use it"). They remain in git history up to commit `1092797`. ADR-0017 stays as the superseded decision record: an ADR is never deleted, only superseded (`adr/README.md`, Conventions).
-- Set up by Gabriel on 2026-10-06 (project chat, 15:12Z): "Board setup done https://github.com/users/gtavaresdevs/projects/2". The Build 1 gate item for the board is met. `docs/roadmap.md` stays the tracker until its open steps move onto the board as issues; that move, and what agents may do on issues, is the next board step (Open questions).
+- Set up by Gabriel on 2026-10-06 (project chat, 15:12Z): "Board setup done https://github.com/users/gtavaresdevs/projects/2". The Build 1 gate item for the board is met. Since 2026-10-07 agents create the issues themselves as build steps start (Decision), so `docs/roadmap.md` hands over to the board step by step.
 - Agents must never:
   - invent or cite an issue number that does not exist;
-  - create the project, its fields, views or workflows, or the labels, before Gabriel says so;
+  - create the project, its fields, views or workflows, or new labels, before Gabriel says so (issues for build work are the exception, Decision);
   - use a closing keyword in a commit message;
   - put any of the data listed above into an issue.
 
 ## Open questions
 - Q-83: the 2026-10-06 change is recorded in its row. HTTPS exposure and off-box backups are moot (they were already closed under Plane Cloud). The reference convention (`#<n>` with `Refs`) was Claude's default; Gabriel confirmed it with the runbook on 2026-10-06 (project thread, 18:12Z: "4 - confirmed", "confirms all points as per recommended by claude"), together with the rest of the board design in section 0.
-- What agents may do on issues once the board is the tracker: decided then (carried over from ADR-0017). The board exists since 2026-10-06; the tracker has not moved yet.
+- Answered 2026-10-07 (Gabriel, 01:45Z, recorded as Reviewed at his word): agents create, comment on, label and close issues for build work on their own (Decision).
 
 ## Sources
+- Gabriel, project thread 2026-10-07T01:45Z (agents create issues for build work).
 - Gabriel, project thread 2026-10-06T14:02Z (this decision) and 13:48Z-13:49Z (Plane Cloud, ADR-0017).
 - GitHub REST API from this project's cloud session, 2026-10-06: `repos/gtavaresdevs/Enterprise-Order-Suite` and `repos/gtavaresdevs/enterprise-order-suite-frontend` (`default_branch: main`, `visibility: public`, `has_issues`, `has_projects`); the refused GraphQL call and `users/gtavaresdevs/projectsV2` call, with the proxy's messages quoted above.
 - GitHub Docs, read 2026-10-06: About Projects (50 fields; projects at the user or organization level): https://docs.github.com/en/issues/planning-and-tracking-with-projects/learning-about-projects/about-projects ; Adding items automatically (GitHub Free: 1 auto-add workflow; one repository per workflow; existing items are not added): https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/adding-items-automatically ; Using the built-in automations (closed and merged set Done, on by default): https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-built-in-automations ; Linking a pull request to an issue (keywords; closed "when you merge the commit into the default branch"): https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue

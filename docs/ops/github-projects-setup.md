@@ -107,7 +107,16 @@ gh label create "needs-human" --repo gtavaresdevs/Enterprise-Order-Suite --color
 
 Cloud sessions need no setup: they already reach the repo's issues.
 
-How agents use issues (read, comment, label, close) is decided when the board replaces `docs/roadmap.md` as the tracker (ADR-0021). Until then agents never invent or cite an issue number.
+### How agents use issues
+
+Gabriel, 2026-10-07T01:45Z (ADR-0021 Decision). Agents do this on their own, without being told:
+
+1. When a build step or a piece of build work starts, search the backend repo's open issues for one that covers it.
+2. If none does, create one in `gtavaresdevs/Enterprise-Order-Suite` (frontend work too): a short title, one `area:*` label (`area:frontend` for frontend work), one `type:*` label, and a body that links the canonical doc (plan, roadmap step, ADR) instead of copying it. Add `ready-for-agent`, `blocked` or `needs-human` when they apply.
+3. Cite it in every commit for that work: `Refs #<n>`, or `Refs gtavaresdevs/Enterprise-Order-Suite#<n>` from the frontend repo. Never `closes`, `fixes` or `resolves`.
+4. When the work is done, comment with the commits and close the issue by hand; the card moves to Done. Put the issue number in the step's Status in `docs/roadmap.md` when the step starts.
+
+Never put restaurant, customer or order data, secrets, tokens, IP addresses or credentials in an issue (the repo is public), and never cite an issue number that does not exist. Cards between Todo, In Progress and In review are moved by Gabriel or a local session.
 
 ## 7. Checklist
 
