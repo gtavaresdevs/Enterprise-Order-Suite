@@ -1,8 +1,8 @@
 # Planning: audit backlog triage (S5)
 
-- Status: Draft
+- Status: Reviewed
 - Updated: 2026-10-07
-- Reviewed: not yet
+- Reviewed: Reviewed by Gabriel on 2026-10-07 (Gabriel, project thread 2026-10-07T01:39Z: "reviewed s5 and all approved")
 - Roadmap step: S5 (`docs/roadmap.md`)
 - Related: ADR-0005, ADR-0006, ADR-0008, ADR-0014, ADR-0020; register Q-19, Q-24, Q-27, Q-29, Q-42, Q-44, Q-45, Q-46, Q-48, Q-53, Q-56, Q-57, Q-58, Q-62, Q-67, Q-68, Q-81, Q-82, Q-86; `planning/run-scope.md`, `architecture/NFR.md`
 

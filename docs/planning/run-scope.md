@@ -1,8 +1,8 @@
 # Product: scope of this run (short PRD)
 
-- Status: Draft
+- Status: Reviewed
 - Updated: 2026-10-07
-- Reviewed: not yet
+- Reviewed: Reviewed by Gabriel on 2026-10-07 (Gabriel, project thread 2026-10-07T01:39Z: "reviewed s5 and all approved")
 - Roadmap step: S5 (`docs/roadmap.md`)
 - Related: ADR-0001, ADR-0002, ADR-0003, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0014, ADR-0018, ADR-0020; register Q-17..Q-31, Q-41..Q-71, Q-78..Q-82, Q-86..Q-89 (all answered); `planning/audit-triage.md`, `architecture/NFR.md`, `planning/proposals/settings-and-notifications.md` (Reviewed 2026-10-06), `architecture/TENANCY-AND-IDENTITY.md` (Reviewed 2026-10-07)
 

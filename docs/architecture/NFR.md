@@ -1,12 +1,12 @@
 # Architecture: non-functional requirements (this run)
 
-- Status: Draft
+- Status: Reviewed
 - Updated: 2026-10-07
-- Reviewed: not yet
+- Reviewed: Reviewed by Gabriel on 2026-10-07 (Gabriel, project thread 2026-10-07T01:39Z: "reviewed s5 and all approved")
 - Roadmap step: S5 (`docs/roadmap.md`); each requirement names the build that meets it
 - Related: ADR-0001, ADR-0004, ADR-0005, ADR-0008, ADR-0013; register Q-18, Q-23, Q-32, Q-36, Q-52, Q-60, Q-61, Q-69, Q-79; `architecture/API-CONVENTIONS.md`, `architecture/TENANCY-AND-IDENTITY.md`, `planning/run-scope.md`
 
-Rows marked **(Claude)** are Claude's proposals; Q-52 a asked Claude to propose the retention periods here. Gabriel may change any of them at review. Everything else cites a decision. This is not legal advice: the LGPD reading is Claude's and should be checked with a lawyer before the first pilot.
+Rows marked **(Claude)** are Claude's proposals; Q-52 a asked Claude to propose the retention periods here. Gabriel approved all of them with his review on 2026-10-07. Everything else cites a decision. This is not legal advice: the LGPD reading is Claude's and should be checked with a lawyer before the first pilot.
 
 ## Goal
 Keep the run safe and cheap: protect customer and staff data from day one, keep tenants apart, and list what must exist before a first pilot restaurant without building it now (no pilot is planned this run, Q-23 b).
@@ -89,7 +89,7 @@ Moved here from `planning/superseded-docs.md` §5 and the settings proposal. Eac
 - From then on: semver, changelog, deprecation rules, no more Flyway re-baseline (Q-32 a).
 
 ## Open questions
-- The **(Claude)** rows above are proposals; Gabriel accepts or changes them by reviewing this page. Blocks: Build 1 (P-5, P-6, P-7) and Build 3 (P-3).
+- none. The **(Claude)** rows were approved with the page on 2026-10-07.
 
 ## Sources
 - MASTER-PLAN §5 ("Short NFR page"); `planning/superseded-docs.md` §5; register answers cited above; LGPD (Lei 13.709/2018) Art. 19; Marco Civil da Internet (Lei 12.965/2014) Art. 15.
