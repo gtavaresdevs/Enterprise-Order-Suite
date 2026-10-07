@@ -49,10 +49,15 @@ class RefreshOriginFilterTest {
   }
 
   @Test
-  void noCookie_skipsTheCheck_evenWithAForeignOrigin() throws Exception {
+  void noCookie_withAForeignOrigin_isRejected_too() throws Exception {
     assertThat(run(request("/auth/refresh", false, "https://evil.example")).getStatus())
-      .as("a body-borne token was already readable by the caller, so CSRF does not apply")
-      .isEqualTo(200);
+      .as("the check is unconditional on the cookie endpoints (D-10), cookie or not")
+      .isEqualTo(403);
+  }
+
+  @Test
+  void noCookie_withAllowedOrigin_passes() throws Exception {
+    assertThat(run(request("/auth/logout", false, "http://localhost:3000")).getStatus()).isEqualTo(200);
   }
 
   @Test

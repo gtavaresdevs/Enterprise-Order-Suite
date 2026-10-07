@@ -55,3 +55,7 @@ management:
 security:
   rate-limit:
     enabled: false
+  # Pinned, not env-bound: /auth/refresh and /auth/logout check Origin on every call, and the
+  # tests send this one (support.RefreshCookies.FRONTEND) whatever a local environment allows.
+  cors:
+    allowed-origins: http://localhost:3000

@@ -2,10 +2,9 @@ package com.enterprise.ordersuite.security.ratelimit;
 
 import com.enterprise.ordersuite.api.errors.ApiErrorResponse;
 import com.enterprise.ordersuite.auth.dtos.AuthRequest;
-import com.enterprise.ordersuite.auth.dtos.RefreshRequest;
 import com.enterprise.ordersuite.support.IntegrationTest;
+import com.enterprise.ordersuite.support.RefreshCookies;
 import com.enterprise.ordersuite.support.TestUsers;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -88,27 +87,15 @@ class RefreshRateLimitIT {
       .andExpect(status().isOk())
       .andReturn();
 
-    JsonNode response = objectMapper.readTree(
-      loginResult.getResponse().getContentAsString()
-    );
-
-    assertThat(response.hasNonNull("refreshToken"))
-      .as("Successful authentication must return a refresh token")
-      .isTrue();
-
-    return response.get("refreshToken").asText();
+    return RefreshCookies.valueOf(loginResult);
   }
 
   private MvcResult performRefresh(String ip, String refreshToken) throws Exception {
-    RefreshRequest refreshRequest = new RefreshRequest(refreshToken);
-
-    return mockMvc.perform(post("/auth/refresh")
+    return mockMvc.perform(RefreshCookies.refresh(refreshToken)
         .with(request -> {
           request.setRemoteAddr(ip);
           return request;
-        })
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(refreshRequest)))
+        }))
       .andReturn();
   }
 

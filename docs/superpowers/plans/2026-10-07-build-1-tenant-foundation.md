@@ -1,6 +1,6 @@
 # Build 1: Tenant foundation (implementation plan)
 
-- Status: Slices 0-3 done; slices 4-9 approved step by step (Gabriel, 2026-10-07)
+- Status: Slices 0-4 done; slices 5-9 approved step by step (Gabriel, 2026-10-07)
 - Updated: 2026-10-07
 - Issue: #31
 - Contract: `docs/architecture/TENANCY-AND-IDENTITY.md` (Reviewed) and `docs/api/drafts/tenancy-identity.yaml`; conventions `docs/architecture/API-CONVENTIONS.md` (Reviewed)
@@ -29,4 +29,5 @@ The contract is the spec. This plan only orders the work. Every slice ends with 
 - After slice 4 the frontend's auth, profile and administration screens stop working against this branch until a frontend session adapts them (Q-91 a).
 - Slice 2 (done) also removed the endpoints that existed only to manage legacy roles and profiles: `/auth/register`, `/roles`, `/admin/users*`, `/admin/identity-audit`, `/users*`, `/profile*` (Q-91 a). Since slice 3 the access token carries only `sub` (user ULID), `rid` and `role`; the frontend reads names and email from `GET /me`. Gradle 8.14 cannot compile the build script on JDK 25: run it with JDK 17 or 21 (`JAVA_HOME`).
 - Slice 3 (done): `common.tenancy` holds `TenantContext`, `TenantContextHolder` (fail-closed `requireRestaurantId()`, mapped to 500 and logged as a bug), `@TenantUnscoped` and the `TaskDecorator`; `security.web.TenantContextFilter` runs after JWT authentication and handles `X-Support-Restaurant-Id` (platform admin, `GET`, ULID only; else 403 `FORBIDDEN`). A denied `@PreAuthorize` now answers 403 `FORBIDDEN` in the `ApiErrorResponse` shape. The ArchUnit rule is `architecture.TenantRepositoryRuleTest`: a restaurant-owned entity is one with a `restaurantId` field. The unused unscoped audit finders were removed (slice 6 adds the scoped list).
+- Slice 4 (done): `AuthResponse` is `{accessToken}` only; `/auth/refresh` and `/auth/logout` read only the cookie, take no body and declare no `consumes`; `RefreshOriginFilter` checks `Origin` on them with or without the cookie (a missing `Origin` is rejected too). Access token default 15 minutes (`JWT_EXPIRATION_MS`, default 900000), `REFRESH_TTL` 30 days. `PasswordResetService.sendInvite(User)` (replaces the unused `sendPasswordSetupForNewUser`) issues an `INVITE` token for 7 days, invalidates earlier unused invite tokens, joins the caller's transaction and sends `invitation-email` after commit. `PASSWORD_REUSE_ERROR` is 409. Revocation on deactivation is enforced at refresh (an inactive user's refresh revokes the family and answers 401); the explicit `revokeAllFor` calls on deactivation and role change land with those operations in slice 6.
 - Slices 2-4 are one breaking stretch: each still ends green, but the API in between is neither legacy nor the contract.

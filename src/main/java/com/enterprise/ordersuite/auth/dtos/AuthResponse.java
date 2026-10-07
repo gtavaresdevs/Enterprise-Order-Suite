@@ -1,15 +1,5 @@
-    package com.enterprise.ordersuite.auth.dtos;
+package com.enterprise.ordersuite.auth.dtos;
 
-    import lombok.AllArgsConstructor;
-    import lombok.Getter;
-    import lombok.NoArgsConstructor;
-    import lombok.Setter;
-
-    @Getter
-    @Setter
-    @AllArgsConstructor
-    @NoArgsConstructor
-    public class AuthResponse {
-        private String accessToken;
-        private String refreshToken;
-    }
+// The refresh token never appears in a body: it travels only in the HttpOnly cookie (D-10).
+public record AuthResponse(String accessToken) {
+}

@@ -1,7 +1,6 @@
 package com.enterprise.ordersuite.auth.service;
 
 import com.enterprise.ordersuite.auth.dtos.AuthRequest;
-import com.enterprise.ordersuite.auth.dtos.AuthResponse;
 import com.enterprise.ordersuite.auth.domain.RefreshToken;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidCredentialsException;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidRefreshTokenException;
@@ -26,7 +25,7 @@ public class AuthenticationService {
   private final RefreshTokenService refreshTokenService;
   private final MeterRegistry meterRegistry;
 
-  public AuthResponse authenticate(AuthRequest request) {
+  public AuthTokens authenticate(AuthRequest request) {
     User user = userRepository.findByEmail(request.getEmail())
       .orElse(null);
 
@@ -41,13 +40,13 @@ public class AuthenticationService {
     String accessToken = accessTokenFor(user);
     var issuedRefresh = refreshTokenService.issueFor(user);
 
-    return new AuthResponse(accessToken, issuedRefresh.rawToken());
+    return new AuthTokens(accessToken, issuedRefresh.rawToken());
   }
 
   // noRollbackFor: the reuse branch revokes the family and then answers 401. If the
   // exception rolled that back, reuse detection would silently do nothing.
   @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
-  public AuthResponse refresh(String rawRefreshToken) {
+  public AuthTokens refresh(String rawRefreshToken) {
     RefreshToken existing = refreshTokenService.findForRotationOrNull(rawRefreshToken);
     if (existing == null) {
       throw new InvalidRefreshTokenException();
@@ -72,7 +71,7 @@ public class AuthenticationService {
 
     var rotated = refreshTokenService.rotate(existing);
 
-    return new AuthResponse(accessTokenFor(user), rotated.rawToken());
+    return new AuthTokens(accessTokenFor(user), rotated.rawToken());
   }
 
   @Transactional

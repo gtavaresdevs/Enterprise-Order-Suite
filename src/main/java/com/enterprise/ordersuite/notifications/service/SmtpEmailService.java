@@ -35,21 +35,29 @@ public class SmtpEmailService implements EmailService {
   @Override
   @Async
   public void sendPasswordResetEmail(String toEmail, String resetUrl) {
-    log.info("Initiating asynchronous password reset email dispatch sequence to: {}", toEmail);
+    send(toEmail, "Reset Your Password - Enterprise Order Suite",
+      emailProperties.getTemplateName(), "resetUrl", resetUrl, "password reset");
+  }
+
+  @Override
+  @Async
+  public void sendInvitationEmail(String toEmail, String setupUrl) {
+    send(toEmail, "You're invited - Enterprise Order Suite",
+      emailProperties.getInvitationTemplateName(), "setupUrl", setupUrl, "invitation");
+  }
+
+  private void send(String toEmail, String subject, String templateName, String urlVariable, String url, String kind) {
+    log.info("Initiating asynchronous {} email dispatch sequence to: {}", kind, toEmail);
 
     try {
       // Prepare the Thymeleaf rendering context variables
       Context context = new Context();
-      context.setVariable("resetUrl", resetUrl);
-
-      // Add the template variable mapping here
+      context.setVariable(urlVariable, url);
       context.setVariable("logoUrl", emailProperties.getLogoUrl());
 
       // Pass the absolute public backend base URL down to let HTML locate static assets (like /logo.png)
       context.setVariable("backendBaseUrl", emailProperties.getBackendBaseUrl());
 
-      // Process the dynamic Thymeleaf HTML template file matching the config name
-      String templateName = emailProperties.getTemplateName();
       String htmlContent = templateEngine.process(templateName, context);
 
       // Construct the structural low-level mime layout message properties
@@ -58,12 +66,12 @@ public class SmtpEmailService implements EmailService {
 
       helper.setFrom(emailProperties.getFrom());
       helper.setTo(toEmail);
-      helper.setSubject("Reset Your Password - Enterprise Order Suite");
+      helper.setSubject(subject);
       helper.setText(htmlContent, true); // True flag dictates raw string compilation to HTML layout
 
       // Dispatch message onto the configured external mail broker/relay
       mailSender.send(message);
-      log.info("Successfully dispatched password reset email onto exchange relay for: {}", toEmail);
+      log.info("Successfully dispatched {} email onto exchange relay for: {}", kind, toEmail);
 
     } catch (MessagingException e) {
       log.error("Failed to construct email mime structure or handshake with destination SMTP exchange for address: {}", toEmail, e);

@@ -1,15 +1,17 @@
 package com.enterprise.ordersuite.auth.controllers;
 
 import com.enterprise.ordersuite.auth.domain.PasswordResetToken;
+import com.enterprise.ordersuite.auth.domain.PasswordResetTokenPurpose;
 import com.enterprise.ordersuite.auth.dtos.AuthRequest;
 import com.enterprise.ordersuite.auth.dtos.ForgotPasswordRequest;
-import com.enterprise.ordersuite.auth.dtos.RefreshRequest;
 import com.enterprise.ordersuite.auth.dtos.ResetPasswordRequest;
 import com.enterprise.ordersuite.auth.persistence.PasswordResetTokenRepository;
 import com.enterprise.ordersuite.auth.service.PasswordResetService;
 import com.enterprise.ordersuite.identity.domain.User;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import com.enterprise.ordersuite.support.IntegrationTest;
+import com.enterprise.ordersuite.support.RefreshCookies;
+import com.enterprise.ordersuite.support.TestUsers;
 import com.enterprise.ordersuite.support.TestEmailServiceConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,11 +22,17 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @IntegrationTest
@@ -52,6 +60,15 @@ class AuthenticationControllerIT {
 
   @Autowired
   private TestEmailServiceConfig.CapturingEmailService capturingEmailService;
+
+  @Autowired
+  private TestUsers testUsers;
+
+  @Autowired
+  private TransactionTemplate transactionTemplate;
+
+  @Autowired
+  private Clock clock;
 
   @BeforeEach
   void setup() {
@@ -207,19 +224,106 @@ class AuthenticationControllerIT {
     return email;
   }
 
+  @Test
+  void resetPassword_reusingThePassword_returns409() throws Exception {
+    String email = saveActiveUser("OldPass123!");
+    String rawToken = passwordResetService.requestPasswordReset(email).orElseThrow();
+
+    resetPassword(rawToken, "OldPass123!")
+      .andExpect(status().isConflict())
+      .andExpect(jsonPath("$.code").value("PASSWORD_REUSE_ERROR"));
+  }
+
+  @Test
+  void invite_completedThroughResetPassword_letsTheMemberSignIn() throws Exception {
+    User invited = invitedOwner();
+
+    passwordResetService.sendInvite(invited);
+
+    assertThat(capturingEmailService.invitations()).hasSize(1);
+    assertThat(capturingEmailService.invitations().get(0).toEmail()).isEqualTo(invited.getEmail());
+    assertThat(capturingEmailService.sent()).as("an invite is not a reset email").isEmpty();
+    resetPassword(inviteToken(0), "FirstPass123!@#").andExpect(status().isOk());
+
+    mockMvc.perform(post("/auth/login")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(new AuthRequest(invited.getEmail(), "FirstPass123!@#"))))
+      .andExpect(status().isOk());
+  }
+
+  @Test
+  void invite_tokenHasTheInvitePurpose_andExpiresAfter7Days() {
+    User invited = invitedOwner();
+    Instant before = Instant.now(clock);
+
+    passwordResetService.sendInvite(invited);
+
+    PasswordResetToken token = tokenRepository.findAll().stream()
+      .filter(t -> t.getUser().getId().equals(invited.getId()))
+      .findFirst().orElseThrow();
+    assertThat(token.getPurpose()).isEqualTo(PasswordResetTokenPurpose.INVITE);
+    assertThat(token.getExpiresAt())
+      .isBetween(before.plus(Duration.ofDays(7)), Instant.now(clock).plus(Duration.ofDays(7)));
+  }
+
+  @Test
+  void invite_resent_invalidatesTheOldLink() throws Exception {
+    User invited = invitedOwner();
+    passwordResetService.sendInvite(invited);
+    passwordResetService.sendInvite(invited);
+    assertThat(capturingEmailService.invitations()).hasSize(2);
+
+    resetPassword(inviteToken(0), "FirstPass123!@#")
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("INVALID_RESET_TOKEN"));
+    resetPassword(inviteToken(1), "FirstPass123!@#").andExpect(status().isOk());
+  }
+
+  @Test
+  void invite_inATransactionThatRollsBack_sendsNoEmail() {
+    User invited = invitedOwner();
+
+    transactionTemplate.executeWithoutResult(status -> {
+      passwordResetService.sendInvite(invited);
+      status.setRollbackOnly();
+    });
+
+    assertThat(capturingEmailService.invitations())
+      .as("the email goes out after commit, so a rolled-back invite reaches no one")
+      .isEmpty();
+  }
+
+  // A member who was invited and has not set a password yet.
+  private User invitedOwner() {
+    User user = testUsers.owner("invite-" + UUID.randomUUID() + "@test.com", "unused");
+    user.setPassword(null);
+    return userRepository.save(user);
+  }
+
+  private String inviteToken(int index) {
+    String url = capturingEmailService.invitations().get(index).resetUrl();
+    return url.substring(url.indexOf("token=") + "token=".length());
+  }
+
+  private ResultActions resetPassword(String rawToken, String newPassword) throws Exception {
+    ResetPasswordRequest request = new ResetPasswordRequest();
+    request.setToken(rawToken);
+    request.setNewPassword(newPassword);
+    return mockMvc.perform(post("/auth/reset-password")
+      .contentType(MediaType.APPLICATION_JSON)
+      .content(objectMapper.writeValueAsString(request)));
+  }
+
   private String loginForRefreshToken(String email, String rawPassword) throws Exception {
-    String body = mockMvc.perform(post("/auth/login")
+    return RefreshCookies.valueOf(mockMvc.perform(post("/auth/login")
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(new AuthRequest(email, rawPassword))))
       .andExpect(status().isOk())
-      .andReturn().getResponse().getContentAsString();
-    return objectMapper.readTree(body).get("refreshToken").asText();
+      .andReturn());
   }
 
   private int refreshStatus(String refreshToken) throws Exception {
-    return mockMvc.perform(post("/auth/refresh")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(new RefreshRequest(refreshToken))))
+    return mockMvc.perform(RefreshCookies.refresh(refreshToken))
       .andReturn().getResponse().getStatus();
   }
 }

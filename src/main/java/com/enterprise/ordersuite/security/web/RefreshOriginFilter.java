@@ -1,11 +1,9 @@
 package com.enterprise.ordersuite.security.web;
 
 import com.enterprise.ordersuite.api.errors.ApiErrorResponse;
-import com.enterprise.ordersuite.security.config.RefreshCookieProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.MediaType;
@@ -14,14 +12,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
 /**
- * CSRF defense for the only two cookie-authenticated endpoints (D19). A request carrying the
- * refresh cookie must come from an allowed origin. Requests without the cookie are not
- * CSRF-able - the caller had to read the token to send it - so they pass untouched.
+ * CSRF defense for the only two cookie-authenticated endpoints (D19). Every request to them
+ * must come from an allowed origin, with or without the cookie (Tenancy & Identity D-10):
+ * the refresh token travels only in the cookie, so these endpoints have no other caller.
  * Not authorization: it never looks at who the user is.
  */
 public class RefreshOriginFilter extends OncePerRequestFilter {
@@ -40,7 +37,7 @@ public class RefreshOriginFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !GUARDED_PATHS.contains(RequestPaths.withinApplication(request)) || !hasRefreshCookie(request);
+        return !GUARDED_PATHS.contains(RequestPaths.withinApplication(request));
     }
 
     @Override
@@ -55,11 +52,5 @@ public class RefreshOriginFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getOutputStream(),
                 new ApiErrorResponse("ORIGIN_NOT_ALLOWED", "Origin not allowed", Instant.now(clock)));
-    }
-
-    private static boolean hasRefreshCookie(HttpServletRequest request) {
-        Cookie[] cookies = request.getCookies();
-        return cookies != null && Arrays.stream(cookies)
-                .anyMatch(c -> RefreshCookieProperties.COOKIE_NAME.equals(c.getName()));
     }
 }

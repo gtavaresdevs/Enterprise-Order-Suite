@@ -22,7 +22,7 @@ public class RefreshTokenService {
     private final RefreshTokenGenerator refreshTokenGenerator;
     private final Clock clock;
 
-    public static final Duration REFRESH_TTL = Duration.ofDays(14);
+    public static final Duration REFRESH_TTL = Duration.ofDays(30);
 
     public IssuedRefreshToken issueFor(User user) {
         return issue(user, UUID.randomUUID());

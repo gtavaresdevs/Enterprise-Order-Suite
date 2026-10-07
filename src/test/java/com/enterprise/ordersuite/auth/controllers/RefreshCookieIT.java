@@ -1,11 +1,10 @@
 package com.enterprise.ordersuite.auth.controllers;
 
 import com.enterprise.ordersuite.auth.dtos.AuthRequest;
-import com.enterprise.ordersuite.auth.dtos.RefreshRequest;
 import com.enterprise.ordersuite.support.IntegrationTest;
+import com.enterprise.ordersuite.support.RefreshCookies;
 import com.enterprise.ordersuite.support.TestUsers;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -23,9 +22,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Pinned: spring-dotenv loads the developer's .env, which sets REFRESH_COOKIE_SECURE=false
-// locally. These assertions describe what production ships, on every machine.
-// MockMvc has no context path, so the cookie path is /auth here; /api/auth is unit-tested.
+// Pinned: a developer's local environment may set REFRESH_COOKIE_SECURE=false. These
+// assertions describe what production ships, on every machine.
+// MockMvc has no context path, so the cookie path is /auth here; /api/auth is tested below.
 @IntegrationTest
 @AutoConfigureMockMvc
 @TestPropertySource(properties = {
@@ -36,7 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RefreshCookieIT {
 
   private static final String PASSWORD = "Password123!";
-  private static final String FRONTEND = "http://localhost:3000";
+  // 30 days, sliding (Tenancy & Identity D-11).
+  private static final String THIRTY_DAYS = "Max-Age=2592000";
 
   @Autowired
   private MockMvc mockMvc;
@@ -48,14 +48,16 @@ class RefreshCookieIT {
   private TestUsers testUsers;
 
   @Test
-  void login_setsTheRefreshCookie_matchingTheBodyToken() throws Exception {
+  void login_setsThe30DayRefreshCookie_andTheBodyHasOnlyTheAccessToken() throws Exception {
     MvcResult result = login(register());
 
-    String setCookie = result.getResponse().getHeader(HttpHeaders.SET_COOKIE);
-    assertThat(setCookie)
+    assertThat(result.getResponse().getHeader(HttpHeaders.SET_COOKIE))
       .startsWith("refreshToken=")
-      .contains("Path=/auth", "Max-Age=1209600", "HttpOnly", "Secure", "SameSite=Lax");
-    assertThat(cookieValue(result)).isEqualTo(bodyRefreshToken(result));
+      .contains("Path=/auth", THIRTY_DAYS, "HttpOnly", "Secure", "SameSite=Lax");
+    assertThat(objectMapper.readTree(result.getResponse().getContentAsString()).fieldNames())
+      .toIterable()
+      .as("acceptance 11: no auth response body contains refreshToken")
+      .containsExactly("accessToken");
   }
 
   @Test
@@ -76,47 +78,57 @@ class RefreshCookieIT {
   }
 
   @Test
-  void refresh_viaCookieWithNoBody_rotatesAndSetsANewCookie() throws Exception {
-    String first = cookieValue(login(register()));
+  void refresh_viaCookieWithNoBodyAndNoContentType_rotates_andSlidesTheExpiry() throws Exception {
+    String first = RefreshCookies.valueOf(login(register()));
 
-    MvcResult result = mockMvc.perform(post("/auth/refresh")
-        .cookie(new Cookie("refreshToken", first))
-        .header(HttpHeaders.ORIGIN, FRONTEND)
-        .contentType(MediaType.APPLICATION_JSON))
+    MvcResult result = mockMvc.perform(RefreshCookies.refresh(first))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.accessToken").isNotEmpty())
+      .andExpect(jsonPath("$.refreshToken").doesNotExist())
       .andReturn();
 
-    assertThat(cookieValue(result)).isNotBlank().isNotEqualTo(first);
+    assertThat(RefreshCookies.valueOf(result)).isNotBlank().isNotEqualTo(first);
+    assertThat(result.getResponse().getHeader(HttpHeaders.SET_COOKIE))
+      .as("each rotation sets a new 30-day expiry")
+      .contains(THIRTY_DAYS);
   }
 
   @Test
-  void refresh_cookieAndBodyBothPresent_cookieWins() throws Exception {
-    String token = cookieValue(login(register()));
+  void refresh_withAJsonContentType_stillWorks() throws Exception {
+    String token = RefreshCookies.valueOf(login(register()));
 
-    mockMvc.perform(post("/auth/refresh")
-        .cookie(new Cookie("refreshToken", token))
-        .header(HttpHeaders.ORIGIN, FRONTEND)
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(new RefreshRequest("stale-local-storage-value"))))
+    mockMvc.perform(RefreshCookies.refresh(token).contentType(MediaType.APPLICATION_JSON))
       .andExpect(status().isOk());
   }
 
   @Test
-  void refresh_jsonContentTypeButNoTokenAnywhere_returns401() throws Exception {
-    mockMvc.perform(post("/auth/refresh").contentType(MediaType.APPLICATION_JSON))
+  void refresh_tokenInTheBody_isIgnored_andIs401() throws Exception {
+    String token = RefreshCookies.valueOf(login(register()));
+
+    mockMvc.perform(post("/auth/refresh")
+        .header(HttpHeaders.ORIGIN, RefreshCookies.FRONTEND)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"refreshToken\":\"" + token + "\"}"))
+      .andExpect(status().isUnauthorized())
+      .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+
+    // The ignored body did not consume the token.
+    mockMvc.perform(RefreshCookies.refresh(token))
+      .andExpect(status().isOk());
+  }
+
+  @Test
+  void refresh_noCookie_returns401() throws Exception {
+    mockMvc.perform(post("/auth/refresh").header(HttpHeaders.ORIGIN, RefreshCookies.FRONTEND))
       .andExpect(status().isUnauthorized())
       .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
   }
 
   @Test
   void logout_viaCookie_clearsTheCookie_andRevokesTheFamily() throws Exception {
-    String token = cookieValue(login(register()));
+    String token = RefreshCookies.valueOf(login(register()));
 
-    MvcResult result = mockMvc.perform(post("/auth/logout")
-        .cookie(new Cookie("refreshToken", token))
-        .header(HttpHeaders.ORIGIN, FRONTEND)
-        .contentType(MediaType.APPLICATION_JSON))
+    MvcResult result = mockMvc.perform(RefreshCookies.logout(token))
       .andExpect(status().isOk())
       .andReturn();
 
@@ -124,15 +136,13 @@ class RefreshCookieIT {
       .startsWith("refreshToken=;")
       .contains("Max-Age=0", "Path=/auth", "HttpOnly", "Secure", "SameSite=Lax");
 
-    mockMvc.perform(post("/auth/refresh")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(new RefreshRequest(token))))
+    mockMvc.perform(RefreshCookies.refresh(token))
       .andExpect(status().isUnauthorized());
   }
 
   @Test
-  void logout_withNoTokenAnywhere_isIdempotent_andStillClearsTheCookie() throws Exception {
-    MvcResult result = mockMvc.perform(post("/auth/logout").contentType(MediaType.APPLICATION_JSON))
+  void logout_withNoCookie_isIdempotent_andStillClearsTheCookie() throws Exception {
+    MvcResult result = mockMvc.perform(post("/auth/logout").header(HttpHeaders.ORIGIN, RefreshCookies.FRONTEND))
       .andExpect(status().isOk())
       .andReturn();
 
@@ -151,15 +161,5 @@ class RefreshCookieIT {
         .content(objectMapper.writeValueAsString(new AuthRequest(email, PASSWORD))))
       .andExpect(status().isOk())
       .andReturn();
-  }
-
-  private String cookieValue(MvcResult result) {
-    String header = result.getResponse().getHeader(HttpHeaders.SET_COOKIE);
-    assertThat(header).as("response must set the refresh cookie").isNotNull();
-    return header.substring("refreshToken=".length(), header.indexOf(';'));
-  }
-
-  private String bodyRefreshToken(MvcResult result) throws Exception {
-    return objectMapper.readTree(result.getResponse().getContentAsString()).get("refreshToken").asText();
   }
 }

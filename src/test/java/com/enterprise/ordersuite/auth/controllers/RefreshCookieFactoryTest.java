@@ -24,7 +24,7 @@ class RefreshCookieFactoryTest {
     assertThat(cookie.getPath())
       .as("production serves under context path /api; the cookie must reach /api/auth/refresh")
       .isEqualTo("/api/auth");
-    assertThat(cookie.getMaxAge()).isEqualTo(Duration.ofDays(14));
+    assertThat(cookie.getMaxAge()).as("30 days, sliding (Tenancy & Identity D-11)").isEqualTo(Duration.ofDays(30));
   }
 
   @Test

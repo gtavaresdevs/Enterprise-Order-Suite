@@ -31,7 +31,7 @@ class RefreshTokenConcurrencyIT {
   void refresh_sameTokenPresentedConcurrently_succeedsExactlyOnce() throws Exception {
     String email = "race-" + UUID.randomUUID() + "@test.com";
     testUsers.owner(email, "Password123!");
-    String token = authenticationService.authenticate(new AuthRequest(email, "Password123!")).getRefreshToken();
+    String token = authenticationService.authenticate(new AuthRequest(email, "Password123!")).refreshToken();
 
     CountDownLatch start = new CountDownLatch(1);
     ExecutorService pool = Executors.newFixedThreadPool(2);

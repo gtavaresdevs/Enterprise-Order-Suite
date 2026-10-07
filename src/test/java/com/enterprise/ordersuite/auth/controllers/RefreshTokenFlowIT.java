@@ -1,9 +1,10 @@
 package com.enterprise.ordersuite.auth.controllers;
 
 import com.enterprise.ordersuite.auth.dtos.AuthRequest;
-import com.enterprise.ordersuite.auth.dtos.LogoutRequest;
-import com.enterprise.ordersuite.auth.dtos.RefreshRequest;
+import com.enterprise.ordersuite.identity.domain.User;
+import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import com.enterprise.ordersuite.support.IntegrationTest;
+import com.enterprise.ordersuite.support.RefreshCookies;
 import com.enterprise.ordersuite.support.TestUsers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Body-borne refresh: the live (pre-Phase 6) path, kept working for backward compatibility.
+// Rotation, reuse detection and logout through the cookie, the only transport (D-10).
 @IntegrationTest
 @AutoConfigureMockMvc
 class RefreshTokenFlowIT {
@@ -33,6 +34,9 @@ class RefreshTokenFlowIT {
   private TestUsers testUsers;
 
   @Autowired
+  private UserRepository userRepository;
+
+  @Autowired
   private MockMvc mockMvc;
 
   @Autowired
@@ -41,7 +45,7 @@ class RefreshTokenFlowIT {
   private String testEmail;
 
   @BeforeEach
-  void setUp() throws Exception {
+  void setUp() {
     testEmail = "testuser_" + UUID.randomUUID() + "@example.com";
 
     testUsers.owner(testEmail, RAW_PASSWORD);
@@ -113,8 +117,26 @@ class RefreshTokenFlowIT {
       .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
   }
 
+  // Acceptance 5: after a member is deactivated, their next refresh gets 401.
+  @Test
+  void refresh_afterDeactivation_returns401_andTheFamilyStaysDead() throws Exception {
+    String token = login();
+    User user = userRepository.findByEmailIgnoreCase(testEmail).orElseThrow();
+    user.setActive(false);
+    userRepository.save(user);
+
+    refresh(token)
+      .andExpect(status().isUnauthorized())
+      .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+
+    user.setActive(true);
+    userRepository.save(user);
+    // Reactivation does not revive the revoked session; the member signs in again.
+    refresh(token).andExpect(status().isUnauthorized());
+  }
+
   private String login() throws Exception {
-    String body = mockMvc.perform(post("/auth/login")
+    return RefreshCookies.valueOf(mockMvc.perform(post("/auth/login")
         .with(request -> {
           request.setRemoteAddr(TEST_IP);
           return request;
@@ -123,32 +145,26 @@ class RefreshTokenFlowIT {
         .content(objectMapper.writeValueAsString(new AuthRequest(testEmail, RAW_PASSWORD))))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.accessToken").isNotEmpty())
-      .andReturn().getResponse().getContentAsString();
-    return objectMapper.readTree(body).get("refreshToken").asText();
+      .andReturn());
   }
 
   private ResultActions refresh(String refreshToken) throws Exception {
-    return mockMvc.perform(post("/auth/refresh")
+    return mockMvc.perform(RefreshCookies.refresh(refreshToken)
       .with(request -> {
         request.setRemoteAddr(TEST_IP);
         return request;
-      })
-      .contentType(MediaType.APPLICATION_JSON)
-      .content(objectMapper.writeValueAsString(new RefreshRequest(refreshToken))));
+      }));
   }
 
   private ResultActions logout(String refreshToken) throws Exception {
-    return mockMvc.perform(post("/auth/logout")
+    return mockMvc.perform(RefreshCookies.logout(refreshToken)
       .with(request -> {
         request.setRemoteAddr(TEST_IP);
         return request;
-      })
-      .contentType(MediaType.APPLICATION_JSON)
-      .content(objectMapper.writeValueAsString(new LogoutRequest(refreshToken))));
+      }));
   }
 
-  private String refreshToken(ResultActions result) throws Exception {
-    return objectMapper.readTree(result.andReturn().getResponse().getContentAsString())
-      .get("refreshToken").asText();
+  private String refreshToken(ResultActions result) {
+    return RefreshCookies.valueOf(result.andReturn());
   }
 }

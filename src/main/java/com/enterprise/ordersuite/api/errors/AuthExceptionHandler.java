@@ -52,11 +52,12 @@ public class AuthExceptionHandler {
     return build(HttpStatus.BAD_REQUEST, "INVALID_RESET_TOKEN", "Invalid or expired reset token");
   }
 
-  // Explicitly handling the custom historical reuse error mapping rule
+  // 409, not 400: the request is well-formed but conflicts with the password history
+  // (API conventions §10.3).
   @ExceptionHandler(PasswordReuseException.class)
   public ResponseEntity<ApiErrorResponse> handlePasswordReuse(PasswordReuseException ex) {
     return build(
-      HttpStatus.BAD_REQUEST,
+      HttpStatus.CONFLICT,
       "PASSWORD_REUSE_ERROR",
       ex.getMessage() // Transmits: "This password has been used before. Please choose a different password."
     );

@@ -28,6 +28,11 @@ public class EmailProperties {
   private String templateName = "password-reset-email";
 
   /**
+   * The Thymeleaf template for a member invitation (password setup, 7 days).
+   */
+  private String invitationTemplateName = "invitation-email";
+
+  /**
    * The absolute, fully qualified public root base URL of the active backend service instance.
    * Crucial for compiling cross-origin fully distinct paths for static embedded resources (like logo images).
    * e.g., http://localhost:8080 or https://api.yourproductionsite.com
