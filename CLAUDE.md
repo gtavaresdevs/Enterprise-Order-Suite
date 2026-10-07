@@ -12,9 +12,9 @@
 
 ## This repo (backend)
 
-Java 17, Spring Boot 3, PostgreSQL (Flyway), JWT auth. Base package `com.enterprise.ordersuite`. A modular monolith: modules under `src/main/java/com/enterprise/ordersuite/` (`auth`, `identity`, `orders`, `products`, `profile`, `security`, `storage`, `notifications`, `common`, `config`, `api`) are isolated by dependency inversion, not by service boundaries.
+Java 17, Spring Boot 3, PostgreSQL (Flyway), JWT auth. Base package `com.enterprise.ordersuite`. A modular monolith: modules under `src/main/java/com/enterprise/ordersuite/` (`auth`, `identity`, `profile`, `security`, `storage`, `notifications`, `common`, `config`, `api`) are isolated by dependency inversion, not by service boundaries.
 
-It is becoming the restaurant-ops multi-tenant SaaS (ADR-0001, ADR-0002). The current code still has the legacy B2B shape: one tenant, `/orders` and `/products`, orders owned by a `User`, `Long` ids. That shape is replaced, not evolved (ADR-0008); do not extend it for new-architecture work.
+It is becoming the restaurant-ops multi-tenant SaaS (ADR-0001, ADR-0002). Build 1 (Tenant foundation, #31) is replacing the legacy B2B shape: the legacy `orders` and `products` modules are deleted (Q-90 a); Menu and Order Core are rebuilt in Builds 2 and 3. What remains of the legacy shape (one tenant, `Long` ids, `roles`) is replaced, not evolved (ADR-0008); do not extend it for new-architecture work.
 
 **Direction:** start at `docs/README.md` and the ADRs in `docs/adr/`; build order is Tenant foundation, Menu, Order Core, Storefront to Order Core (ADR-0007). The old direction (single restaurant, frontend-owned contract, the `docs/contracts/` snapshot, the 2026-09-20 migration design) is superseded: see the banners on those files and ADR-0000. Customers stay anonymous: a snapshot on each order, no Customer table this run (Q-51 a, ADR-0000 FS-03).
 
@@ -54,8 +54,8 @@ Gradle, not Maven: ignore the Maven instructions in `README.md`.
 ./gradlew build
 ./gradlew bootRun      # profile local (optional, gitignored application-local.yml); needs .env (see Environment)
 ./gradlew test         # JUnit 5 + Testcontainers; Docker must be running
-./gradlew test --tests "com.enterprise.ordersuite.orders.application.service.OrderServiceTest"
-./gradlew test --tests "com.enterprise.ordersuite.orders.api.OrderControllerIT.createOrder_asRegularUser_returns201"
+./gradlew test --tests "com.enterprise.ordersuite.auth.service.AuthenticationServiceTest"
+./gradlew test --tests "com.enterprise.ordersuite.auth.controllers.RefreshCookieIT"
 ./gradlew flywayMigrate   # migrations: src/main/resources/db/migration (also applied on boot)
 ./gradlew flywayInfo
 ```
@@ -74,17 +74,16 @@ Tests never need `.env` or a local Postgres: they start real containers through 
 
 **Layering per module:** `api` (controllers, DTOs) → `application` (services, mappers) → `domain` (entities, domain exceptions) → `persistence` (Spring Data repositories). Not every module has all four; new code follows this shape.
 
-**Cross-module dependency inversion:** the consuming module defines the interface it needs and the providing module implements it. Example: `orders.application.service.ProductService` is an interface owned by `orders`, implemented by `products.application.service.ProductService`. Never import across module packages directly.
+**Cross-module dependency inversion:** the consuming module defines the interface it needs and the providing module implements it. (The legacy `orders`/`products` pair was the worked example; it was deleted in Build 1.) Never import across module packages directly.
 
 **Reuse, do not re-implement:**
 - `identity.application.CurrentUserService`: the logged-in user (id, email) from the security context.
 - `common.util.PagedResult`: pagination wrapper for list and search endpoints.
 - `api.errors.ApiErrorResponse` with `GlobalExceptionHandler` / `AuthExceptionHandler`: the error shape (`code`, `message`, `timestamp`, optional `errors` for validation).
 
-**Authorization:** only in `@PreAuthorize` (D2), never in a method body. Role hierarchy `ROLE_SUPER_ADMIN > ROLE_ADMIN > ROLE_USER` (`SecurityConfig.roleHierarchy()`) is applied by `methodSecurityExpressionHandler`, so it affects annotations and not a raw `getAuthorities()` call. Resource checks are helper beans referenced from SpEL, for example `@PreAuthorize("hasRole('ADMIN') or @orderService.isOrderOwner(#id, principal.id)")`. Code that must know a role for query filtering resolves it through `RoleHierarchy` (`OrderService.isAdmin`).
-- Legacy: `isOrderOwner` and the per-user filtering in `OrderService.searchOrders` / `getAllOrders` are B2B behavior (ADR-0000 row D2). "Tenant" now means restaurant (ADR-0001); the scoping mechanism comes from the Tenancy & Identity contract. Do not copy per-user ownership into new-architecture endpoints.
+**Authorization:** only in `@PreAuthorize` (D2), never in a method body. Role hierarchy `ROLE_SUPER_ADMIN > ROLE_ADMIN > ROLE_USER` (`SecurityConfig.roleHierarchy()`) is applied by `methodSecurityExpressionHandler`, so it affects annotations and not a raw `getAuthorities()` call. Resource checks are helper beans referenced from SpEL. Code that must know a role for query filtering resolves it through `RoleHierarchy`, never `getAuthorities()`. "Tenant" means restaurant (ADR-0001); the scoping mechanism is the Tenancy & Identity contract (`docs/architecture/TENANCY-AND-IDENTITY.md`). Do not copy per-user ownership into new-architecture endpoints.
 
-**Legacy order domain:** `Order.transitionTo` enforces the status state machine (`InvalidStatusTransitionException`); every change goes through it. `OrderService.updateOrder` writes an `OrderHistory` row per transition and triggers a notification. Create and cancel change `Product` stock through `ProductService.decrementStock` / `incrementStock`; do not touch stock outside `OrderService`. The new Menu has no stock counts: the 86 toggle is the only availability control (Q-42 c, ADR-0000 FS-08).
+**Menu:** no stock counts; the 86 toggle is the only availability control (Q-42 c, ADR-0000 FS-08).
 
 **Auth:** stateless JWT access token (`SessionCreationPolicy.STATELESS`). The refresh token is an HttpOnly cookie on `<context-path>/auth`, rotated per use; reusing a rotated token revokes its whole family (V21). The body `refreshToken` is a backward-compatible fallback (`RefreshTokenSource`) until the auth cleanup in Tenant foundation. `RefreshOriginFilter` checks `Origin` on `/auth/refresh` and `/auth/logout`. `RefreshTokenCleanupScheduler` purges expired tokens. Password reset keeps `PasswordHistory` (no reuse). Per-endpoint rate limiting: `AuthRateLimitFilter` + `RateLimiter` (`InMemoryBucketedSlidingWindowRateLimiter`, or `NoOpRateLimiter` when `security.rate-limit.enabled=false`).
 

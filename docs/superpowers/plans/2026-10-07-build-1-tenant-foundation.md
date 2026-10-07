@@ -1,6 +1,6 @@
 # Build 1: Tenant foundation (implementation plan)
 
-- Status: Draft (awaiting Gabriel's go)
+- Status: Approved for slices 0-2 (Gabriel, 2026-10-07); slices 3-9 follow after a check-in
 - Updated: 2026-10-07
 - Issue: #31
 - Contract: `docs/architecture/TENANCY-AND-IDENTITY.md` (Reviewed) and `docs/api/drafts/tenancy-identity.yaml`; conventions `docs/architecture/API-CONVENTIONS.md` (Reviewed)
@@ -12,7 +12,7 @@ The contract is the spec. This plan only orders the work. Every slice ends with 
 
 | # | Slice | Contents | Contract refs |
 |---|---|---|---|
-| 0 | Prep | ADR-0009 Consequences: amend `flyway-migrations` skill and `flyway-migration-author` agent (pre-launch re-baseline exception, V21 count, drop the `docs/contracts/` pointer). Roadmap: Build 1 `In progress (started 2026-10-07), #31`. This plan. | ADR-0009 |
+| 0 | Prep | Done before Build 1 (already in the skill and agent): ADR-0009 Consequences: amend `flyway-migrations` skill and `flyway-migration-author` agent (pre-launch re-baseline exception, V21 count, drop the `docs/contracts/` pointer). Roadmap: Build 1 `In progress (started 2026-10-07), #31`. This plan. | ADR-0009 |
 | 1 | Drop legacy domain | Delete `orders` and `products` modules, their tests and their exception mappings (Q-90 a). Tables are left for slice 2. | ADR-0008 |
 | 2 | Re-baseline | Replace V1-V21 with one `V1__baseline.sql`: `restaurants`, `users` (ULID, `platform_admin`, folded profile fields, `avatar_key`), `memberships`, `refresh_tokens`, `password_history`, `password_reset_tokens` + `purpose`, `identity_audit_events` + `restaurant_id`, `target_user_id`, `details jsonb`; platform-admin seed from the env-seeded root user. ULID ids (`char(26)`, ulid-creator) in `BaseEntity` and every entity; `roles`, `user_profiles` and their code removed. Existing auth tests are adapted to the new ids. | Schema notes; ADR-0009 |
 | 3 | Tenant context | JWT claims `sub`, `rid`, `role` (display names removed); `TenantContext` request-scoped + filter after JWT auth; fail-closed accessor (500, logged); `X-Support-Restaurant-Id` handling (GET only, platform admin only); MDC `restaurantId`, `userId`, `support`; `TaskDecorator` copying context and MDC; `RoleHierarchy` OWNER > MANAGER > STAFF, PLATFORM_ADMIN outside it; ArchUnit tenant rule. | §5.1-§5.4; acceptance 8, 10, 12 |
@@ -21,7 +21,7 @@ The contract is the spec. This plan only orders the work. Every slice ends with 
 | 6 | Restaurant, team, audit | `GET`/`PATCH /restaurant`; `/team/members*` with the §5.3 matrix in `@PreAuthorize` helper beans, `LAST_OWNER`, `SELF_ACTION_NOT_ALLOWED`, `INVITATION_NOT_PENDING`; `GET /audit-events`. Cross-tenant, role and support-read tests per endpoint. | §5.3, §5.6; acceptance 2-4, 7 |
 | 7 | Platform and public | `/platform/restaurants*` (create in one transaction with the owner invite, email after commit; slug pattern and reserved list; `SLUG_TAKEN`); `GET /public/r/{slug}` with a leak test. | Restaurant creation; §5.5; acceptance 2, 9 |
 | 8 | Limits and seed | Rate-limit buckets for `POST /me/password`, `POST /team/members`, `POST /platform/restaurants` (Q-92) and `/public/r/{slug}`; dev and test seeder R1 and R2 (owner, manager, staff) under `local` and `test` only, password from `DEV_SEED_PASSWORD` (added to `.env.example`; test fallback in `application-test.yml`). | Q-92, Q-93; NFR S-2 |
-| 9 | Contract graduation | `docs/api/openapi.yaml` holding every operation of the contract; drift test comparing it with the springdoc output; contract graduation log; roadmap and README status. Then a `spring-security-reviewer` audit, a push, an issue comment with the commits, and the card moves to In review. | ADR-0010; acceptance 13 |
+| 9 | Contract graduation | `docs/api/openapi.yaml` holding every operation of the contract; drift test comparing it with the springdoc output; contract graduation log; roadmap and README status; skills and agents swap the deleted `orders`/`products` worked examples for Build 1 code. Then a `spring-security-reviewer` audit, a push, an issue comment with the commits, and the card moves to In review. | ADR-0010; acceptance 13 |
 
 ## Notes
 

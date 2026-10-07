@@ -4,8 +4,6 @@ import com.enterprise.ordersuite.auth.service.exceptions.InvalidCredentialsExcep
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidPasswordResetTokenException;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidRefreshTokenException;
 import com.enterprise.ordersuite.auth.service.exceptions.PasswordReuseException; // Imported
-import com.enterprise.ordersuite.orders.domain.exception.InvalidStatusTransitionException;
-import com.enterprise.ordersuite.orders.domain.exception.ProductNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -33,18 +31,6 @@ public class AuthExceptionHandler {
 
   public AuthExceptionHandler(Clock clock) {
     this.clock = clock;
-  }
-
-  // -------- Order / Product Errors --------
-
-  @ExceptionHandler(ProductNotFoundException.class)
-  public ResponseEntity<ApiErrorResponse> handleProductNotFound(ProductNotFoundException ex) {
-    return build(HttpStatus.BAD_REQUEST, "PRODUCT_NOT_FOUND", ex.getMessage());
-  }
-
-  @ExceptionHandler(InvalidStatusTransitionException.class)
-  public ResponseEntity<ApiErrorResponse> handleInvalidStatusTransition(InvalidStatusTransitionException ex) {
-    return build(HttpStatus.BAD_REQUEST, "INVALID_STATUS_TRANSITION", ex.getMessage());
   }
 
   // -------- Login / authentication --------

@@ -1,9 +1,5 @@
 package com.enterprise.ordersuite.api.errors;
 
-import com.enterprise.ordersuite.orders.domain.exception.InvalidStatusTransitionException;
-import com.enterprise.ordersuite.orders.domain.exception.OrderNotEditableException;
-import com.enterprise.ordersuite.orders.domain.exception.ProductNotFoundException;
-import com.enterprise.ordersuite.products.domain.exception.InsufficientStockException;
 import com.enterprise.ordersuite.profile.domain.exception.InvalidAvatarException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,55 +25,6 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     private final Clock clock;
-
-    @ExceptionHandler(ProductNotFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleProductNotFound(ProductNotFoundException ex) {
-        log.warn("ProductNotFoundException: {}", ex.getMessage());
-        ApiErrorResponse body = new ApiErrorResponse(
-                "PRODUCT_NOT_FOUND",
-                ex.getMessage(),
-                Instant.now(clock),
-                null
-        );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
-    }
-
-    @ExceptionHandler(InsufficientStockException.class)
-    public ResponseEntity<ApiErrorResponse> handleInsufficientStock(InsufficientStockException ex) {
-        log.warn("InsufficientStockException: {}", ex.getMessage());
-        ApiErrorResponse body = new ApiErrorResponse(
-                "INSUFFICIENT_STOCK",
-                ex.getMessage(),
-                Instant.now(clock),
-                null
-        );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
-    }
-
-    @ExceptionHandler(InvalidStatusTransitionException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidStatusTransition(InvalidStatusTransitionException ex) {
-        log.warn("InvalidStatusTransitionException: {}", ex.getMessage());
-        ApiErrorResponse body = new ApiErrorResponse(
-                "INVALID_STATUS_TRANSITION",
-                ex.getMessage(),
-                Instant.now(clock),
-                null
-        );
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
-    }
-
-    // 409, not 400: the payload is well-formed. It is the order's state that refuses it.
-    @ExceptionHandler(OrderNotEditableException.class)
-    public ResponseEntity<ApiErrorResponse> handleOrderNotEditable(OrderNotEditableException ex) {
-        log.warn("OrderNotEditableException: {}", ex.getMessage());
-        ApiErrorResponse body = new ApiErrorResponse(
-                "ORDER_NOT_EDITABLE",
-                ex.getMessage(),
-                Instant.now(clock),
-                null
-        );
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
-    }
 
     @ExceptionHandler(InvalidAvatarException.class)
     public ResponseEntity<ApiErrorResponse> handleInvalidAvatar(InvalidAvatarException ex) {
@@ -113,22 +60,6 @@ public class GlobalExceptionHandler {
 
         Throwable rootCause = findRootCause(ex);
 
-        if (rootCause instanceof InsufficientStockException) {
-            log.warn("Handling InsufficientStockException from root cause: {}", rootCause.getMessage());
-            return handleInsufficientStock((InsufficientStockException) rootCause);
-        }
-        if (rootCause instanceof ProductNotFoundException) {
-            log.warn("Handling ProductNotFoundException from root cause: {}", rootCause.getMessage());
-            return handleProductNotFound((ProductNotFoundException) rootCause);
-        }
-        if (rootCause instanceof InvalidStatusTransitionException) {
-            log.warn("Handling InvalidStatusTransitionException from root cause: {}", rootCause.getMessage());
-            return handleInvalidStatusTransition((InvalidStatusTransitionException) rootCause);
-        }
-        if (rootCause instanceof OrderNotEditableException) {
-            log.warn("Handling OrderNotEditableException from root cause: {}", rootCause.getMessage());
-            return handleOrderNotEditable((OrderNotEditableException) rootCause);
-        }
         if (rootCause instanceof InvalidAvatarException) {
             log.warn("Handling InvalidAvatarException from root cause: {}", rootCause.getMessage());
             return handleInvalidAvatar((InvalidAvatarException) rootCause);
