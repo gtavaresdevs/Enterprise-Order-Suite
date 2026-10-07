@@ -114,9 +114,11 @@ Gabriel, 2026-10-07T01:45Z (ADR-0021 Decision). Agents do this on their own, wit
 1. When a build step or a piece of build work starts, search the backend repo's open issues for one that covers it.
 2. If none does, create one in `gtavaresdevs/Enterprise-Order-Suite` (frontend work too): a short title, one `area:*` label (`area:frontend` for frontend work), one `type:*` label, and a body that links the canonical doc (plan, roadmap step, ADR) instead of copying it. Add `ready-for-agent`, `blocked` or `needs-human` when they apply.
 3. Cite it in every commit for that work: `Refs #<n>`, or `Refs gtavaresdevs/Enterprise-Order-Suite#<n>` from the frontend repo. Never `closes`, `fixes` or `resolves`.
-4. When the work is done, comment with the commits and close the issue by hand; the card moves to Done. Put the issue number in the step's Status in `docs/roadmap.md` when the step starts.
+4. Put the issue number in the step's Status in `docs/roadmap.md` when the step starts.
+5. Cards (Gabriel, 2026-10-07T01:55Z). A local session (its `gh` has the `project` scope, item 3 of section 6 above) moves the card to **In Progress** when it starts the step and to **In review** when the work is pushed and waits for Gabriel's check, with `gh project item-edit`. A cloud session cannot change board fields: it skips this and says so in its reply.
+6. When the work is pushed, comment on the issue with the commits and leave it open. Gabriel checks it and closes the issue when he approves; closing moves the card to Done. Agents never close a build issue themselves.
 
-Never put restaurant, customer or order data, secrets, tokens, IP addresses or credentials in an issue (the repo is public), and never cite an issue number that does not exist. Cards between Todo, In Progress and In review are moved by Gabriel or a local session.
+Never put restaurant, customer or order data, secrets, tokens, IP addresses or credentials in an issue (the repo is public), and never cite an issue number that does not exist. The `gh auth refresh -s project` setup is one-time, on Gabriel's machine; it persists and is not repeated per session. It does not help cloud sessions, which never reach board fields.
 
 ## 7. Checklist
 
