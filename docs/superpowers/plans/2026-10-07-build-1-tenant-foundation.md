@@ -1,0 +1,30 @@
+# Build 1: Tenant foundation (implementation plan)
+
+- Status: Draft (awaiting Gabriel's go)
+- Updated: 2026-10-07
+- Issue: #31
+- Contract: `docs/architecture/TENANCY-AND-IDENTITY.md` (Reviewed) and `docs/api/drafts/tenancy-identity.yaml`; conventions `docs/architecture/API-CONVENTIONS.md` (Reviewed)
+- Decisions taken at the start: Q-90 a (drop legacy orders and products), Q-91 a (clean cut, no legacy endpoints kept), Q-92 (rate-limit `POST /me/password`, `POST /team/members`, `POST /platform/restaurants`), Q-93 a (Java seeder under `local` and `test`, `DEV_SEED_PASSWORD`)
+
+The contract is the spec. This plan only orders the work. Every slice ends with a full `./gradlew test` run that passes, and is committed with an explicit pathspec, `Refs #31`, and pushed. Skills: `flyway-migrations` (slice 2), `spring-security-changes` (slices 3, 4, 8), `backend-module-development` (slices 5-7), `writing-backend-tests` (every slice).
+
+## Slices
+
+| # | Slice | Contents | Contract refs |
+|---|---|---|---|
+| 0 | Prep | ADR-0009 Consequences: amend `flyway-migrations` skill and `flyway-migration-author` agent (pre-launch re-baseline exception, V21 count, drop the `docs/contracts/` pointer). Roadmap: Build 1 `In progress (started 2026-10-07), #31`. This plan. | ADR-0009 |
+| 1 | Drop legacy domain | Delete `orders` and `products` modules, their tests and their exception mappings (Q-90 a). Tables are left for slice 2. | ADR-0008 |
+| 2 | Re-baseline | Replace V1-V21 with one `V1__baseline.sql`: `restaurants`, `users` (ULID, `platform_admin`, folded profile fields, `avatar_key`), `memberships`, `refresh_tokens`, `password_history`, `password_reset_tokens` + `purpose`, `identity_audit_events` + `restaurant_id`, `target_user_id`, `details jsonb`; platform-admin seed from the env-seeded root user. ULID ids (`char(26)`, ulid-creator) in `BaseEntity` and every entity; `roles`, `user_profiles` and their code removed. Existing auth tests are adapted to the new ids. | Schema notes; ADR-0009 |
+| 3 | Tenant context | JWT claims `sub`, `rid`, `role` (display names removed); `TenantContext` request-scoped + filter after JWT auth; fail-closed accessor (500, logged); `X-Support-Restaurant-Id` handling (GET only, platform admin only); MDC `restaurantId`, `userId`, `support`; `TaskDecorator` copying context and MDC; `RoleHierarchy` OWNER > MANAGER > STAFF, PLATFORM_ADMIN outside it; ArchUnit tenant rule. | §5.1-§5.4; acceptance 8, 10, 12 |
+| 4 | Auth cleanup | Remove `/auth/register`, body `refreshToken` and the body fallback; check `Origin` on every cookie-borne call; access token 15 min, refresh 30 days sliding; revoke refresh tokens on deactivation and role or membership change; invite tokens (`purpose = INVITE`, 7 days) completed through `/auth/reset-password`; reused password becomes 409. | D-10, D-11; Tokens; acceptance 1, 5, 11 |
+| 5 | Own account | `GET`/`PATCH /me` (profile folded in), `POST`/`DELETE /me/avatar` (keys `restaurants/{restaurantId}/...`, user prefix for the platform admin), `POST /me/password`, `POST /me/sign-out-other-devices`. | Own account; acceptance 6 |
+| 6 | Restaurant, team, audit | `GET`/`PATCH /restaurant`; `/team/members*` with the §5.3 matrix in `@PreAuthorize` helper beans, `LAST_OWNER`, `SELF_ACTION_NOT_ALLOWED`, `INVITATION_NOT_PENDING`; `GET /audit-events`. Cross-tenant, role and support-read tests per endpoint. | §5.3, §5.6; acceptance 2-4, 7 |
+| 7 | Platform and public | `/platform/restaurants*` (create in one transaction with the owner invite, email after commit; slug pattern and reserved list; `SLUG_TAKEN`); `GET /public/r/{slug}` with a leak test. | Restaurant creation; §5.5; acceptance 2, 9 |
+| 8 | Limits and seed | Rate-limit buckets for `POST /me/password`, `POST /team/members`, `POST /platform/restaurants` (Q-92) and `/public/r/{slug}`; dev and test seeder R1 and R2 (owner, manager, staff) under `local` and `test` only, password from `DEV_SEED_PASSWORD` (added to `.env.example`; test fallback in `application-test.yml`). | Q-92, Q-93; NFR S-2 |
+| 9 | Contract graduation | `docs/api/openapi.yaml` holding every operation of the contract; drift test comparing it with the springdoc output; contract graduation log; roadmap and README status. Then a `spring-security-reviewer` audit, a push, an issue comment with the commits, and the card moves to In review. | ADR-0010; acceptance 13 |
+
+## Notes
+
+- After slice 2 every local database must be dropped and recreated (ADR-0009). Gabriel does this on his machine; tests use fresh containers.
+- After slice 4 the frontend's auth, profile and administration screens stop working against this branch until a frontend session adapts them (Q-91 a).
+- Slices 2-4 are one breaking stretch: each still ends green, but the API in between is neither legacy nor the contract.
