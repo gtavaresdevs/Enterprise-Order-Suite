@@ -2,8 +2,8 @@ package com.enterprise.ordersuite.security;
 
 import com.enterprise.ordersuite.auth.dtos.AuthRequest;
 import com.enterprise.ordersuite.auth.dtos.RefreshRequest;
-import com.enterprise.ordersuite.auth.dtos.RegisterRequest;
 import com.enterprise.ordersuite.support.IntegrationTest;
+import com.enterprise.ordersuite.support.TestUsers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
@@ -36,6 +36,9 @@ class RefreshOriginIT {
   private static final String FRONTEND = "http://localhost:3000";
   private static final String EVIL = "https://evil.example";
   private static final String PASSWORD = "Password123!";
+
+  @Autowired
+  private TestUsers testUsers;
 
   @Autowired
   private MockMvc mockMvc;
@@ -123,19 +126,12 @@ class RefreshOriginIT {
   }
 
   private String loginForRefreshToken() throws Exception {
-    RegisterRequest register = new RegisterRequest();
-    register.setFirstName("Origin");
-    register.setLastName("Check");
-    register.setEmail("origin-" + UUID.randomUUID() + "@test.com");
-    register.setPassword(PASSWORD);
-    mockMvc.perform(post("/auth/register")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(register)))
-      .andExpect(status().isOk());
+    String email = "origin-" + UUID.randomUUID() + "@test.com";
+    testUsers.owner(email, PASSWORD);
 
     String body = mockMvc.perform(post("/auth/login")
         .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(new AuthRequest(register.getEmail(), PASSWORD))))
+        .content(objectMapper.writeValueAsString(new AuthRequest(email, PASSWORD))))
       .andExpect(status().isOk())
       .andReturn().getResponse().getContentAsString();
     return objectMapper.readTree(body).get("refreshToken").asText();

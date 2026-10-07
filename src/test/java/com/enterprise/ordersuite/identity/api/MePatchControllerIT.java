@@ -1,11 +1,11 @@
 package com.enterprise.ordersuite.identity.api;
 
 import com.enterprise.ordersuite.auth.dtos.AuthRequest;
-import com.enterprise.ordersuite.auth.dtos.RegisterRequest;
 import com.enterprise.ordersuite.identity.api.dto.UpdateMeRequest;
 import com.enterprise.ordersuite.identity.domain.User;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import com.enterprise.ordersuite.support.IntegrationTest;
+import com.enterprise.ordersuite.support.TestUsers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +33,9 @@ class MePatchControllerIT {
 
   @Autowired
   private UserRepository userRepository;
+
+  @Autowired
+  private TestUsers testUsers;
 
   @Test
   void patchMe_invalidInput_returns400() throws Exception {
@@ -92,16 +95,7 @@ class MePatchControllerIT {
     String password
   ) throws Exception {
 
-    RegisterRequest registerRequest = new RegisterRequest();
-    registerRequest.setFirstName("OriginalFirst");
-    registerRequest.setLastName("OriginalLast");
-    registerRequest.setEmail(email);
-    registerRequest.setPassword(password);
-
-    mockMvc.perform(post("/auth/register")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(registerRequest)))
-      .andExpect(status().isOk());
+    testUsers.owner(email, password);
 
     AuthRequest loginRequest = new AuthRequest(email, password);
 

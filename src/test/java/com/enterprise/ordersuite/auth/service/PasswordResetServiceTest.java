@@ -166,7 +166,7 @@ class PasswordResetServiceTest {
   @Test
   void resetPassword_whenNewPasswordMatchesCurrentActivePassword_throwsPasswordReuseException() {
     User user = new User();
-    user.setId(1L);
+    user.setId("01J0000000000000000000000A");
     user.setEmail("gabriel@example.com");
     user.setActive(true);
     user.setPassword("hashed_current_password");
@@ -190,7 +190,7 @@ class PasswordResetServiceTest {
   @Test
   void resetPassword_whenNewPasswordMatchesHistoricalPassword_throwsPasswordReuseException() {
     User user = new User();
-    user.setId(1L);
+    user.setId("01J0000000000000000000000A");
     user.setEmail("gabriel@example.com");
     user.setActive(true);
     user.setPassword("hashed_current_password");
@@ -206,20 +206,20 @@ class PasswordResetServiceTest {
     when(passwordEncoder.matches("OldPassword123!", "hashed_current_password")).thenReturn(false);
     when(passwordEncoder.matches("OldPassword123!", "hashed_old_password")).thenReturn(true);
 
-    when(passwordHistoryRepository.findRecentByUserId(eq(1L), any(PageRequest.class)))
+    when(passwordHistoryRepository.findRecentByUserId(eq("01J0000000000000000000000A"), any(PageRequest.class)))
       .thenReturn(List.of(historicalEntry));
 
     assertThatThrownBy(() -> service.resetPassword("raw-token", "OldPassword123!"))
       .isInstanceOf(PasswordReuseException.class);
 
     verify(userRepository, never()).save(any());
-    verify(passwordHistoryRepository, never()).pruneOldEntries(anyLong(), anyLong());
+    verify(passwordHistoryRepository, never()).pruneOldEntries(anyString(), anyLong());
   }
 
   @Test
   void resetPassword_whenValidToken_updatesPassword_archivesOldHash_andPrunesOldEntries() {
     User user = new User();
-    user.setId(1L);
+    user.setId("01J0000000000000000000000A");
     user.setEmail("gabriel@example.com");
     user.setActive(true);
     user.setPassword("hashed_old_active_password");
@@ -231,7 +231,7 @@ class PasswordResetServiceTest {
 
     when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.of(prt));
     when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
-    when(passwordHistoryRepository.findRecentByUserId(eq(1L), any(PageRequest.class))).thenReturn(Collections.emptyList());
+    when(passwordHistoryRepository.findRecentByUserId(eq("01J0000000000000000000000A"), any(PageRequest.class))).thenReturn(Collections.emptyList());
     when(passwordEncoder.encode("SecureNewPass1!_")).thenReturn("ENC(SecureNewPass1!_)");
 
     service.resetPassword("raw-token", "SecureNewPass1!_");
@@ -247,7 +247,7 @@ class PasswordResetServiceTest {
     verify(tokenRepository).save(prt);
 
     // Fixed Parameter Evaluation Check to expect a primitive/object 'long'
-    verify(passwordHistoryRepository).pruneOldEntries(eq(1L), eq(5L));
+    verify(passwordHistoryRepository).pruneOldEntries(eq("01J0000000000000000000000A"), eq(5L));
     verify(refreshTokenService).revokeAllFor(user);
   }
 

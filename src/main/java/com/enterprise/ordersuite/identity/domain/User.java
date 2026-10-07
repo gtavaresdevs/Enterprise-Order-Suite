@@ -28,15 +28,19 @@ public class User extends BaseEntity {
     @Email
     private String email;
 
-    @Column(nullable = false)
-    @NotNull
+    // Null until an invited user sets a password.
     private String password;
+
+    private String phone;
+
+    // Set by seed or migration only, never by an endpoint (Tenancy & Identity D-3).
+    @Column(nullable = false)
+    private boolean platformAdmin = false;
 
     @Column(nullable = false)
     private Boolean active = true;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "role_id", nullable = false)
-    private Role role;
+    @Column(name = "avatar_key")
+    private String avatarKey;
 
 }

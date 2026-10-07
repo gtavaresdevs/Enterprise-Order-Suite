@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
+public interface RefreshTokenRepository extends JpaRepository<RefreshToken, String> {
 
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
@@ -36,7 +36,7 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     // commit, so the bulk update that follows sees the successor it inserted.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select rt from RefreshToken rt where rt.user.id = :userId and rt.revokedAt is null")
-    List<RefreshToken> findUnrevokedByUserIdForUpdate(Long userId);
+    List<RefreshToken> findUnrevokedByUserIdForUpdate(String userId);
 
     @Modifying
     @Transactional
@@ -45,7 +45,7 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
             set rt.revokedAt = :now
             where rt.user.id = :userId and rt.revokedAt is null
             """)
-    int revokeAllForUser(Long userId, Instant now);
+    int revokeAllForUser(String userId, Instant now);
 
     @Modifying
     @Transactional

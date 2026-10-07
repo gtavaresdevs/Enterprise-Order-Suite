@@ -8,11 +8,12 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.List;
 
-public record CustomUserDetails(User user) implements UserDetails {
+// role: PLATFORM_ADMIN or the membership role; null when the user has neither.
+public record CustomUserDetails(User user, String role) implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().getName()));
+        return role == null ? List.of() : List.of(new SimpleGrantedAuthority("ROLE_" + role));
     }
 
     @Override

@@ -1,8 +1,8 @@
 package com.enterprise.ordersuite.identity.api;
 
 import com.enterprise.ordersuite.auth.dtos.AuthRequest;
-import com.enterprise.ordersuite.auth.dtos.RegisterRequest;
 import com.enterprise.ordersuite.support.IntegrationTest;
+import com.enterprise.ordersuite.support.TestUsers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +23,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class MeControllerIT {
 
   @Autowired
+  private TestUsers testUsers;
+
+  @Autowired
   private MockMvc mockMvc;
 
   @Autowired
@@ -39,16 +42,7 @@ class MeControllerIT {
     String email = "me-" + UUID.randomUUID() + "@test.com";
     String password = "Password123!";
 
-    RegisterRequest registerRequest = new RegisterRequest();
-    registerRequest.setFirstName("Me");
-    registerRequest.setLastName("Test");
-    registerRequest.setEmail(email);
-    registerRequest.setPassword(password);
-
-    mockMvc.perform(post("/auth/register")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(registerRequest)))
-      .andExpect(status().isOk());
+    testUsers.owner(email, password);
 
     AuthRequest loginRequest = new AuthRequest(email, password);
 

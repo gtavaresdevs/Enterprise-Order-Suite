@@ -3,8 +3,8 @@ package com.enterprise.ordersuite.auth.controllers;
 import com.enterprise.ordersuite.auth.dtos.AuthRequest;
 import com.enterprise.ordersuite.auth.dtos.LogoutRequest;
 import com.enterprise.ordersuite.auth.dtos.RefreshRequest;
-import com.enterprise.ordersuite.auth.dtos.RegisterRequest;
 import com.enterprise.ordersuite.support.IntegrationTest;
+import com.enterprise.ordersuite.support.TestUsers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +30,9 @@ class RefreshTokenFlowIT {
   private static final String TEST_IP = "10.10.10.10";
 
   @Autowired
+  private TestUsers testUsers;
+
+  @Autowired
   private MockMvc mockMvc;
 
   @Autowired
@@ -41,16 +44,7 @@ class RefreshTokenFlowIT {
   void setUp() throws Exception {
     testEmail = "testuser_" + UUID.randomUUID() + "@example.com";
 
-    RegisterRequest registerRequest = new RegisterRequest();
-    registerRequest.setFirstName("Test");
-    registerRequest.setLastName("User");
-    registerRequest.setEmail(testEmail);
-    registerRequest.setPassword(RAW_PASSWORD);
-
-    mockMvc.perform(post("/auth/register")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(registerRequest)))
-      .andExpect(status().isOk());
+    testUsers.owner(testEmail, RAW_PASSWORD);
   }
 
   @Test

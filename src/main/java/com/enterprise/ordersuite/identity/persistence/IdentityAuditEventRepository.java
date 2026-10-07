@@ -6,7 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface IdentityAuditEventRepository extends JpaRepository<IdentityAuditEvent, Long> {
+public interface IdentityAuditEventRepository extends JpaRepository<IdentityAuditEvent, String> {
 
     Page<IdentityAuditEvent> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
@@ -16,12 +16,12 @@ public interface IdentityAuditEventRepository extends JpaRepository<IdentityAudi
     );
 
     Page<IdentityAuditEvent> findByTargetUserIdOrderByCreatedAtDesc(
-            Long targetUserId,
+            String targetUserId,
             Pageable pageable
     );
 
     Page<IdentityAuditEvent> findByActorUserIdOrderByCreatedAtDesc(
-            Long actorUserId,
+            String actorUserId,
             Pageable pageable
     );
 }

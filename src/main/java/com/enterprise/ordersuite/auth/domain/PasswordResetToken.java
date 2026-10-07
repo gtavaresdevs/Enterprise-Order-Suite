@@ -1,9 +1,12 @@
 package com.enterprise.ordersuite.auth.domain;
 
+import com.enterprise.ordersuite.common.persistence.UlidId;
 import com.enterprise.ordersuite.identity.domain.User;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 
@@ -13,8 +16,10 @@ import java.time.Instant;
 public class PasswordResetToken {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @UlidId
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(length = 26)
+    private String id;
 
     // Many reset tokens can belong to one user
     @Setter
@@ -26,6 +31,12 @@ public class PasswordResetToken {
     @Setter
     @Column(name = "token_hash", nullable = false, length = 64, unique = true)
     private String tokenHash;
+
+    // RESET or INVITE: invites reuse this table (Tenancy & Identity schema notes).
+    @Setter
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private PasswordResetTokenPurpose purpose = PasswordResetTokenPurpose.RESET;
 
     @Setter
     @Column(name = "expires_at", nullable = false)

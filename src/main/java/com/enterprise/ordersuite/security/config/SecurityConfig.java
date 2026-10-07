@@ -54,7 +54,9 @@ public class SecurityConfig {
 
   @Bean
   public RoleHierarchy roleHierarchy() {
-    return RoleHierarchyImpl.fromHierarchy("ROLE_SUPER_ADMIN > ROLE_ADMIN \n ROLE_ADMIN > ROLE_USER");
+    // Membership roles only. ROLE_PLATFORM_ADMIN sits outside the hierarchy (Tenancy &
+    // Identity D-3): it does not imply a membership role.
+    return RoleHierarchyImpl.fromHierarchy("ROLE_OWNER > ROLE_MANAGER \n ROLE_MANAGER > ROLE_STAFF");
   }
 
   @Bean
@@ -170,9 +172,7 @@ public class SecurityConfig {
       .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedEntryPoint()))
       .authorizeHttpRequests(auth -> auth
         .requestMatchers("/error", "/auth/**", "/actuator/health/**", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html", "/webjars/**", "/logo.png").permitAll()
-        .requestMatchers("/actuator/info", "/actuator/metrics/**").hasRole("SUPER_ADMIN")
-        .requestMatchers("/admin/users/**", "/admin/identity-audit/**").hasRole("SUPER_ADMIN")
-        .requestMatchers("/admin/**", "/roles").hasRole("ADMIN")
+        .requestMatchers("/actuator/info", "/actuator/metrics/**").hasRole("PLATFORM_ADMIN")
         .anyRequest().authenticated()
       )
       .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

@@ -123,22 +123,22 @@ class RefreshTokenServiceTest {
     @Test
     void revokeAllFor_revokesEveryTokenOfThatUserAtNow() {
         User user = new User();
-        user.setId(42L);
+        user.setId("01J0000000000000000000000A");
 
         service.revokeAllFor(user);
 
-        verify(repo).revokeAllForUser(42L, NOW);
+        verify(repo).revokeAllForUser("01J0000000000000000000000A", NOW);
     }
 
     @Test
     void revokeAllFor_locksTheUsersLiveTokens_beforeTheBulkUpdate() {
         User user = new User();
-        user.setId(42L);
+        user.setId("01J0000000000000000000000A");
 
         service.revokeAllFor(user);
 
         InOrder order = inOrder(repo);
-        order.verify(repo).findUnrevokedByUserIdForUpdate(42L);
-        order.verify(repo).revokeAllForUser(42L, NOW);
+        order.verify(repo).findUnrevokedByUserIdForUpdate("01J0000000000000000000000A");
+        order.verify(repo).revokeAllForUser("01J0000000000000000000000A", NOW);
     }
 }

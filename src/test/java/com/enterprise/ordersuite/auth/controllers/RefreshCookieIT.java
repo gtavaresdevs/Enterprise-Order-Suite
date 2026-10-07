@@ -2,8 +2,8 @@ package com.enterprise.ordersuite.auth.controllers;
 
 import com.enterprise.ordersuite.auth.dtos.AuthRequest;
 import com.enterprise.ordersuite.auth.dtos.RefreshRequest;
-import com.enterprise.ordersuite.auth.dtos.RegisterRequest;
 import com.enterprise.ordersuite.support.IntegrationTest;
+import com.enterprise.ordersuite.support.TestUsers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
@@ -44,6 +44,9 @@ class RefreshCookieIT {
   @Autowired
   private ObjectMapper objectMapper;
 
+  @Autowired
+  private TestUsers testUsers;
+
   @Test
   void login_setsTheRefreshCookie_matchingTheBodyToken() throws Exception {
     MvcResult result = login(register());
@@ -57,15 +60,11 @@ class RefreshCookieIT {
 
   @Test
   void login_underApiContextPath_setsTheRefreshCookieScopedToApiAuth() throws Exception {
-    RegisterRequest request = registerRequest();
-    mockMvc.perform(post(URI.create("/api/auth/register")).contextPath("/api")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(request)))
-      .andExpect(status().isOk());
+    String email = register();
 
     MvcResult result = mockMvc.perform(post(URI.create("/api/auth/login")).contextPath("/api")
         .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(new AuthRequest(request.getEmail(), PASSWORD))))
+        .content(objectMapper.writeValueAsString(new AuthRequest(email, PASSWORD))))
       .andExpect(status().isOk())
       .andReturn();
 
@@ -74,18 +73,6 @@ class RefreshCookieIT {
       .as("cookie path must include the deployed context path so it is only sent to /api/auth/*")
       .startsWith("refreshToken=")
       .contains("Path=/api/auth");
-  }
-
-  @Test
-  void register_setsTheRefreshCookie() throws Exception {
-    RegisterRequest request = registerRequest();
-    MvcResult result = mockMvc.perform(post("/auth/register")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(request)))
-      .andExpect(status().isOk())
-      .andReturn();
-
-    assertThat(cookieValue(result)).isNotBlank().isEqualTo(bodyRefreshToken(result));
   }
 
   @Test
@@ -152,22 +139,10 @@ class RefreshCookieIT {
     assertThat(result.getResponse().getHeader(HttpHeaders.SET_COOKIE)).contains("Max-Age=0");
   }
 
-  private RegisterRequest registerRequest() {
-    RegisterRequest request = new RegisterRequest();
-    request.setFirstName("Cookie");
-    request.setLastName("Jar");
-    request.setEmail("cookie-" + UUID.randomUUID() + "@test.com");
-    request.setPassword(PASSWORD);
-    return request;
-  }
-
-  private String register() throws Exception {
-    RegisterRequest request = registerRequest();
-    mockMvc.perform(post("/auth/register")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(request)))
-      .andExpect(status().isOk());
-    return request.getEmail();
+  private String register() {
+    String email = "cookie-" + UUID.randomUUID() + "@test.com";
+    testUsers.owner(email, PASSWORD);
+    return email;
   }
 
   private MvcResult login(String email) throws Exception {

@@ -11,9 +11,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class MeService {
 
     private final CurrentUserService currentUserService;
+    private final UserRoleResolver userRoleResolver;
 
-    public MeService(CurrentUserService currentUserService) {
+    public MeService(CurrentUserService currentUserService, UserRoleResolver userRoleResolver) {
         this.currentUserService = currentUserService;
+        this.userRoleResolver = userRoleResolver;
     }
 
     @Transactional(readOnly = true)
@@ -23,7 +25,7 @@ public class MeService {
         return new MeResponse(
                 user.getId(),
                 user.getEmail(),
-                user.getRole().getName(),
+                userRoleResolver.roleOf(user).orElse(null),
                 user.getCreatedAt(),
                 user.getUpdatedAt()
         );

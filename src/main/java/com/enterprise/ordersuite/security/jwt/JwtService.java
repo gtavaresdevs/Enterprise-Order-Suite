@@ -24,10 +24,11 @@ public class JwtService {
   private final JwtProperties jwtProperties;
   private final Clock clock;
 
-  public String generateToken(User user) {
+  // role: PLATFORM_ADMIN or the membership role; null when the user has neither.
+  public String generateToken(User user, String role) {
     Map<String, Object> claims = new HashMap<>();
     claims.put("userId", user.getId());
-    claims.put("roles", List.of(user.getRole().getName()));
+    claims.put("roles", role == null ? List.of() : List.of(role));
     // Display data only - a JWT payload is base64, not encrypted. Never phone or address.
     claims.put("firstName", user.getFirstName());
     claims.put("lastName", user.getLastName());
@@ -50,8 +51,8 @@ public class JwtService {
     return extractClaim(token, Claims::getSubject);
   }
 
-  public Long extractUserId(String token) {
-    return extractClaim(token, claims -> claims.get("userId", Long.class));
+  public String extractUserId(String token) {
+    return extractClaim(token, claims -> claims.get("userId", String.class));
   }
 
   @SuppressWarnings("unchecked")

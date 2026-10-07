@@ -10,12 +10,18 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class IdentityAuditServiceTest {
+
+  private static final String RESTAURANT = "01J0000000000000000000000R";
+  private static final String ACTOR = "01J0000000000000000000000A";
+  private static final String TARGET = "01J0000000000000000000000T";
 
   @Mock
   private IdentityAuditEventRepository repository;
@@ -29,10 +35,11 @@ class IdentityAuditServiceTest {
       .thenAnswer(invocation -> invocation.getArgument(0));
 
     IdentityAuditEvent result = service.recordEvent(
-      IdentityAuditEventType.USER_DEACTIVATED,
-      10L,
-      20L,
-      "{\"reason\":\"policy\"}"
+      IdentityAuditEventType.ROLE_CHANGED,
+      RESTAURANT,
+      ACTOR,
+      TARGET,
+      Map.of("from", "STAFF", "to", "MANAGER")
     );
 
     ArgumentCaptor<IdentityAuditEvent> captor =
@@ -43,16 +50,20 @@ class IdentityAuditServiceTest {
     IdentityAuditEvent persistedEvent = captor.getValue();
 
     assertThat(persistedEvent.getType())
-      .isEqualTo(IdentityAuditEventType.USER_DEACTIVATED);
+      .isEqualTo(IdentityAuditEventType.ROLE_CHANGED);
+
+    assertThat(persistedEvent.getRestaurantId())
+      .isEqualTo(RESTAURANT);
 
     assertThat(persistedEvent.getActorUserId())
-      .isEqualTo(10L);
+      .isEqualTo(ACTOR);
 
     assertThat(persistedEvent.getTargetUserId())
-      .isEqualTo(20L);
+      .isEqualTo(TARGET);
 
-    assertThat(persistedEvent.getMetadata())
-      .isEqualTo("{\"reason\":\"policy\"}");
+    assertThat(persistedEvent.getDetails())
+      .containsEntry("from", "STAFF")
+      .containsEntry("to", "MANAGER");
 
     assertThat(result)
       .isSameAs(persistedEvent);

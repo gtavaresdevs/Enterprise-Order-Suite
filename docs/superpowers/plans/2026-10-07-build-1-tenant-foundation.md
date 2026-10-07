@@ -27,4 +27,5 @@ The contract is the spec. This plan only orders the work. Every slice ends with 
 
 - After slice 2 every local database must be dropped and recreated (ADR-0009). Gabriel does this on his machine; tests use fresh containers.
 - After slice 4 the frontend's auth, profile and administration screens stop working against this branch until a frontend session adapts them (Q-91 a).
+- Slice 2 (done) also removed the endpoints that existed only to manage legacy roles and profiles: `/auth/register`, `/roles`, `/admin/users*`, `/admin/identity-audit`, `/users*`, `/profile*` (Q-91 a). Until slice 3 the JWT `roles` claim carries `PLATFORM_ADMIN` or the membership role. Gradle 8.14 cannot compile the build script on JDK 25: run it with JDK 17 or 21 (`JAVA_HOME`).
 - Slices 2-4 are one breaking stretch: each still ends green, but the API in between is neither legacy nor the contract.

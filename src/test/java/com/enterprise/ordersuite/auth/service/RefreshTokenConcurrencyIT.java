@@ -1,8 +1,9 @@
 package com.enterprise.ordersuite.auth.service;
 
-import com.enterprise.ordersuite.auth.dtos.RegisterRequest;
+import com.enterprise.ordersuite.auth.dtos.AuthRequest;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidRefreshTokenException;
 import com.enterprise.ordersuite.support.IntegrationTest;
+import com.enterprise.ordersuite.support.TestUsers;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -23,14 +24,14 @@ class RefreshTokenConcurrencyIT {
   @Autowired
   private AuthenticationService authenticationService;
 
+  @Autowired
+  private TestUsers testUsers;
+
   @Test
   void refresh_sameTokenPresentedConcurrently_succeedsExactlyOnce() throws Exception {
-    RegisterRequest register = new RegisterRequest();
-    register.setFirstName("Race");
-    register.setLastName("Condition");
-    register.setEmail("race-" + UUID.randomUUID() + "@test.com");
-    register.setPassword("Password123!");
-    String token = authenticationService.register(register).getRefreshToken();
+    String email = "race-" + UUID.randomUUID() + "@test.com";
+    testUsers.owner(email, "Password123!");
+    String token = authenticationService.authenticate(new AuthRequest(email, "Password123!")).getRefreshToken();
 
     CountDownLatch start = new CountDownLatch(1);
     ExecutorService pool = Executors.newFixedThreadPool(2);

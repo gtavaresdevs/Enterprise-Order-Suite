@@ -5,7 +5,6 @@ import com.enterprise.ordersuite.auth.dtos.AuthResponse;
 import com.enterprise.ordersuite.auth.dtos.ForgotPasswordRequest;
 import com.enterprise.ordersuite.auth.dtos.LogoutRequest;
 import com.enterprise.ordersuite.auth.dtos.RefreshRequest;
-import com.enterprise.ordersuite.auth.dtos.RegisterRequest;
 import com.enterprise.ordersuite.auth.dtos.ResetPasswordRequest;
 import com.enterprise.ordersuite.auth.service.AuthenticationService;
 import com.enterprise.ordersuite.auth.service.PasswordResetService;
@@ -31,12 +30,6 @@ public class AuthenticationController {
     private final AuthenticationService authenticationService;
     private final PasswordResetService passwordResetService;
     private final RefreshCookieFactory refreshCookieFactory;
-
-    @Operation(summary = "Register a new user and issue access + refresh tokens (refresh also as HttpOnly cookie)")
-    @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
-        return withRefreshCookie(authenticationService.register(request), httpRequest);
-    }
 
     @Operation(summary = "Login and issue access + refresh tokens (refresh also as HttpOnly cookie)")
     @PostMapping(value= "/login", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)

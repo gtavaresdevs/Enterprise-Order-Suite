@@ -1,6 +1,5 @@
 package com.enterprise.ordersuite.security.jwt;
 
-import com.enterprise.ordersuite.identity.domain.Role;
 import com.enterprise.ordersuite.identity.domain.User;
 import org.junit.jupiter.api.Test;
 
@@ -21,16 +20,13 @@ class JwtServiceTest {
     properties.setExpiration(60_000);
     JwtService jwtService = new JwtService(properties, Clock.systemUTC());
 
-    Role role = new Role();
-    role.setName("ADMIN");
     User user = new User();
-    user.setId(7L);
+    user.setId("01J0000000000000000000000A");
     user.setEmail("ana@test.com");
     user.setFirstName("Ana");
     user.setLastName("Souza");
-    user.setRole(role);
 
-    String token = jwtService.generateToken(user);
+    String token = jwtService.generateToken(user, "OWNER");
 
     var firstName = jwtService.<String>extractClaim(token, c -> c.get("firstName", String.class));
     var lastName = jwtService.<String>extractClaim(token, c -> c.get("lastName", String.class));
@@ -40,7 +36,7 @@ class JwtServiceTest {
     assertThat(lastName).isEqualTo("Souza");
     assertThat(email).isEqualTo("ana@test.com");
     assertThat(jwtService.extractEmail(token)).as("sub is unchanged").isEqualTo("ana@test.com");
-    assertThat(jwtService.extractUserId(token)).isEqualTo(7L);
-    assertThat(jwtService.extractRoles(token)).isEqualTo(List.of("ADMIN"));
+    assertThat(jwtService.extractUserId(token)).isEqualTo("01J0000000000000000000000A");
+    assertThat(jwtService.extractRoles(token)).isEqualTo(List.of("OWNER"));
   }
 }

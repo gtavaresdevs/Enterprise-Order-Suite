@@ -3,8 +3,8 @@ package com.enterprise.ordersuite.security.ratelimit;
 import com.enterprise.ordersuite.api.errors.ApiErrorResponse;
 import com.enterprise.ordersuite.auth.dtos.AuthRequest;
 import com.enterprise.ordersuite.auth.dtos.LogoutRequest;
-import com.enterprise.ordersuite.auth.dtos.RegisterRequest;
 import com.enterprise.ordersuite.support.IntegrationTest;
+import com.enterprise.ordersuite.support.TestUsers;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -32,6 +32,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class LogoutRateLimitIT {
 
   private static final int RATE_LIMIT_CAPACITY = 3;
+
+  @Autowired
+  private TestUsers testUsers;
 
   @Autowired
   private MockMvc mockMvc;
@@ -69,20 +72,7 @@ class LogoutRateLimitIT {
     String email = uniqueEmail();
     String password = "SecurePass123!@#";
 
-    RegisterRequest registerRequest = new RegisterRequest();
-    registerRequest.setFirstName("Logout");
-    registerRequest.setLastName("RateLimit");
-    registerRequest.setEmail(email);
-    registerRequest.setPassword(password);
-
-    mockMvc.perform(post("/auth/register")
-        .with(request -> {
-          request.setRemoteAddr(ip);
-          return request;
-        })
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(registerRequest)))
-      .andExpect(status().isOk());
+    testUsers.owner(email, password);
 
     AuthRequest loginRequest = new AuthRequest(email, password);
 

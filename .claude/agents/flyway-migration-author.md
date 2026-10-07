@@ -17,10 +17,9 @@ so (ADR-0008); without that basis, never break a passing test or a working flow.
 
 - List `src/main/resources/db/migration/` and take the next free version number. Never
   assume it — a collision breaks every environment.
-- **Never edit an applied migration.** Flyway checksums them. Write a new version. The one
-  exception is the single pre-launch re-baseline of ADR-0009, planned for Build 1 (Tenant
-  foundation): one dedicated, reviewed change, only while no environment holds data that
-  must be kept. Outside it, and always after launch, there is no exception.
+- **Never edit an applied migration.** Flyway checksums them. Write a new version. The single
+  pre-launch re-baseline of ADR-0009 was used in Build 1 (`V1__baseline.sql`); there is no
+  other exception.
 - The entity change and the migration ship in the **same commit**. `ddl-auto: validate`
   means a mismatch stops the application from starting, which fails the whole integration
   suite rather than one test.

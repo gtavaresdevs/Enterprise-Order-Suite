@@ -21,7 +21,7 @@ whichever environment runs second.
 ls src/main/resources/db/migration/ | sort -V | tail -1
 ```
 
-At the time of writing (2026-09-29) the highest is `V21__Refresh_Token_Families.sql`.
+Since the Build 1 re-baseline (2026-10-07) the only migration is `V1__baseline.sql`; the next is `V2`.
 
 ## Never edit an applied migration
 
@@ -29,12 +29,10 @@ Flyway checksums every migration it has run. Editing one breaks startup in every
 that already applied it — including any teammate's local database and CI. The fix is always
 a **new** version, never a correction in place.
 
-**One exception, before launch only** (ADR-0009): V1-V21 are replaced once by a new baseline
-that creates the target schema (ULID keys, the restaurant id on restaurant-owned tables, the
-missing foreign keys). It is planned for Build 1 (Tenant foundation), as one dedicated,
-reviewed change, and only while no environment holds data that must be kept; every local
-database is dropped and recreated afterwards. Outside that re-baseline, and always after
-launch, this rule applies without exception.
+**The one pre-launch exception has been used** (ADR-0009): Build 1 (Tenant foundation, #31)
+replaced V1-V21 with `V1__baseline.sql` (ULID keys, the restaurant as tenant), and every
+local database was dropped and recreated. There is no second exception: from here on, and
+always after launch, this rule applies without exception.
 
 ## Entity and schema ship together
 
@@ -47,8 +45,9 @@ one of the two is broken by construction, and it breaks for whoever checks it ou
 
 ## Seeds are idempotent
 
-`ON CONFLICT ... DO NOTHING`. Precedent: `V15__seed_super_admin.sql`. Migrations run against
-databases that may already hold the row.
+`ON CONFLICT ... DO NOTHING`. Migrations run against databases that may already hold the row.
+Anything holding a secret (the root platform admin) is seeded at boot from the environment
+(`RootSuperAdminSeeder`), never by a migration.
 
 ## Renaming an enum value is a data migration
 
@@ -57,8 +56,8 @@ databases that may already hold the row.
 migration or compatibility shim is written for legacy B2B data. The technique below applies
 once real data exists.
 
-Enums are persisted as strings — `@Enumerated(EnumType.STRING)` on
-`orders/domain/Order.java:25` — so the stored values are the **Java constant names**. Renaming
+Enums are persisted as strings — `@Enumerated(EnumType.STRING)`, for example
+`identity/domain/Membership.java` — so the stored values are the **Java constant names**. Renaming
 a constant does not change the rows; it just makes every existing row unreadable by the new
 code.
 
@@ -93,7 +92,10 @@ Only what is Accepted so far:
 - **New tables get a ULID primary key** (ADR-0009). Never `IDENTITY`, `SERIAL`/`BIGSERIAL` or
   a database sequence for a primary key; the application generates the id, and foreign keys
   reference ULIDs. The column type is `char(26)` Crockford Base32, the same string in the
-  database, logs and API (Q-35 a, 2026-10-01; ADR-0009 Decision 6).
+  database, logs and API (Q-35 a, 2026-10-01; ADR-0009 Decision 6). Entities extend
+  `common.persistence.BaseEntity` (`@UlidId`, `@JdbcTypeCode(SqlTypes.CHAR)`, length 26); a
+  plain id column referencing another module's row carries the same two annotations, or
+  `ddl-auto: validate` refuses `char(26)`.
 - **Restaurant-owned tables carry the restaurant id** (ADR-0001). Whether child rows (for
   example order lines) carry it directly, and how queries are scoped, come from the Tenancy &
   Identity contract, which is not written yet. Do not invent a mechanism.

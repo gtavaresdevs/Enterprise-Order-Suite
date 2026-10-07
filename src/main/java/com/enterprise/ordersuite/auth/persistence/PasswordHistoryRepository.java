@@ -10,11 +10,11 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface PasswordHistoryRepository extends JpaRepository<PasswordHistory, Long> {
+public interface PasswordHistoryRepository extends JpaRepository<PasswordHistory, String> {
 
   // Fetch chronological history matching the most recent entries first
   @Query("SELECT ph FROM PasswordHistory ph WHERE ph.user.id = :userId ORDER BY ph.createdAt DESC")
-  List<PasswordHistory> findRecentByUserId(@Param("userId") Long userId, Pageable pageable);
+  List<PasswordHistory> findRecentByUserId(@Param("userId") String userId, Pageable pageable);
 
   // Enterprise Best Practice: High-performance bulk delete via a subquery strategy.
   // Removes records for a specific user that are not within the top N newest records.
@@ -22,5 +22,5 @@ public interface PasswordHistoryRepository extends JpaRepository<PasswordHistory
   @Query("DELETE FROM PasswordHistory ph WHERE ph.user.id = :userId AND ph.id NOT IN (" +
     "SELECT sub.id FROM PasswordHistory sub WHERE sub.user.id = :userId ORDER BY sub.createdAt DESC LIMIT :limit" +
     ")")
-  void pruneOldEntries(@Param("userId") Long userId, @Param("limit") long limit);
+  void pruneOldEntries(@Param("userId") String userId, @Param("limit") long limit);
 }

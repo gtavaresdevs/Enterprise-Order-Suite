@@ -20,7 +20,7 @@ public class CurrentUserService {
         return authenticationOrThrow().getName();
     }
 
-    public Long getUserId() {
+    public String getUserId() {
         Authentication auth = authenticationOrThrow();
         if (auth.getPrincipal() instanceof JwtUserPrincipal principal) {
             return principal.id();

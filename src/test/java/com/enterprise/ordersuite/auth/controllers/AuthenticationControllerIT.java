@@ -4,16 +4,11 @@ import com.enterprise.ordersuite.auth.domain.PasswordResetToken;
 import com.enterprise.ordersuite.auth.dtos.AuthRequest;
 import com.enterprise.ordersuite.auth.dtos.ForgotPasswordRequest;
 import com.enterprise.ordersuite.auth.dtos.RefreshRequest;
-import com.enterprise.ordersuite.auth.dtos.RegisterRequest;
 import com.enterprise.ordersuite.auth.dtos.ResetPasswordRequest;
 import com.enterprise.ordersuite.auth.persistence.PasswordResetTokenRepository;
 import com.enterprise.ordersuite.auth.service.PasswordResetService;
-import com.enterprise.ordersuite.identity.domain.Role;
 import com.enterprise.ordersuite.identity.domain.User;
-import com.enterprise.ordersuite.identity.persistence.RoleRepository;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
-import com.enterprise.ordersuite.profile.domain.UserProfile;
-import com.enterprise.ordersuite.profile.persistence.UserProfileRepository;
 import com.enterprise.ordersuite.support.IntegrationTest;
 import com.enterprise.ordersuite.support.TestEmailServiceConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -47,12 +42,6 @@ class AuthenticationControllerIT {
   private UserRepository userRepository;
 
   @Autowired
-  private RoleRepository roleRepository;
-
-  @Autowired
-  private UserProfileRepository userProfileRepository;
-
-  @Autowired
   private PasswordResetTokenRepository tokenRepository;
 
   @Autowired
@@ -64,86 +53,21 @@ class AuthenticationControllerIT {
   @Autowired
   private TestEmailServiceConfig.CapturingEmailService capturingEmailService;
 
-  private Role userRole;
-
   @BeforeEach
   void setup() {
     capturingEmailService.clear();
-    userRole = roleRepository.findByName("USER").orElseThrow();
     tokenRepository.deleteAll();
   }
 
+  // Signup is invite-only (Tenancy & Identity D-5): the public registration endpoint is gone.
   @Test
-  void register_ValidRequest_Returns200_AndCreatesUserAndProfile() throws Exception {
-
-    String email = "registration-" + UUID.randomUUID() + "@test.com";
-
-    RegisterRequest request = new RegisterRequest();
-    request.setFirstName("Integration");
-    request.setLastName("User");
-    request.setEmail(email);
-    request.setPassword("SecurePass123!@#");
-
+  void register_isGone() throws Exception {
     mockMvc.perform(post("/auth/register")
         .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(request)))
-      .andExpect(status().isOk());
+        .content("{\"firstName\":\"A\",\"lastName\":\"B\",\"email\":\"a@test.com\",\"password\":\"SecurePass123!@#\"}"))
+      .andExpect(status().isNotFound());
 
-    User user = userRepository.findByEmailIgnoreCase(email).orElseThrow();
-
-    assertThat(user.getFirstName()).isEqualTo("Integration");
-    assertThat(user.getLastName()).isEqualTo("User");
-    assertThat(user.getEmail()).isEqualTo(email);
-    assertThat(user.getRole().getName()).isEqualTo("USER");
-    assertThat(user.getActive()).isTrue();
-
-    assertThat(
-      passwordEncoder.matches(
-        "SecurePass123!@#",
-        user.getPassword()
-      )
-    ).isTrue();
-
-    UserProfile profile =
-      userProfileRepository.findByUserId(user.getId()).orElseThrow();
-
-    assertThat(profile.getUserId()).isEqualTo(user.getId());
-    assertThat(profile.getPhone()).isNull();
-    assertThat(profile.getCountry()).isNull();
-    assertThat(profile.getTimezone()).isNull();
-    assertThat(profile.getDepartment()).isNull();
-    assertThat(profile.getOffice()).isNull();
-    assertThat(profile.getBio()).isNull();
-  }
-
-  @Test
-  void register_ValidRequest_CreatesExactlyOneProfileForUser() throws Exception {
-
-    String email = "registration-profile-" + UUID.randomUUID() + "@test.com";
-
-    RegisterRequest request = new RegisterRequest();
-    request.setFirstName("Profile");
-    request.setLastName("Test");
-    request.setEmail(email);
-    request.setPassword("SecurePass123!@#");
-
-    mockMvc.perform(post("/auth/register")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(request)))
-      .andExpect(status().isOk());
-
-    User user = userRepository.findByEmailIgnoreCase(email).orElseThrow();
-
-    assertThat(
-      userProfileRepository.findByUserId(user.getId())
-    ).isPresent();
-
-    assertThat(
-      userProfileRepository.findAll()
-        .stream()
-        .filter(profile -> profile.getUserId().equals(user.getId()))
-        .count()
-    ).isEqualTo(1);
+    assertThat(userRepository.findByEmailIgnoreCase("a@test.com")).isEmpty();
   }
 
   @Test
@@ -154,7 +78,6 @@ class AuthenticationControllerIT {
     User user = new User();
     user.setEmail(email);
     user.setPassword(passwordEncoder.encode("OldPass123!"));
-    user.setRole(userRole);
     user.setActive(true);
     user.setFirstName("Integration");
     user.setLastName("User");
@@ -200,7 +123,6 @@ class AuthenticationControllerIT {
     User user = new User();
     user.setEmail(email);
     user.setPassword(passwordEncoder.encode("OldPass123!"));
-    user.setRole(userRole);
     user.setActive(true);
     user.setFirstName("Reset");
     user.setLastName("User");
@@ -278,7 +200,6 @@ class AuthenticationControllerIT {
     User user = new User();
     user.setEmail(email);
     user.setPassword(passwordEncoder.encode(rawPassword));
-    user.setRole(userRole);
     user.setActive(true);
     user.setFirstName("Reset");
     user.setLastName("User");

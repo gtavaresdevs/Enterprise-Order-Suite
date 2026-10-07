@@ -5,7 +5,6 @@ import com.enterprise.ordersuite.auth.service.RefreshTokenCleanupService;
 import com.enterprise.ordersuite.auth.service.RefreshTokenService;
 import com.enterprise.ordersuite.auth.service.tokens.TokenHashing;
 import com.enterprise.ordersuite.identity.domain.User;
-import com.enterprise.ordersuite.identity.persistence.RoleRepository;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import com.enterprise.ordersuite.support.IntegrationTest;
 import org.junit.jupiter.api.Test;
@@ -34,9 +33,6 @@ class RefreshTokenPersistenceIT {
 
   @Autowired
   private UserRepository userRepository;
-
-  @Autowired
-  private RoleRepository roleRepository;
 
   @Autowired
   private JdbcTemplate jdbcTemplate;
@@ -113,7 +109,6 @@ class RefreshTokenPersistenceIT {
     User user = new User();
     user.setEmail("rt-" + UUID.randomUUID() + "@test.com");
     user.setPassword("not-a-real-hash");
-    user.setRole(roleRepository.findByName("USER").orElseThrow());
     user.setActive(true);
     user.setFirstName("Refresh");
     user.setLastName("Token");
