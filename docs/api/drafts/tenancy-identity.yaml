@@ -1,0 +1,684 @@
+openapi: 3.0.3
+info:
+  title: Enterprise Order Suite - Tenancy & Identity (draft)
+  version: 0.1.0-draft
+  description: >
+    Design-first draft for Build 1 (Tenant foundation). Status: Draft, same as
+    docs/architecture/TENANCY-AND-IDENTITY.md, which holds the rules, the permission
+    matrix and the decisions. Conventions: docs/architecture/API-CONVENTIONS.md.
+    Paths are relative to the /api context path.
+servers:
+  - url: /api
+tags:
+  - name: tenancy-identity
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      operationId: login
+      tags: [tenancy-identity]
+      security: []
+      x-roles: [PUBLIC]
+      x-seed: live POST /auth/login (refreshToken removed from body)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Signed in. The refresh token is set as an HttpOnly cookie.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { description: 'INVALID_CREDENTIALS', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+        '429': { $ref: '#/components/responses/Error' }
+  /auth/refresh:
+    post:
+      operationId: refreshSession
+      tags: [tenancy-identity]
+      security: []
+      x-roles: [PUBLIC]
+      x-seed: live POST /auth/refresh (cookie only; body fallback removed)
+      responses:
+        '200':
+          description: New access token; the refresh cookie is rotated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { description: 'INVALID_REFRESH_TOKEN', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+        '403': { description: 'ORIGIN_NOT_ALLOWED', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [tenancy-identity]
+      security: []
+      x-roles: [PUBLIC]
+      x-seed: live POST /auth/logout
+      responses:
+        '204': { description: Family revoked and cookie cleared. }
+        '403': { description: 'ORIGIN_NOT_ALLOWED', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      tags: [tenancy-identity]
+      security: []
+      x-roles: [PUBLIC]
+      x-seed: live POST /auth/forgot-password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email]
+              properties:
+                email: { type: string, format: email, maxLength: 254 }
+      responses:
+        '204': { description: Always 204, whether or not the email exists. }
+        '429': { $ref: '#/components/responses/Error' }
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      tags: [tenancy-identity]
+      security: []
+      x-roles: [PUBLIC]
+      x-seed: live POST /auth/reset-password (also completes an invite)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token, newPassword]
+              properties:
+                token: { type: string }
+                newPassword: { type: string, minLength: 8, maxLength: 128 }
+      responses:
+        '204': { description: Password set; invitationPending becomes false. }
+        '400': { description: 'INVALID_RESET_TOKEN, INVALID_INPUT', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+        '409': { description: 'PASSWORD_REUSE_ERROR', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+
+  /me:
+    get:
+      operationId: getMe
+      tags: [tenancy-identity]
+      x-roles: [OWNER, MANAGER, STAFF, PLATFORM_ADMIN]
+      x-seed: live GET /me and GET /me/profile, merged
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+          description: The signed-in user, membership and restaurant summary.
+        '401': { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: updateMe
+      tags: [tenancy-identity]
+      x-roles: [OWNER, MANAGER, STAFF, PLATFORM_ADMIN]
+      x-seed: live PATCH /me and PATCH /me/profile, merged
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                firstName: { type: string, minLength: 1, maxLength: 80 }
+                lastName: { type: string, minLength: 1, maxLength: 80 }
+                phone: { $ref: '#/components/schemas/Phone' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+          description: Updated.
+        '400': { $ref: '#/components/responses/Error' }
+  /me/avatar:
+    post:
+      operationId: uploadMyAvatar
+      tags: [tenancy-identity]
+      x-roles: [OWNER, MANAGER, STAFF, PLATFORM_ADMIN]
+      x-seed: live POST /me/profile/avatar
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+          description: Stored as WebP.
+        '400': { description: 'INVALID_AVATAR', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+        '413': { $ref: '#/components/responses/Error' }
+        '415': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteMyAvatar
+      tags: [tenancy-identity]
+      x-roles: [OWNER, MANAGER, STAFF, PLATFORM_ADMIN]
+      x-seed: live DELETE /me/profile/avatar
+      responses:
+        '204': { description: Removed. }
+  /me/password:
+    post:
+      operationId: changeMyPassword
+      tags: [tenancy-identity]
+      x-roles: [OWNER, MANAGER, STAFF, PLATFORM_ADMIN]
+      x-seed: new (proposal C4)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, maxLength: 128 }
+                newPassword: { type: string, minLength: 8, maxLength: 128 }
+      responses:
+        '204': { description: Changed; the user's other refresh-token families are revoked. }
+        '400': { description: 'INVALID_CURRENT_PASSWORD, INVALID_INPUT', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+        '409': { description: 'PASSWORD_REUSE_ERROR', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+  /me/sign-out-other-devices:
+    post:
+      operationId: signOutOtherDevices
+      tags: [tenancy-identity]
+      x-roles: [OWNER, MANAGER, STAFF, PLATFORM_ADMIN]
+      x-seed: new (proposal C5)
+      responses:
+        '204': { description: Every refresh-token family except the current one is revoked. }
+
+  /restaurant:
+    get:
+      operationId: getMyRestaurant
+      tags: [tenancy-identity]
+      x-roles: [OWNER, MANAGER, STAFF, PLATFORM_ADMIN_SUPPORT_READ]
+      x-seed: new
+      parameters:
+        - $ref: '#/components/parameters/SupportRestaurantId'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Restaurant' }
+          description: The caller's restaurant.
+    patch:
+      operationId: updateMyRestaurant
+      tags: [tenancy-identity]
+      x-roles: [OWNER]
+      x-seed: new (Build 4 adds storefront fields)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 1, maxLength: 80 }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Restaurant' }
+          description: Updated.
+        '403': { $ref: '#/components/responses/Error' }
+
+  /team/members:
+    get:
+      operationId: listMembers
+      tags: [tenancy-identity]
+      x-roles: [OWNER, MANAGER, PLATFORM_ADMIN_SUPPORT_READ]
+      x-seed: live GET /users
+      x-sort: [lastName, createdAt]
+      x-default-order: role (OWNER, MANAGER, STAFF), then lastName, then id
+      parameters:
+        - $ref: '#/components/parameters/SupportRestaurantId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/Sort'
+        - { name: role, in: query, schema: { $ref: '#/components/schemas/MemberRole' } }
+        - { name: active, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedMembers' }
+          description: Members of the caller's restaurant.
+    post:
+      operationId: inviteMember
+      tags: [tenancy-identity]
+      x-roles: [OWNER, MANAGER]
+      x-seed: live POST /admin/users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InviteRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Member' }
+          description: Invited; the password-setup email is sent after commit.
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { description: 'EMAIL_TAKEN', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+  /team/members/{memberId}:
+    parameters:
+      - $ref: '#/components/parameters/MemberId'
+    get:
+      operationId: getMember
+      tags: [tenancy-identity]
+      x-roles: [OWNER, MANAGER, PLATFORM_ADMIN_SUPPORT_READ]
+      x-seed: live GET /users/{id}
+      parameters:
+        - $ref: '#/components/parameters/SupportRestaurantId'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Member' }
+          description: The member.
+        '404': { description: 'MEMBER_NOT_FOUND', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+    patch:
+      operationId: updateMember
+      tags: [tenancy-identity]
+      x-roles: [OWNER, MANAGER]
+      x-seed: live PATCH /admin/users/{id} and PATCH /admin/users/{id}/role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                firstName: { type: string, minLength: 1, maxLength: 80 }
+                lastName: { type: string, minLength: 1, maxLength: 80 }
+                role: { $ref: '#/components/schemas/MemberRole' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Member' }
+          description: Updated; a role change revokes the member's refresh tokens.
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { description: 'MEMBER_NOT_FOUND', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+        '409': { description: 'LAST_OWNER, SELF_ACTION_NOT_ALLOWED', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+  /team/members/{memberId}/deactivate:
+    parameters:
+      - $ref: '#/components/parameters/MemberId'
+    post:
+      operationId: deactivateMember
+      tags: [tenancy-identity]
+      x-roles: [OWNER, MANAGER]
+      x-seed: live POST /admin/users/{id}/deactivate
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Member' }
+          description: Deactivated (repeat is a no-op); refresh tokens revoked.
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { description: 'MEMBER_NOT_FOUND', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+        '409': { description: 'LAST_OWNER, SELF_ACTION_NOT_ALLOWED', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+  /team/members/{memberId}/reactivate:
+    parameters:
+      - $ref: '#/components/parameters/MemberId'
+    post:
+      operationId: reactivateMember
+      tags: [tenancy-identity]
+      x-roles: [OWNER, MANAGER]
+      x-seed: live POST /admin/users/{id}/reactivate
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Member' }
+          description: Reactivated (repeat is a no-op).
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { description: 'MEMBER_NOT_FOUND', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+  /team/members/{memberId}/resend-invite:
+    parameters:
+      - $ref: '#/components/parameters/MemberId'
+    post:
+      operationId: resendInvite
+      tags: [tenancy-identity]
+      x-roles: [OWNER, MANAGER]
+      x-seed: live POST /admin/users/{id}/password-setup
+      responses:
+        '204': { description: A new invite token is emailed; the old one stops working. }
+        '404': { description: 'MEMBER_NOT_FOUND', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+        '409': { description: 'INVITATION_NOT_PENDING', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+
+  /audit-events:
+    get:
+      operationId: listAuditEvents
+      tags: [tenancy-identity]
+      x-roles: [OWNER, MANAGER, PLATFORM_ADMIN_SUPPORT_READ]
+      x-seed: live GET /admin/identity-audit
+      x-default-order: occurredAt desc, then id desc
+      parameters:
+        - $ref: '#/components/parameters/SupportRestaurantId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - { name: type, in: query, schema: { $ref: '#/components/schemas/AuditEventType' } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedAuditEvents' }
+          description: The caller's restaurant's events.
+
+  /platform/restaurants:
+    get:
+      operationId: listRestaurants
+      tags: [tenancy-identity]
+      x-roles: [PLATFORM_ADMIN]
+      x-seed: new
+      x-sort: [name, createdAt]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedRestaurants' }
+          description: Every restaurant.
+    post:
+      operationId: createRestaurant
+      tags: [tenancy-identity]
+      x-roles: [PLATFORM_ADMIN]
+      x-seed: new (proposal B1)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateRestaurantRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Restaurant' }
+          description: Created; the owner's invite email is sent after commit.
+        '400': { description: 'INVALID_INPUT, SLUG_RESERVED', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+        '409': { description: 'SLUG_TAKEN, EMAIL_TAKEN', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+  /platform/restaurants/{restaurantId}:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    get:
+      operationId: getRestaurant
+      tags: [tenancy-identity]
+      x-roles: [PLATFORM_ADMIN]
+      x-seed: new
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Restaurant' }
+          description: The restaurant.
+        '404': { description: 'RESTAURANT_NOT_FOUND', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+    patch:
+      operationId: updateRestaurant
+      tags: [tenancy-identity]
+      x-roles: [PLATFORM_ADMIN]
+      x-seed: new
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 1, maxLength: 80 }
+                timezone: { type: string, example: America/Sao_Paulo }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Restaurant' }
+          description: Updated.
+        '404': { description: 'RESTAURANT_NOT_FOUND', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+  /platform/restaurants/{restaurantId}/members:
+    parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+    get:
+      operationId: listRestaurantMembers
+      tags: [tenancy-identity]
+      x-roles: [PLATFORM_ADMIN]
+      x-seed: new
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagedMembers' }
+          description: The restaurant's members.
+    post:
+      operationId: inviteRestaurantMember
+      tags: [tenancy-identity]
+      x-roles: [PLATFORM_ADMIN]
+      x-seed: new
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InviteRequest' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Member' }
+          description: Invited.
+        '409': { description: 'EMAIL_TAKEN', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+
+  /public/r/{slug}:
+    get:
+      operationId: getPublicRestaurant
+      tags: [tenancy-identity]
+      security: []
+      x-roles: [PUBLIC]
+      x-seed: new (the Storefront contract extends this shape)
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [name, slug, timezone, currency]
+                properties:
+                  name: { type: string }
+                  slug: { type: string }
+                  timezone: { type: string }
+                  currency: { type: string, enum: [BRL] }
+          description: Public restaurant fields only; no ids of members or settings.
+        '404': { description: 'RESTAURANT_NOT_FOUND', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    SupportRestaurantId:
+      name: X-Support-Restaurant-Id
+      in: header
+      required: false
+      description: Platform admin only, GET only (contract §5.4). Any other use is 403 FORBIDDEN.
+      schema: { $ref: '#/components/schemas/Ulid' }
+    MemberId:
+      { name: memberId, in: path, required: true, schema: { $ref: '#/components/schemas/Ulid' } }
+    RestaurantId:
+      { name: restaurantId, in: path, required: true, schema: { $ref: '#/components/schemas/Ulid' } }
+    Page:
+      { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+    Size:
+      { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+    Sort:
+      { name: sort, in: query, description: '<field>,<asc|desc>; fields in x-sort', schema: { type: string } }
+  responses:
+    Error:
+      description: ApiErrorResponse (API conventions §10)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiErrorResponse' }
+  schemas:
+    Ulid: { type: string, pattern: '^[0-9A-HJKMNP-TV-Z]{26}$' }
+    Phone: { type: string, pattern: '^\+[1-9][0-9]{7,14}$', nullable: true }
+    MemberRole: { type: string, enum: [OWNER, MANAGER, STAFF] }
+    TokenRole: { type: string, enum: [OWNER, MANAGER, STAFF, PLATFORM_ADMIN] }
+    AuditEventType:
+      type: string
+      enum: [MEMBER_INVITED, INVITE_RESENT, ROLE_CHANGED, MEMBER_DEACTIVATED, MEMBER_REACTIVATED,
+             PASSWORD_CHANGED, PASSWORD_RESET, SIGNED_OUT_OTHER_DEVICES, RESTAURANT_CREATED, RESTAURANT_UPDATED]
+    ApiErrorResponse:
+      type: object
+      required: [code, message, timestamp]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        timestamp: { type: string, format: date-time }
+        errors: { type: array, items: { type: string }, nullable: true }
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        password: { type: string, maxLength: 128 }
+    AuthResponse:
+      type: object
+      required: [accessToken, expiresAt, role]
+      properties:
+        accessToken: { type: string }
+        expiresAt: { type: string, format: date-time }
+        role: { $ref: '#/components/schemas/TokenRole' }
+    Membership:
+      type: object
+      required: [restaurantId, role, memberSince]
+      properties:
+        restaurantId: { $ref: '#/components/schemas/Ulid' }
+        role: { $ref: '#/components/schemas/MemberRole' }
+        memberSince: { type: string, format: date-time }
+    Me:
+      type: object
+      required: [id, email, firstName, lastName, phone, avatarUrl, platformAdmin, membership, restaurant]
+      properties:
+        id: { $ref: '#/components/schemas/Ulid' }
+        email: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        phone: { $ref: '#/components/schemas/Phone' }
+        avatarUrl: { type: string, nullable: true }
+        platformAdmin: { type: boolean }
+        membership: { allOf: [{ $ref: '#/components/schemas/Membership' }], nullable: true }
+        restaurant: { allOf: [{ $ref: '#/components/schemas/Restaurant' }], nullable: true }
+    Member:
+      type: object
+      required: [id, email, firstName, lastName, phone, avatarUrl, role, active, invitationPending, memberSince]
+      properties:
+        id: { $ref: '#/components/schemas/Ulid' }
+        email: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        phone: { $ref: '#/components/schemas/Phone' }
+        avatarUrl: { type: string, nullable: true }
+        role: { $ref: '#/components/schemas/MemberRole' }
+        active: { type: boolean }
+        invitationPending: { type: boolean }
+        memberSince: { type: string, format: date-time }
+    InviteRequest:
+      type: object
+      additionalProperties: false
+      required: [email, firstName, lastName, role]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        firstName: { type: string, minLength: 1, maxLength: 80 }
+        lastName: { type: string, minLength: 1, maxLength: 80 }
+        role: { $ref: '#/components/schemas/MemberRole' }
+    Restaurant:
+      type: object
+      required: [id, name, slug, storefrontUrl, timezone, currency, createdAt]
+      properties:
+        id: { $ref: '#/components/schemas/Ulid' }
+        name: { type: string }
+        slug: { type: string }
+        storefrontUrl: { type: string }
+        timezone: { type: string }
+        currency: { type: string, enum: [BRL] }
+        createdAt: { type: string, format: date-time }
+    CreateRestaurantRequest:
+      type: object
+      additionalProperties: false
+      required: [name, slug, owner]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        slug: { type: string, minLength: 3, maxLength: 40, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
+        timezone: { type: string, default: America/Sao_Paulo }
+        owner:
+          type: object
+          additionalProperties: false
+          required: [email, firstName, lastName]
+          properties:
+            email: { type: string, format: email, maxLength: 254 }
+            firstName: { type: string, minLength: 1, maxLength: 80 }
+            lastName: { type: string, minLength: 1, maxLength: 80 }
+    AuditEvent:
+      type: object
+      required: [id, restaurantId, type, actorUserId, actorName, targetUserId, targetName, details, occurredAt]
+      properties:
+        id: { $ref: '#/components/schemas/Ulid' }
+        restaurantId: { allOf: [{ $ref: '#/components/schemas/Ulid' }], nullable: true }
+        type: { $ref: '#/components/schemas/AuditEventType' }
+        actorUserId: { $ref: '#/components/schemas/Ulid' }
+        actorName: { type: string }
+        targetUserId: { allOf: [{ $ref: '#/components/schemas/Ulid' }], nullable: true }
+        targetName: { type: string, nullable: true }
+        details: { type: object, additionalProperties: true }
+        occurredAt: { type: string, format: date-time }
+    PageFields:
+      type: object
+      required: [page, size, totalItems, totalPages]
+      properties:
+        page: { type: integer }
+        size: { type: integer }
+        totalItems: { type: integer, format: int64 }
+        totalPages: { type: integer }
+    PagedMembers:
+      allOf:
+        - $ref: '#/components/schemas/PageFields'
+        - type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/Member' } }
+    PagedAuditEvents:
+      allOf:
+        - $ref: '#/components/schemas/PageFields'
+        - type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/AuditEvent' } }
+    PagedRestaurants:
+      allOf:
+        - $ref: '#/components/schemas/PageFields'
+        - type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: '#/components/schemas/Restaurant' } }
