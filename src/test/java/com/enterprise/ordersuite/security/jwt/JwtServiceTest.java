@@ -1,42 +1,49 @@
 package com.enterprise.ordersuite.security.jwt;
 
-import com.enterprise.ordersuite.identity.domain.User;
+import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.Base64;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtServiceTest {
 
+  private static final String USER = "01J0000000000000000000000U";
+  private static final String RESTAURANT = "01J0000000000000000000000R";
+
+  private final JwtService jwtService = new JwtService(properties(), Clock.systemUTC());
+
   @Test
-  void generateToken_carriesDisplayIdentityClaims_andKeepsTheExistingOnes() {
+  void generateToken_forMember_carriesSubRidAndRole_andNoDisplayData() {
+    String token = jwtService.generateToken(USER, RESTAURANT, "OWNER");
+
+    assertThat(jwtService.extractUserId(token)).as("sub is the user ULID").isEqualTo(USER);
+    assertThat(jwtService.extractRestaurantId(token)).isEqualTo(RESTAURANT);
+    assertThat(jwtService.extractRole(token)).isEqualTo("OWNER");
+    Set<String> claimNames = jwtService.extractClaim(token, (Claims claims) -> new HashSet<>(claims.keySet()));
+    assertThat(claimNames)
+      .as("display names and email leave the token; the client reads them from GET /me")
+      .containsExactlyInAnyOrder("sub", "rid", "role", "iat", "exp");
+  }
+
+  @Test
+  void generateToken_forPlatformAdmin_hasNoRestaurantClaim() {
+    String token = jwtService.generateToken(USER, null, "PLATFORM_ADMIN");
+
+    assertThat(jwtService.extractRestaurantId(token)).isNull();
+    assertThat(jwtService.extractRole(token)).isEqualTo("PLATFORM_ADMIN");
+  }
+
+  private static JwtProperties properties() {
     JwtProperties properties = new JwtProperties();
     properties.setSecret(Base64.getEncoder()
       .encodeToString("0123456789abcdef0123456789abcdef".getBytes(StandardCharsets.UTF_8)));
     properties.setExpiration(60_000);
-    JwtService jwtService = new JwtService(properties, Clock.systemUTC());
-
-    User user = new User();
-    user.setId("01J0000000000000000000000A");
-    user.setEmail("ana@test.com");
-    user.setFirstName("Ana");
-    user.setLastName("Souza");
-
-    String token = jwtService.generateToken(user, "OWNER");
-
-    var firstName = jwtService.<String>extractClaim(token, c -> c.get("firstName", String.class));
-    var lastName = jwtService.<String>extractClaim(token, c -> c.get("lastName", String.class));
-    var email = jwtService.<String>extractClaim(token, c -> c.get("email", String.class));
-
-    assertThat(firstName).isEqualTo("Ana");
-    assertThat(lastName).isEqualTo("Souza");
-    assertThat(email).isEqualTo("ana@test.com");
-    assertThat(jwtService.extractEmail(token)).as("sub is unchanged").isEqualTo("ana@test.com");
-    assertThat(jwtService.extractUserId(token)).isEqualTo("01J0000000000000000000000A");
-    assertThat(jwtService.extractRoles(token)).isEqualTo(List.of("OWNER"));
+    return properties;
   }
 }

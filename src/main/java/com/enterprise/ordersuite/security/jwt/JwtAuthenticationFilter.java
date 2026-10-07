@@ -16,9 +16,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -46,21 +44,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             if (jwtService.isTokenValid(jwt)) {
-                String userEmail = jwtService.extractEmail(jwt);
                 String userId = jwtService.extractUserId(jwt);
-                List<String> roles = jwtService.extractRoles(jwt);
+                String restaurantId = jwtService.extractRestaurantId(jwt);
+                String role = jwtService.extractRole(jwt);
 
-                if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+                if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                    // The role claim becomes the only authority; RoleHierarchy expands it
+                    // for @PreAuthorize.
+                    List<SimpleGrantedAuthority> authorities = role == null
+                            ? List.of()
+                            : List.of(new SimpleGrantedAuthority("ROLE_" + role));
 
-                    // Map roles to Spring Security authorities with "ROLE_" prefix
-                    if (roles != null) {
-                        authorities.addAll(roles.stream()
-                                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
-                                .collect(Collectors.toList()));
-                    }
-
-                    JwtUserPrincipal principal = new JwtUserPrincipal(userId, userEmail);
+                    JwtUserPrincipal principal = new JwtUserPrincipal(userId, restaurantId, role);
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(
                                     principal,
@@ -70,7 +65,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                    log.debug("User {} (ID: {}) authenticated with authorities: {}", userEmail, userId, authorities);
+                    log.debug("User {} authenticated with authorities: {}", userId, authorities);
                 }
             }
         } catch (Exception ex) {

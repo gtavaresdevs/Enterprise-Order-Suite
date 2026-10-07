@@ -1,5 +1,6 @@
 package com.enterprise.ordersuite.api.errors;
 
+import com.enterprise.ordersuite.common.tenancy.TenantContextMissingException;
 import com.enterprise.ordersuite.profile.domain.exception.InvalidAvatarException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +53,20 @@ public class GlobalExceptionHandler {
                 null
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    // Always a bug (Tenancy & Identity §5.1.2): restaurant-scoped code ran without a
+    // restaurant and failed closed.
+    @ExceptionHandler(TenantContextMissingException.class)
+    public ResponseEntity<ApiErrorResponse> handleTenantContextMissing(TenantContextMissingException ex) {
+        log.error("BUG: restaurant-scoped code ran without a tenant context", ex);
+        ApiErrorResponse body = new ApiErrorResponse(
+                "INTERNAL_SERVER_ERROR",
+                "An unexpected runtime error occurred.",
+                Instant.now(clock),
+                null
+        );
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 
     @ExceptionHandler(RuntimeException.class)

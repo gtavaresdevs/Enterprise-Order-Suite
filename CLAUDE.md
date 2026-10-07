@@ -77,11 +77,11 @@ Tests never need `.env` or a local Postgres: they start real containers through 
 **Cross-module dependency inversion:** the consuming module defines the interface it needs and the providing module implements it. (The legacy `orders`/`products` pair was the worked example; it was deleted in Build 1.) Never import across module packages directly.
 
 **Reuse, do not re-implement:**
-- `identity.application.CurrentUserService`: the logged-in user (id, email) from the security context.
+- `identity.application.CurrentUserService`: the logged-in user's id from the access token, and their `User` row.
 - `common.util.PagedResult`: pagination wrapper for list and search endpoints.
 - `api.errors.ApiErrorResponse` with `GlobalExceptionHandler` / `AuthExceptionHandler`: the error shape (`code`, `message`, `timestamp`, optional `errors` for validation).
 
-**Authorization:** only in `@PreAuthorize` (D2), never in a method body. Role hierarchy `ROLE_OWNER > ROLE_MANAGER > ROLE_STAFF`, with `ROLE_PLATFORM_ADMIN` outside it (`SecurityConfig.roleHierarchy()`) is applied by `methodSecurityExpressionHandler`, so it affects annotations and not a raw `getAuthorities()` call. Resource checks are helper beans referenced from SpEL. Code that must know a role for query filtering resolves it through `RoleHierarchy`, never `getAuthorities()`. "Tenant" means restaurant (ADR-0001); the scoping mechanism is the Tenancy & Identity contract (`docs/architecture/TENANCY-AND-IDENTITY.md`). Do not copy per-user ownership into new-architecture endpoints.
+**Authorization:** only in `@PreAuthorize` (D2), never in a method body. Role hierarchy `ROLE_OWNER > ROLE_MANAGER > ROLE_STAFF`, with `ROLE_PLATFORM_ADMIN` outside it (`SecurityConfig.roleHierarchy()`) is applied by `methodSecurityExpressionHandler`, so it affects annotations and not a raw `getAuthorities()` call. Resource checks are helper beans referenced from SpEL. Code that must know a role for query filtering resolves it through `RoleHierarchy`, never `getAuthorities()`. "Tenant" means restaurant (ADR-0001); the scoping mechanism is the Tenancy & Identity contract (`docs/architecture/TENANCY-AND-IDENTITY.md`). Do not copy per-user ownership into new-architecture endpoints. Restaurant-scoped code reads its restaurant only through `common.tenancy.TenantContextHolder.requireRestaurantId()` (fails closed), set by `security.web.TenantContextFilter` from the token claims `sub`, `rid`, `role`; every repository method of an entity with a `restaurantId` field takes the restaurant id or is `@TenantUnscoped` with a reason (`architecture.TenantRepositoryRuleTest`).
 
 **Menu:** no stock counts; the 86 toggle is the only availability control (Q-42 c, ADR-0000 FS-08).
 

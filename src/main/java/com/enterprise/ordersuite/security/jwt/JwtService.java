@@ -1,6 +1,5 @@
 package com.enterprise.ordersuite.security.jwt;
 
-import com.enterprise.ordersuite.identity.domain.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -13,7 +12,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -24,40 +22,39 @@ public class JwtService {
   private final JwtProperties jwtProperties;
   private final Clock clock;
 
-  // role: PLATFORM_ADMIN or the membership role; null when the user has neither.
-  public String generateToken(User user, String role) {
-    Map<String, Object> claims = new HashMap<>();
-    claims.put("userId", user.getId());
-    claims.put("roles", role == null ? List.of() : List.of(role));
-    // Display data only - a JWT payload is base64, not encrypted. Never phone or address.
-    claims.put("firstName", user.getFirstName());
-    claims.put("lastName", user.getLastName());
-    claims.put("email", user.getEmail());
-    return buildToken(claims, user.getEmail());
-  }
+  public static final String RESTAURANT_ID_CLAIM = "rid";
+  public static final String ROLE_CLAIM = "role";
 
-  private String buildToken(Map<String, Object> extraClaims, String subject) {
+  // Tenancy & Identity, Tokens: sub (user ULID), rid (restaurant ULID, absent for the
+  // platform admin), role. No display data: the client reads it from GET /me.
+  public String generateToken(String userId, String restaurantId, String role) {
+    Map<String, Object> claims = new HashMap<>();
+    if (restaurantId != null) {
+      claims.put(RESTAURANT_ID_CLAIM, restaurantId);
+    }
+    if (role != null) {
+      claims.put(ROLE_CLAIM, role);
+    }
     Instant now = clock.instant();
     return Jwts.builder()
-      .claims(extraClaims)
-      .subject(subject)
+      .claims(claims)
+      .subject(userId)
       .issuedAt(Date.from(now))
       .expiration(Date.from(now.plusMillis(jwtProperties.getExpiration())))
       .signWith(getSignInKey())
       .compact();
   }
 
-  public String extractEmail(String token) {
+  public String extractUserId(String token) {
     return extractClaim(token, Claims::getSubject);
   }
 
-  public String extractUserId(String token) {
-    return extractClaim(token, claims -> claims.get("userId", String.class));
+  public String extractRestaurantId(String token) {
+    return extractClaim(token, claims -> claims.get(RESTAURANT_ID_CLAIM, String.class));
   }
 
-  @SuppressWarnings("unchecked")
-  public List<String> extractRoles(String token) {
-    return extractClaim(token, claims -> claims.get("roles", List.class));
+  public String extractRole(String token) {
+    return extractClaim(token, claims -> claims.get(ROLE_CLAIM, String.class));
   }
 
   public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {

@@ -103,6 +103,7 @@ dependencies {
   testImplementation 'org.testcontainers:postgresql'
   testImplementation "org.assertj:assertj-core:3.27.7"
   testImplementation 'org.testcontainers:minio'
+  testImplementation 'com.tngtech.archunit:archunit:1.4.1'
 }
 
 test {

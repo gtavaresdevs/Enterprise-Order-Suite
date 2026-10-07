@@ -92,7 +92,7 @@ logging:
   level:
     org.springframework.security: DEBUG
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [requestId=%X{requestId}] - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [requestId=%X{requestId} restaurantId=%X{restaurantId} userId=%X{userId} support=%X{support}] - %msg%n"
 
 management:
   endpoints:

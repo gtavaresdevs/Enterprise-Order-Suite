@@ -89,6 +89,10 @@ public class AuthenticationService {
   }
 
   private String accessTokenFor(User user) {
-    return jwtService.generateToken(user, userRoleResolver.roleOf(user).orElse(null));
+    var acting = userRoleResolver.resolve(user);
+    return jwtService.generateToken(
+      user.getId(),
+      acting.map(UserRoleResolver.ActingRole::restaurantId).orElse(null),
+      acting.map(UserRoleResolver.ActingRole::role).orElse(null));
   }
 }
