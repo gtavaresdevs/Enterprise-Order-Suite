@@ -40,6 +40,7 @@ Leaves to other contracts: storefront settings, branding, ordering settings, del
 | D-17 | No restaurant suspension or deletion this run: there is no billing (ADR-0018). | **Claude** | ADR-0018 |
 | D-18 | Profile keeps name, phone, email (read-only) and avatar; department, office, bio, country and timezone are removed. `/me/profile` folds into `/me`. | Gabriel (proposal Q3 yes); folding: Claude | proposal C1 |
 | D-19 | The access token carries `sid`, the id of the refresh-token family it came from (stable across rotations). `POST /me/password` and `POST /me/sign-out-other-devices` keep that family and revoke the others: the refresh cookie is scoped to `/auth` and never reaches `/me/*`. A token without `sid` keeps no session. | Gabriel (2026-10-07, Build 1 slice 5: chose the `sid` claim over widening the cookie path) | Own account 2, 3 |
+| D-20 | `/auth/login` and `/auth/refresh` return `{ accessToken, expiresAt, role, user }`, where `user` is the app shell's display data: `id`, `firstName`, `lastName`, `email`, `avatarUrl`, `restaurantId`, `restaurantName` (both null for the platform admin). The frontend paints names from the same call that gives it the token, with no placeholder and no `GET /me` first; names stay out of the token, which travels on every request. | Gabriel (2026-10-07, Build 1 slice 5: names in the body rather than back in the token; the shell field set) | Phase 1 put names in the token to stop the dashboard showing a placeholder |
 
 ## Resources
 
@@ -151,7 +152,7 @@ Removed with no replacement: `GET /roles` (three fixed roles, proposal B6), `GET
 3. `POST /me/sign-out-other-devices` revokes every refresh-token family of the user except the current one, named by the access token's `sid` (D-19; proposal C5).
 
 ### Tokens
-1. Access token: JWT, 15 minutes (D-11). Claims: `sub` (user ULID), `rid` (restaurant ULID, absent for a platform admin), `role` (`OWNER`, `MANAGER`, `STAFF` or `PLATFORM_ADMIN`), `sid` (refresh-token family, D-19). Display names leave the token; the client reads them from `GET /me` **(Claude)**.
+1. Access token: JWT, 15 minutes (D-11). Claims: `sub` (user ULID), `rid` (restaurant ULID, absent for a platform admin), `role` (`OWNER`, `MANAGER`, `STAFF` or `PLATFORM_ADMIN`), `sid` (refresh-token family, D-19). Display names leave the token; the login and refresh responses carry them in the body (D-20), and `GET /me` has the full account.
 2. Refresh token: today's HttpOnly cookie with family rotation and reuse detection (D16-D24 kept), never in a body (D-10). Each rotation sets a new 30-day expiry (sliding; `RefreshTokenService.REFRESH_TTL` goes from 14 to 30 days in Build 1) (D-11).
 3. The claims are written from the membership when the token is issued. A membership change revokes the refresh tokens, so the next access token carries the new role.
 

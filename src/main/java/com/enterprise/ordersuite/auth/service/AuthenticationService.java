@@ -4,6 +4,7 @@ import com.enterprise.ordersuite.auth.dtos.AuthRequest;
 import com.enterprise.ordersuite.auth.domain.RefreshToken;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidCredentialsException;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidRefreshTokenException;
+import com.enterprise.ordersuite.identity.application.SessionUserFactory;
 import com.enterprise.ordersuite.identity.application.UserRoleResolver;
 import com.enterprise.ordersuite.identity.domain.User;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
@@ -14,14 +15,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.UUID;
-
 @Service
 @RequiredArgsConstructor
 public class AuthenticationService {
 
   private final UserRepository userRepository;
   private final UserRoleResolver userRoleResolver;
+  private final SessionUserFactory sessionUserFactory;
   private final PasswordEncoder passwordEncoder;
   private final JwtService jwtService;
   private final RefreshTokenService refreshTokenService;
@@ -39,9 +39,7 @@ public class AuthenticationService {
 
     meterRegistry.counter("app.login.attempt", "status", "success").increment();
 
-    var issuedRefresh = refreshTokenService.issueFor(user);
-
-    return new AuthTokens(accessTokenFor(user, issuedRefresh.familyId()), issuedRefresh.rawToken());
+    return tokensFor(user, refreshTokenService.issueFor(user));
   }
 
   // noRollbackFor: the reuse branch revokes the family and then answers 401. If the
@@ -70,9 +68,7 @@ public class AuthenticationService {
       throw new InvalidRefreshTokenException();
     }
 
-    var rotated = refreshTokenService.rotate(existing);
-
-    return new AuthTokens(accessTokenFor(user, rotated.familyId()), rotated.rawToken());
+    return tokensFor(user, refreshTokenService.rotate(existing));
   }
 
   @Transactional
@@ -88,12 +84,20 @@ public class AuthenticationService {
     refreshTokenService.revokeFamily(token);
   }
 
-  private String accessTokenFor(User user, UUID sessionId) {
+  // The body carries the shell's display data (D-20); the token carries only sub, rid, role
+  // and sid.
+  private AuthTokens tokensFor(User user, RefreshTokenService.IssuedRefreshToken refresh) {
     var acting = userRoleResolver.resolve(user);
-    return jwtService.generateToken(
-      user.getId(),
-      acting.map(UserRoleResolver.ActingRole::restaurantId).orElse(null),
-      acting.map(UserRoleResolver.ActingRole::role).orElse(null),
-      sessionId.toString());
+    String restaurantId = acting.map(UserRoleResolver.ActingRole::restaurantId).orElse(null);
+    String role = acting.map(UserRoleResolver.ActingRole::role).orElse(null);
+
+    String accessToken = jwtService.generateToken(user.getId(), restaurantId, role, refresh.familyId().toString());
+
+    return new AuthTokens(
+      accessToken,
+      jwtService.extractExpiresAt(accessToken),
+      role,
+      sessionUserFactory.of(user, restaurantId),
+      refresh.rawToken());
   }
 }

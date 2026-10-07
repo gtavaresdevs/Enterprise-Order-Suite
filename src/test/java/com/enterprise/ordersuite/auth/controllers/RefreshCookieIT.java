@@ -48,7 +48,7 @@ class RefreshCookieIT {
   private TestUsers testUsers;
 
   @Test
-  void login_setsThe30DayRefreshCookie_andTheBodyHasOnlyTheAccessToken() throws Exception {
+  void login_setsThe30DayRefreshCookie_andTheBodyNeverHasTheRefreshToken() throws Exception {
     MvcResult result = login(register());
 
     assertThat(result.getResponse().getHeader(HttpHeaders.SET_COOKIE))
@@ -57,7 +57,7 @@ class RefreshCookieIT {
     assertThat(objectMapper.readTree(result.getResponse().getContentAsString()).fieldNames())
       .toIterable()
       .as("acceptance 11: no auth response body contains refreshToken")
-      .containsExactly("accessToken");
+      .containsExactlyInAnyOrder("accessToken", "expiresAt", "role", "user");
   }
 
   @Test

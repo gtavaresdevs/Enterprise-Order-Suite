@@ -65,6 +65,10 @@ public class JwtService {
     return extractClaim(token, claims -> claims.get(SESSION_ID_CLAIM, String.class));
   }
 
+  public Instant extractExpiresAt(String token) {
+    return extractExpiration(token).toInstant();
+  }
+
   public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
     final Claims claims = extractAllClaims(token);
     return claimsResolver.apply(claims);

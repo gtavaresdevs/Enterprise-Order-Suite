@@ -565,11 +565,24 @@ components:
         password: { type: string, maxLength: 128 }
     AuthResponse:
       type: object
-      required: [accessToken, expiresAt, role]
+      required: [accessToken, expiresAt, role, user]
       properties:
         accessToken: { type: string }
         expiresAt: { type: string, format: date-time }
         role: { $ref: '#/components/schemas/TokenRole' }
+        user: { $ref: '#/components/schemas/SessionUser' }
+    SessionUser:
+      description: The app shell's display data (D-20). Never in the token.
+      type: object
+      required: [id, firstName, lastName, email, avatarUrl, restaurantId, restaurantName]
+      properties:
+        id: { $ref: '#/components/schemas/Ulid' }
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string }
+        avatarUrl: { type: string, nullable: true }
+        restaurantId: { allOf: [{ $ref: '#/components/schemas/Ulid' }], nullable: true }
+        restaurantName: { type: string, nullable: true }
     Membership:
       type: object
       required: [restaurantId, role, memberSince]

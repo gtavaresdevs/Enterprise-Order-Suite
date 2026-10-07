@@ -60,7 +60,7 @@ public class AuthenticationController {
         ResponseCookie cookie = refreshCookieFactory.issue(tokens.refreshToken(), httpRequest.getContextPath());
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(new AuthResponse(tokens.accessToken()));
+                .body(new AuthResponse(tokens.accessToken(), tokens.accessTokenExpiresAt(), tokens.role(), tokens.user()));
     }
 
     @Operation(summary = "Send password reset email (if user exists)")
