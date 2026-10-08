@@ -1,11 +1,14 @@
 package com.enterprise.ordersuite.auth.domain;
 
+import com.enterprise.ordersuite.common.persistence.UlidId;
 import com.enterprise.ordersuite.identity.domain.User;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import java.time.LocalDateTime;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import java.time.Instant;
 
 @Entity
 @Table(name = "password_history")
@@ -15,8 +18,10 @@ import java.time.LocalDateTime;
 public class PasswordHistory {
 
   @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
+  @UlidId
+  @JdbcTypeCode(SqlTypes.CHAR)
+  @Column(length = 26)
+  private String id;
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "user_id", nullable = false)
@@ -26,9 +31,9 @@ public class PasswordHistory {
   private String passwordHash;
 
   @Column(name = "created_at", nullable = false, updatable = false)
-  private LocalDateTime createdAt;
+  private Instant createdAt;
 
-  public PasswordHistory(User user, String passwordHash, LocalDateTime createdAt) {
+  public PasswordHistory(User user, String passwordHash, Instant createdAt) {
     this.user = user;
     this.passwordHash = passwordHash;
     this.createdAt = createdAt;

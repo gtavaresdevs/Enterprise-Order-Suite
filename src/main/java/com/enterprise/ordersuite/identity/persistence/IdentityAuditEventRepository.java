@@ -5,23 +5,19 @@ import com.enterprise.ordersuite.identity.domain.IdentityAuditEventType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
-public interface IdentityAuditEventRepository extends JpaRepository<IdentityAuditEvent, Long> {
+// Audit events are restaurant-owned: any finder added here takes the restaurant id
+// (TenantRepositoryRuleTest).
+public interface IdentityAuditEventRepository extends JpaRepository<IdentityAuditEvent, String> {
 
-    Page<IdentityAuditEvent> findAllByOrderByCreatedAtDesc(Pageable pageable);
-
-    Page<IdentityAuditEvent> findByTypeOrderByCreatedAtDesc(
-            IdentityAuditEventType type,
-            Pageable pageable
-    );
-
-    Page<IdentityAuditEvent> findByTargetUserIdOrderByCreatedAtDesc(
-            Long targetUserId,
-            Pageable pageable
-    );
-
-    Page<IdentityAuditEvent> findByActorUserIdOrderByCreatedAtDesc(
-            Long actorUserId,
+    // GET /audit-events: newest first, then id (the draft's x-default-order).
+    @Query("select e from IdentityAuditEvent e where e.restaurantId = :restaurantId"
+            + " and (:type is null or e.type = :type) order by e.createdAt desc, e.id desc")
+    Page<IdentityAuditEvent> findForRestaurant(
+            @Param("restaurantId") String restaurantId,
+            @Param("type") IdentityAuditEventType type,
             Pageable pageable
     );
 }

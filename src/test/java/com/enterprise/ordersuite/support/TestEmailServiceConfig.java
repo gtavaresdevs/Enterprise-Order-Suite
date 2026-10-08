@@ -21,6 +21,7 @@ public class TestEmailServiceConfig {
   public static class CapturingEmailService implements EmailService {
 
     private final List<SentEmail> sent = new CopyOnWriteArrayList<>();
+    private final List<SentEmail> invitations = new CopyOnWriteArrayList<>();
     private final AtomicBoolean fail = new AtomicBoolean(false);
 
     @Override
@@ -31,12 +32,22 @@ public class TestEmailServiceConfig {
       sent.add(new SentEmail(toEmail, resetUrl));
     }
 
+    @Override
+    public void sendInvitationEmail(String toEmail, String setupUrl) {
+      invitations.add(new SentEmail(toEmail, setupUrl));
+    }
+
     public List<SentEmail> sent() {
       return sent;
     }
 
+    public List<SentEmail> invitations() {
+      return invitations;
+    }
+
     public void clear() {
       sent.clear();
+      invitations.clear();
       fail.set(false);
     }
 

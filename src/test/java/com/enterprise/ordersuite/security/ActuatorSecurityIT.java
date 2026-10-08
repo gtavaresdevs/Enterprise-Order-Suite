@@ -46,22 +46,22 @@ class ActuatorSecurityIT {
   }
 
   @Test
-  @WithMockUser(roles = "USER")
-  void info_forbiddenForUser() throws Exception {
+  @WithMockUser(roles = "STAFF")
+  void info_forbiddenForStaff() throws Exception {
     mockMvc.perform(get("/actuator/info"))
       .andExpect(status().isForbidden());
   }
 
   @Test
-  @WithMockUser(roles = "ADMIN")
-  void info_forbiddenForAdmin() throws Exception {
+  @WithMockUser(roles = "OWNER")
+  void info_forbiddenForOwner() throws Exception {
     mockMvc.perform(get("/actuator/info"))
       .andExpect(status().isForbidden());
   }
 
   @Test
-  @WithMockUser(roles = "SUPER_ADMIN")
-  void info_accessibleForSuperAdmin() throws Exception {
+  @WithMockUser(roles = "PLATFORM_ADMIN")
+  void info_accessibleForPlatformAdmin() throws Exception {
     mockMvc.perform(get("/actuator/info"))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.app.name").value("enterprise-order-suite"));
@@ -74,22 +74,22 @@ class ActuatorSecurityIT {
   }
 
   @Test
-  @WithMockUser(roles = "USER")
-  void metrics_forbiddenForUser() throws Exception {
+  @WithMockUser(roles = "STAFF")
+  void metrics_forbiddenForStaff() throws Exception {
     mockMvc.perform(get("/actuator/metrics"))
       .andExpect(status().isForbidden());
   }
 
   @Test
-  @WithMockUser(roles = "ADMIN")
-  void metrics_forbiddenForAdmin() throws Exception {
+  @WithMockUser(roles = "OWNER")
+  void metrics_forbiddenForOwner() throws Exception {
     mockMvc.perform(get("/actuator/metrics"))
       .andExpect(status().isForbidden());
   }
 
   @Test
-  @WithMockUser(roles = "SUPER_ADMIN")
-  void metrics_accessibleForSuperAdmin() throws Exception {
+  @WithMockUser(roles = "PLATFORM_ADMIN")
+  void metrics_accessibleForPlatformAdmin() throws Exception {
     mockMvc.perform(get("/actuator/metrics"))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.names").isArray());

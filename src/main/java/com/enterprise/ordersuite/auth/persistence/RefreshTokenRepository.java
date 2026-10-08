@@ -1,33 +1,67 @@
 package com.enterprise.ordersuite.auth.persistence;
 
 import com.enterprise.ordersuite.auth.domain.RefreshToken;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
-public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
+public interface RefreshTokenRepository extends JpaRepository<RefreshToken, String> {
 
     Optional<RefreshToken> findByTokenHash(String tokenHash);
+
+    // Serializes concurrent presentations of one token: the second waits, then sees used_at.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select rt from RefreshToken rt where rt.tokenHash = :tokenHash")
+    Optional<RefreshToken> findByTokenHashForUpdate(String tokenHash);
+
+    @Modifying
+    @Transactional
+    @Query("""
+            update RefreshToken rt
+            set rt.revokedAt = :now
+            where rt.familyId = :familyId and rt.revokedAt is null
+            """)
+    int revokeFamily(UUID familyId, Instant now);
+
+    // Taken before revokeAllForUser: waits for any in-flight rotation of these tokens to
+    // commit, so the bulk update that follows sees the successor it inserted.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select rt from RefreshToken rt where rt.user.id = :userId and rt.revokedAt is null")
+    List<RefreshToken> findUnrevokedByUserIdForUpdate(String userId);
+
+    @Modifying
+    @Transactional
+    @Query("""
+            update RefreshToken rt
+            set rt.revokedAt = :now
+            where rt.user.id = :userId and rt.revokedAt is null
+            """)
+    int revokeAllForUser(String userId, Instant now);
+
+    @Modifying
+    @Transactional
+    @Query("""
+            update RefreshToken rt
+            set rt.revokedAt = :now
+            where rt.user.id = :userId and rt.familyId <> :keptFamilyId and rt.revokedAt is null
+            """)
+    int revokeAllForUserExceptFamily(String userId, UUID keptFamilyId, Instant now);
+
     @Modifying
     @Transactional
     @Query("""
             delete from RefreshToken rt
             where rt.expiresAt < :now
             """)
-    int deleteExpired(LocalDateTime now);
-
-    @Modifying
-    @Transactional
-    @Query("""
-            delete from RefreshToken rt
-            where (rt.usedAt is not null and rt.usedAt < :cutoff)
-               or (rt.revokedAt is not null and rt.revokedAt < :cutoff)
-            """)
-    int deleteUsedOrRevokedBefore(LocalDateTime cutoff);
+    int deleteExpired(Instant now);
 
 }

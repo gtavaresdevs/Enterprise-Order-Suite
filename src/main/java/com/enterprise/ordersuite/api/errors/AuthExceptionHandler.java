@@ -1,11 +1,12 @@
 package com.enterprise.ordersuite.api.errors;
 
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidCredentialsException;
+import com.enterprise.ordersuite.auth.service.exceptions.InvalidCurrentPasswordException;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidPasswordResetTokenException;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidRefreshTokenException;
 import com.enterprise.ordersuite.auth.service.exceptions.PasswordReuseException; // Imported
-import com.enterprise.ordersuite.orders.domain.exception.InvalidStatusTransitionException;
-import com.enterprise.ordersuite.orders.domain.exception.ProductNotFoundException;
+import com.enterprise.ordersuite.common.errors.InvalidInputException;
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -13,6 +14,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.core.annotation.Order;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
@@ -21,6 +23,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 
+// Consulted before GlobalExceptionHandler, which is where an unmapped exception lands.
+// Spring picks the first advice with any matching method, so order decides which advice
+// sees an exception at all - it must be explicit, not left to bean resolution order.
+@Order(1)
 @ControllerAdvice
 public class AuthExceptionHandler {
 
@@ -28,18 +34,6 @@ public class AuthExceptionHandler {
 
   public AuthExceptionHandler(Clock clock) {
     this.clock = clock;
-  }
-
-  // -------- Order / Product Errors --------
-
-  @ExceptionHandler(ProductNotFoundException.class)
-  public ResponseEntity<ApiErrorResponse> handleProductNotFound(ProductNotFoundException ex) {
-    return build(HttpStatus.BAD_REQUEST, "PRODUCT_NOT_FOUND", ex.getMessage());
-  }
-
-  @ExceptionHandler(InvalidStatusTransitionException.class)
-  public ResponseEntity<ApiErrorResponse> handleInvalidStatusTransition(InvalidStatusTransitionException ex) {
-    return build(HttpStatus.BAD_REQUEST, "INVALID_STATUS_TRANSITION", ex.getMessage());
   }
 
   // -------- Login / authentication --------
@@ -61,11 +55,17 @@ public class AuthExceptionHandler {
     return build(HttpStatus.BAD_REQUEST, "INVALID_RESET_TOKEN", "Invalid or expired reset token");
   }
 
-  // Explicitly handling the custom historical reuse error mapping rule
+  @ExceptionHandler(InvalidCurrentPasswordException.class)
+  public ResponseEntity<ApiErrorResponse> handleInvalidCurrentPassword(InvalidCurrentPasswordException ex) {
+    return build(HttpStatus.BAD_REQUEST, "INVALID_CURRENT_PASSWORD", ex.getMessage());
+  }
+
+  // 409, not 400: the request is well-formed but conflicts with the password history
+  // (API conventions §10.3).
   @ExceptionHandler(PasswordReuseException.class)
   public ResponseEntity<ApiErrorResponse> handlePasswordReuse(PasswordReuseException ex) {
     return build(
-      HttpStatus.BAD_REQUEST,
+      HttpStatus.CONFLICT,
       "PASSWORD_REUSE_ERROR",
       ex.getMessage() // Transmits: "This password has been used before. Please choose a different password."
     );
@@ -75,7 +75,7 @@ public class AuthExceptionHandler {
 
   @ExceptionHandler(InvalidRefreshTokenException.class)
   public ResponseEntity<ApiErrorResponse> handleInvalidRefreshToken(InvalidRefreshTokenException ex) {
-    return build(HttpStatus.BAD_REQUEST, "INVALID_REFRESH_TOKEN", "Invalid refresh token");
+    return build(HttpStatus.UNAUTHORIZED, "INVALID_REFRESH_TOKEN", "Invalid refresh token");
   }
 
   // -------- Validation / bad input --------
@@ -95,13 +95,28 @@ public class AuthExceptionHandler {
     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
   }
 
+  // An unknown field is refused app-wide (API conventions §4.4, spring.jackson
+  // fail-on-unknown-properties) and named in errors.
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ApiErrorResponse> handleNotReadable(HttpMessageNotReadableException ex) {
+    if (ex.getCause() instanceof UnrecognizedPropertyException unknown) {
+      ApiErrorResponse body = new ApiErrorResponse(
+        "INVALID_INPUT",
+        "Unknown field",
+        Instant.now(clock),
+        List.of(unknown.getPropertyName() + ": unknown field")
+      );
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
     return build(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "Malformed JSON");
   }
 
-  @ExceptionHandler(IllegalArgumentException.class)
-  public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
+  // Only an exception thrown on purpose echoes its message. There is deliberately no
+  // IllegalArgumentException handler: Spring matches handlers against causes too, so one
+  // here answered a data-access error with 400 and the HQL in message (ErrorDisclosureIT).
+  // An IllegalArgumentException is a bug and lands in GlobalExceptionHandler's generic 500.
+  @ExceptionHandler(InvalidInputException.class)
+  public ResponseEntity<ApiErrorResponse> handleInvalidInput(InvalidInputException ex) {
     return build(HttpStatus.BAD_REQUEST, "INVALID_INPUT", ex.getMessage());
   }
 
@@ -112,16 +127,9 @@ public class AuthExceptionHandler {
     throw ex; // Let Spring Security filters handle AccessDeniedException natively
   }
 
-  // -------- Fallback (auth-safe) --------
-
-  @ExceptionHandler(RuntimeException.class)
-  public ResponseEntity<ApiErrorResponse> handleRuntime(RuntimeException ex) {
-    return build(
-      HttpStatus.INTERNAL_SERVER_ERROR,
-      "AUTH_ERROR",
-      "Authentication request failed"
-    );
-  }
+  // No RuntimeException fallback here on purpose. Because this advice is consulted
+  // first, a catch-all would match every RuntimeException and make GlobalExceptionHandler
+  // unreachable - including its domain handlers. The fallback belongs there.
 
   // -------- Helper --------
 

@@ -16,23 +16,24 @@ public class CurrentUserService {
 
     private final UserRepository userRepository;
 
-    public String getEmail() {
-        return authenticationOrThrow().getName();
+    public String getUserId() {
+        return principal().id();
     }
 
-    public Long getUserId() {
+    // The access-token claims of the caller: user, restaurant, role and session (sid).
+    public JwtUserPrincipal principal() {
         Authentication auth = authenticationOrThrow();
         if (auth.getPrincipal() instanceof JwtUserPrincipal principal) {
-            return principal.id();
+            return principal;
         }
-        return requireUser().getId();
+        throw new IllegalStateException("Authenticated principal is not an access-token user");
     }
 
     @Transactional(readOnly = true)
     public User requireUser() {
-        String email = getEmail();
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Authenticated user not found: " + email));
+        String userId = getUserId();
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalStateException("Authenticated user not found: " + userId));
     }
 
     @Transactional(readOnly = true)

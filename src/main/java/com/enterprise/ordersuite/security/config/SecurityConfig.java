@@ -6,7 +6,9 @@ import com.enterprise.ordersuite.security.ratelimit.InMemoryBucketedSlidingWindo
 import com.enterprise.ordersuite.security.ratelimit.NoOpRateLimiter;
 import com.enterprise.ordersuite.security.ratelimit.RateLimiter;
 import com.enterprise.ordersuite.security.web.AuthRateLimitFilter;
+import com.enterprise.ordersuite.security.web.RefreshOriginFilter;
 import com.enterprise.ordersuite.security.web.RequestIdFilter;
+import com.enterprise.ordersuite.security.web.TenantContextFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
 import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
@@ -27,10 +30,12 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -41,17 +46,20 @@ import java.util.Optional;
 @EnableWebSecurity
 @EnableMethodSecurity
 @RequiredArgsConstructor
-@EnableConfigurationProperties(RateLimitProperties.class)
+@EnableConfigurationProperties({RateLimitProperties.class, RefreshCookieProperties.class, CorsProperties.class})
 public class SecurityConfig {
 
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
   private final ObjectMapper objectMapper;
   private final Clock clock;
   private final RateLimitProperties properties;
+  private final CorsProperties corsProperties;
 
   @Bean
   public RoleHierarchy roleHierarchy() {
-    return RoleHierarchyImpl.fromHierarchy("ROLE_SUPER_ADMIN > ROLE_ADMIN \n ROLE_ADMIN > ROLE_USER");
+    // Membership roles only. ROLE_PLATFORM_ADMIN sits outside the hierarchy (Tenancy &
+    // Identity D-3): it does not imply a membership role.
+    return RoleHierarchyImpl.fromHierarchy("ROLE_OWNER > ROLE_MANAGER \n ROLE_MANAGER > ROLE_STAFF");
   }
 
   @Bean
@@ -64,7 +72,7 @@ public class SecurityConfig {
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
-    configuration.setAllowedOrigins(List.of("http://localhost:3000"));
+    configuration.setAllowedOrigins(corsProperties.allowedOrigins());
     configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     configuration.setAllowedHeaders(List.of("Authorization", "Cache-Control", "Content-Type"));
     configuration.setAllowCredentials(true);
@@ -164,18 +172,31 @@ public class SecurityConfig {
     http
       .cors(cors -> cors.configurationSource(corsConfigurationSource()))
       .csrf(AbstractHttpConfigurer::disable)
-      .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedEntryPoint()))
+      .exceptionHandling(ex -> ex
+        .authenticationEntryPoint(unauthorizedEntryPoint())
+        .accessDeniedHandler(forbiddenHandler()))
       .authorizeHttpRequests(auth -> auth
         .requestMatchers("/error", "/auth/**", "/actuator/health/**", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html", "/webjars/**", "/logo.png").permitAll()
-        .requestMatchers("/actuator/info", "/actuator/metrics/**").hasRole("SUPER_ADMIN")
-        .requestMatchers("/admin/users/**", "/admin/identity-audit/**").hasRole("SUPER_ADMIN")
-        .requestMatchers("/admin/**", "/roles").hasRole("ADMIN")
+        // The anonymous storefront surface (Tenancy & Identity §5.5). Each endpoint under it
+        // has its own query and a leak test (LR-4).
+        .requestMatchers(HttpMethod.GET, "/public/**").permitAll()
+        .requestMatchers("/actuator/info", "/actuator/metrics/**").hasRole("PLATFORM_ADMIN")
         .anyRequest().authenticated()
       )
       .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
       .addFilterBefore(requestIdFilter, UsernamePasswordAuthenticationFilter.class)
       .addFilterBefore(authRateLimitFilter.orElse(null), UsernamePasswordAuthenticationFilter.class)
-      .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+      .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+      // After the JWT filter: the tenant context comes from the authenticated token. Not a
+      // bean, for the same reason as RefreshOriginFilter below.
+      .addFilterAfter(new TenantContextFilter(objectMapper, clock), UsernamePasswordAuthenticationFilter.class);
+
+    // Ahead of CorsFilter, so a foreign origin gets the standard ApiErrorResponse (403
+    // ORIGIN_NOT_ALLOWED) rather than the CORS processor's plain-text rejection. Not a bean:
+    // a Filter bean would also be auto-registered in the servlet chain.
+    http.addFilterBefore(
+      new RefreshOriginFilter(corsProperties.allowedOrigins(), objectMapper, clock),
+      CorsFilter.class);
 
     return http.build();
   }
@@ -186,6 +207,18 @@ public class SecurityConfig {
       response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
       response.setContentType(MediaType.APPLICATION_JSON_VALUE);
       ApiErrorResponse body = new ApiErrorResponse("UNAUTHORIZED", "Authentication required", Instant.now(clock));
+      objectMapper.writeValue(response.getOutputStream(), body);
+    };
+  }
+
+  // A role outside an endpoint's @PreAuthorize gets the standard error shape (API
+  // conventions §10), not the container's empty 403.
+  @Bean
+  public AccessDeniedHandler forbiddenHandler() {
+    return (request, response, accessDeniedException) -> {
+      response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+      response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+      ApiErrorResponse body = new ApiErrorResponse("FORBIDDEN", "Access denied", Instant.now(clock));
       objectMapper.writeValue(response.getOutputStream(), body);
     };
   }

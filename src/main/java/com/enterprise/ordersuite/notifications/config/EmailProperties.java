@@ -17,7 +17,7 @@ public class EmailProperties {
 
   /**
    * The 'From' destination envelope sender mailbox identity address utilized
-   * globally across platform transactional mail templates (e.g., gtavaresdev@gmail.com).
+   * globally across platform transactional mail templates (e.g., no-reply@example.com).
    */
   private String from;
 
@@ -26,6 +26,11 @@ public class EmailProperties {
    * Thymeleaf resource layout (defaults to "password-reset-email").
    */
   private String templateName = "password-reset-email";
+
+  /**
+   * The Thymeleaf template for a member invitation (password setup, 7 days).
+   */
+  private String invitationTemplateName = "invitation-email";
 
   /**
    * The absolute, fully qualified public root base URL of the active backend service instance.

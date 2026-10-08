@@ -65,7 +65,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
   protected boolean shouldNotFilter(HttpServletRequest request) {
     if (!"POST".equalsIgnoreCase(request.getMethod())) return true;
 
-    String path = request.getRequestURI();
+    String path = RequestPaths.withinApplication(request);
     return !(
       path.equals("/auth/forgot-password")
         || path.equals("/auth/login")
@@ -93,7 +93,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     // 2. Safely wrap request to allow multiple downstream stream reads
     CachedBodyRequestWrapper wrappedRequest = new CachedBodyRequestWrapper(request);
-    String path = wrappedRequest.getRequestURI();
+    String path = RequestPaths.withinApplication(wrappedRequest);
     String email = null;
 
     // 3. Extract target account identifiers for body-dependent rate limiting
@@ -113,7 +113,9 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
       }
     }
 
-    // 4. Relying on remote address (delegating X-Forwarded-For parsing security to Tomcat RemoteIpFilter)
+    // 4. The client IP. With server.forward-headers-strategy=native (behind a trusted proxy),
+    // Tomcat's RemoteIpValve has already replaced it with the X-Forwarded-For client;
+    // with the default none it is the socket address and forwarded headers are ignored (D23).
     String ip = wrappedRequest.getRemoteAddr();
 
     // 5. Check and apply dual-key rate limit configurations

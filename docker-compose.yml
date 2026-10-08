@@ -15,7 +15,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   minio:
-    image: minio/minio:latest
+    # minio/minio is no longer served by Docker Hub; same pinned build as MinioTestContainerConfig.
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     container_name: eos-minio
     restart: unless-stopped
     env_file:

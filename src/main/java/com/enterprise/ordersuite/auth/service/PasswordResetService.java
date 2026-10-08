@@ -1,28 +1,27 @@
 package com.enterprise.ordersuite.auth.service;
 
-import com.enterprise.ordersuite.auth.domain.PasswordHistory;
 import com.enterprise.ordersuite.auth.domain.PasswordResetToken;
-import com.enterprise.ordersuite.auth.persistence.PasswordHistoryRepository;
+import com.enterprise.ordersuite.auth.domain.PasswordResetTokenPurpose;
 import com.enterprise.ordersuite.auth.persistence.PasswordResetTokenRepository;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidPasswordResetTokenException;
-import com.enterprise.ordersuite.auth.service.exceptions.PasswordReuseException;
+import com.enterprise.ordersuite.common.errors.InvalidInputException;
+import com.enterprise.ordersuite.identity.application.MemberInvitations;
 import com.enterprise.ordersuite.identity.domain.User;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import com.enterprise.ordersuite.notifications.service.EmailService;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Clock;
-import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -31,36 +30,36 @@ import java.util.Optional;
  * historical credential reuse policy validation checks.
  */
 @Service
-public class PasswordResetService {
+public class PasswordResetService implements MemberInvitations {
 
   private static final int TOKEN_BYTES = 32; // Cryptographically strong 256-bit entropy
   private static final int EXPIRY_MINUTES = 15;
-  private static final int HISTORY_LIMIT = 5; // Track up to the last 5 passwords
+  static final Duration INVITE_EXPIRY = Duration.ofDays(7);
 
   private final UserRepository userRepository;
   private final PasswordResetTokenRepository passwordResetTokenRepository;
-  private final PasswordHistoryRepository passwordHistoryRepository;
-  private final PasswordEncoder passwordEncoder;
+  private final PasswordUpdater passwordUpdater;
   private final Clock clock;
   private final EmailService emailService;
   private final PasswordResetLinkBuilder linkBuilder;
+  private final RefreshTokenService refreshTokenService;
 
   public PasswordResetService(
     UserRepository userRepository,
     PasswordResetTokenRepository passwordResetTokenRepository,
-    PasswordHistoryRepository passwordHistoryRepository,
-    PasswordEncoder passwordEncoder,
+    PasswordUpdater passwordUpdater,
     Clock clock,
     EmailService emailService,
-    PasswordResetLinkBuilder linkBuilder
+    PasswordResetLinkBuilder linkBuilder,
+    RefreshTokenService refreshTokenService
   ) {
     this.userRepository = userRepository;
     this.passwordResetTokenRepository = passwordResetTokenRepository;
-    this.passwordHistoryRepository = passwordHistoryRepository;
-    this.passwordEncoder = passwordEncoder;
+    this.passwordUpdater = passwordUpdater;
     this.clock = clock;
     this.emailService = emailService;
     this.linkBuilder = linkBuilder;
+    this.refreshTokenService = refreshTokenService;
   }
 
   /**
@@ -88,19 +87,27 @@ public class PasswordResetService {
   }
 
   /**
-   * Triggers an isolated database transaction to initialize administrative provisioning flows
-   * for brand new platform users. Bypasses active status checks to allow initialization
-   * of pending/inactive provisioned administrator profiles.
-   *
-   * @param email Target destination account address.
+   * Issues an invite token (purpose INVITE, 7 days) for a user who has no password yet, and
+   * invalidates any invite token issued before, so only the newest link works (Tenancy &
+   * Identity, Invites 3). Joins the caller's transaction (restaurant creation, team invite);
+   * the email goes out only after that transaction commits, so a rolled-back invite never
+   * reaches anyone. The invitee completes it through POST /auth/reset-password.
    */
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
-  public void sendPasswordSetupForNewUser(String email) {
-    User user = userRepository.findByEmailIgnoreCase(email)
-      .orElseThrow(() -> new IllegalArgumentException("Cannot provision password setup: User profile not found for email provided."));
+  @Override
+  @Transactional
+  public void sendInvite(User user) {
+    Instant now = Instant.now(clock);
+    passwordResetTokenRepository.invalidateUnused(user.getId(), PasswordResetTokenPurpose.INVITE, now);
 
-    // Process token generation directly, bypassing the public recovery active checking constraints
-    processTokenCreationAndDispatch(user);
+    String rawToken = saveToken(user, PasswordResetTokenPurpose.INVITE, now.plus(INVITE_EXPIRY));
+    String setupUrl = linkBuilder.build(rawToken);
+    String email = user.getEmail();
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+      @Override
+      public void afterCommit() {
+        emailService.sendInvitationEmail(email, setupUrl);
+      }
+    });
   }
 
   /**
@@ -116,7 +123,7 @@ public class PasswordResetService {
       throw InvalidPasswordResetTokenException.generic();
     }
     if (newPassword == null || newPassword.isBlank()) {
-      throw new IllegalArgumentException("New password string constraints failed validation: must not be blank");
+      throw new InvalidInputException("newPassword: must not be blank");
     }
 
     // Compute the deterministic hash matching the criteria utilized during persistence allocation
@@ -125,7 +132,7 @@ public class PasswordResetService {
     PasswordResetToken prt = passwordResetTokenRepository.findByTokenHash(tokenHash)
       .orElseThrow(InvalidPasswordResetTokenException::generic);
 
-    LocalDateTime now = LocalDateTime.now(clock);
+    Instant now = Instant.now(clock);
 
     // Enforce singular execution logic requirements (Replay protection)
     if (prt.getUsedAt() != null) {
@@ -144,80 +151,32 @@ public class PasswordResetService {
       throw InvalidPasswordResetTokenException.generic();
     }
 
-    // ==========================================
-    // 1. EVALUATE PASSWORD REUSE RESTRICTIONS
-    // ==========================================
+    // Same reuse rules and history as a change from /me/password.
+    passwordUpdater.replace(user, newPassword);
 
-    // Step A: Compare against current active password hash (if one exists)
-    if (user.getPassword() != null && !user.getPassword().isBlank() && passwordEncoder.matches(newPassword, user.getPassword())) {
-      throw new PasswordReuseException();
-    }
-
-    // Step B: Compare against recent historical snapshots (limited strictly to the policy context)
-    List<PasswordHistory> historyList = passwordHistoryRepository.findRecentByUserId(
-      user.getId(), PageRequest.of(0, HISTORY_LIMIT)
-    );
-
-    for (PasswordHistory oldEntry : historyList) {
-      if (passwordEncoder.matches(newPassword, oldEntry.getPasswordHash())) {
-        throw new PasswordReuseException();
-      }
-    }
-
-    // ==========================================
-    // 2. PERSIST NEW PASSWORD & ARCHIVE OLD HASH
-    // ==========================================
-
-    // Capture the existing active password into history before overwriting it
-    if (user.getPassword() != null && !user.getPassword().isBlank()) {
-      PasswordHistory newHistoryEntry = new PasswordHistory(user, user.getPassword(), now);
-      passwordHistoryRepository.save(newHistoryEntry);
-    }
-
-    // Safely map and hash raw password string using configured encoders
-    user.setPassword(passwordEncoder.encode(newPassword));
-
-    // Ensure that upon setting the password, the user is explicitly flagged active if they were a provisioned user
-    if (!Boolean.TRUE.equals(user.getActive())) {
-      user.setActive(true);
-    }
-
-    userRepository.save(user);
+    // D21: a reset says the credentials may be compromised - end every existing session.
+    refreshTokenService.revokeAllFor(user);
 
     // Consume token to guarantee it can never be used again
     prt.setUsedAt(now);
     passwordResetTokenRepository.save(prt);
-
-    // ==========================================
-    // 3. CAP COMPLIANCE CLEANUP (Housekeeping)
-    // ==========================================
-
-    // High-performance query truncation delegates pruning to database layer instantly
-    passwordHistoryRepository.pruneOldEntries(user.getId(), (long) HISTORY_LIMIT);
   }
 
-  /**
-   * Shared private business logic handling extraction of raw crypto entropy, token record allocations,
-   * and background mailing dispatches.
-   */
   private String processTokenCreationAndDispatch(User user) {
-    // Generate strong secure random string token sequence
-    String rawToken = generateRawToken();
-    String tokenHash = sha256Hex(rawToken);
-
-    LocalDateTime now = LocalDateTime.now(clock);
-    LocalDateTime expiresAt = now.plusMinutes(EXPIRY_MINUTES);
-
-    // Create the token mapping entity context
-    PasswordResetToken entity = new PasswordResetToken(user, tokenHash, expiresAt);
-    passwordResetTokenRepository.save(entity);
-
-    // Build the frontend link string mapped out via properties configuration
-    String resetUrl = linkBuilder.build(rawToken);
+    String rawToken = saveToken(user, PasswordResetTokenPurpose.RESET,
+      Instant.now(clock).plus(Duration.ofMinutes(EXPIRY_MINUTES)));
 
     // Dispatched into the background thread pool manager asynchronously
-    emailService.sendPasswordResetEmail(user.getEmail(), resetUrl);
+    emailService.sendPasswordResetEmail(user.getEmail(), linkBuilder.build(rawToken));
 
+    return rawToken;
+  }
+
+  private String saveToken(User user, PasswordResetTokenPurpose purpose, Instant expiresAt) {
+    String rawToken = generateRawToken();
+    PasswordResetToken entity = new PasswordResetToken(user, sha256Hex(rawToken), expiresAt);
+    entity.setPurpose(purpose);
+    passwordResetTokenRepository.save(entity);
     return rawToken;
   }
 

@@ -81,6 +81,8 @@ dependencies {
   implementation 'software.amazon.awssdk:s3'
   implementation 'org.apache.tika:tika-core:3.2.2'
   implementation 'com.github.usefulness:webp-imageio:0.11.0'
+  // ULID primary keys (ADR-0009): monotonic within one millisecond.
+  implementation 'com.github.f4b6a3:ulid-creator:5.2.3'
 
   compileOnly 'org.projectlombok:lombok'
   developmentOnly 'org.springframework.boot:spring-boot-devtools'
@@ -101,6 +103,7 @@ dependencies {
   testImplementation 'org.testcontainers:postgresql'
   testImplementation "org.assertj:assertj-core:3.27.7"
   testImplementation 'org.testcontainers:minio'
+  testImplementation 'com.tngtech.archunit:archunit:1.4.1'
 }
 
 test {

@@ -1,6 +1,5 @@
 package com.enterprise.ordersuite.security.jwt;
 
-import com.enterprise.ordersuite.identity.domain.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -13,7 +12,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -24,35 +22,51 @@ public class JwtService {
   private final JwtProperties jwtProperties;
   private final Clock clock;
 
-  public String generateToken(User user) {
-    Map<String, Object> claims = new HashMap<>();
-    claims.put("userId", user.getId());
-    claims.put("roles", List.of(user.getRole().getName()));
-    return buildToken(claims, user.getEmail());
-  }
+  public static final String RESTAURANT_ID_CLAIM = "rid";
+  public static final String ROLE_CLAIM = "role";
+  public static final String SESSION_ID_CLAIM = "sid";
 
-  private String buildToken(Map<String, Object> extraClaims, String subject) {
+  // Tenancy & Identity, Tokens: sub (user ULID), rid (restaurant ULID, absent for the
+  // platform admin), role, sid (the refresh-token family the token came from, stable across
+  // rotations; lets /me/* spare the current session). No display data: the client reads it
+  // from GET /me.
+  public String generateToken(String userId, String restaurantId, String role, String sessionId) {
+    Map<String, Object> claims = new HashMap<>();
+    claims.put(SESSION_ID_CLAIM, sessionId);
+    if (restaurantId != null) {
+      claims.put(RESTAURANT_ID_CLAIM, restaurantId);
+    }
+    if (role != null) {
+      claims.put(ROLE_CLAIM, role);
+    }
     Instant now = clock.instant();
     return Jwts.builder()
-      .claims(extraClaims)
-      .subject(subject)
+      .claims(claims)
+      .subject(userId)
       .issuedAt(Date.from(now))
       .expiration(Date.from(now.plusMillis(jwtProperties.getExpiration())))
       .signWith(getSignInKey())
       .compact();
   }
 
-  public String extractEmail(String token) {
+  public String extractUserId(String token) {
     return extractClaim(token, Claims::getSubject);
   }
 
-  public Long extractUserId(String token) {
-    return extractClaim(token, claims -> claims.get("userId", Long.class));
+  public String extractRestaurantId(String token) {
+    return extractClaim(token, claims -> claims.get(RESTAURANT_ID_CLAIM, String.class));
   }
 
-  @SuppressWarnings("unchecked")
-  public List<String> extractRoles(String token) {
-    return extractClaim(token, claims -> claims.get("roles", List.class));
+  public String extractRole(String token) {
+    return extractClaim(token, claims -> claims.get(ROLE_CLAIM, String.class));
+  }
+
+  public String extractSessionId(String token) {
+    return extractClaim(token, claims -> claims.get(SESSION_ID_CLAIM, String.class));
+  }
+
+  public Instant extractExpiresAt(String token) {
+    return extractExpiration(token).toInstant();
   }
 
   public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {

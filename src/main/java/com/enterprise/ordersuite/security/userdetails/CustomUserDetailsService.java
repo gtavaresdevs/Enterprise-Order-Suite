@@ -1,5 +1,6 @@
 package com.enterprise.ordersuite.security.userdetails;
 
+import com.enterprise.ordersuite.identity.application.UserRoleResolver;
 import com.enterprise.ordersuite.identity.domain.User;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,10 +15,11 @@ import org.springframework.stereotype.Service;
 public class CustomUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
+    private final UserRoleResolver userRoleResolver;
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = userRepository.findByEmailIgnoreCaseFetchingRole(email)
+        User user = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         if (!Boolean.TRUE.equals(user.getActive())) {
@@ -25,6 +27,6 @@ public class CustomUserDetailsService implements UserDetailsService {
             throw new DisabledException("User account is disabled.");
         }
 
-        return new CustomUserDetails(user);
+        return new CustomUserDetails(user, userRoleResolver.roleOf(user).orElse(null));
     }
 }

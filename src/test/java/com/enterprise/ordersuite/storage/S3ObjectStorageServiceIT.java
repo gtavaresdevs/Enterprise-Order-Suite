@@ -3,7 +3,6 @@ package com.enterprise.ordersuite.storage;
 import com.enterprise.ordersuite.support.IntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
@@ -106,7 +105,8 @@ class S3ObjectStorageServiceIT {
           .build()
       )
     )
-      .isInstanceOf(SdkClientException.class);
+      .as("headObject must report the key as gone once delete() has removed it")
+      .isInstanceOf(NoSuchKeyException.class);
   }
 
   @Test
