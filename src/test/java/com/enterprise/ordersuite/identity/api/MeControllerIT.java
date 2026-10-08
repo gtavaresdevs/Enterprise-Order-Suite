@@ -144,7 +144,7 @@ class MeControllerIT {
     User user = testUsers.member(email, PASSWORD, MembershipRole.MANAGER);
     String token = login(email);
 
-    patchMe(token, "{\"firstName\":\"Ana\",\"lastName\":\"Souza\",\"phone\":\"+5511999998888\",\"email\":\"other@test.com\"}")
+    patchMe(token, "{\"firstName\":\"Ana\",\"lastName\":\"Souza\",\"phone\":\"+5511999998888\"}")
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.firstName").value("Ana"))
       .andExpect(jsonPath("$.lastName").value("Souza"))
@@ -156,6 +156,22 @@ class MeControllerIT {
     assertThat(saved.getFirstName()).isEqualTo("Ana");
     assertThat(saved.getPhone()).isEqualTo("+5511999998888");
     assertThat(saved.getEmail()).as("email is read-only (Own account 1)").isEqualTo(email);
+  }
+
+  @Test
+  void patchMe_withAnEmail_isRejectedAsAnUnknownField_andTheEmailStays() throws Exception {
+    String email = uniqueEmail();
+    User user = testUsers.owner(email, PASSWORD);
+    String token = login(email);
+
+    patchMe(token, "{\"firstName\":\"Ana\",\"email\":\"other@test.com\"}")
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+      .andExpect(jsonPath("$.errors[0]").value("email: unknown field"));
+
+    User saved = userRepository.findById(user.getId()).orElseThrow();
+    assertThat(saved.getEmail()).as("email is read-only (Own account 1)").isEqualTo(email);
+    assertThat(saved.getFirstName()).as("a refused request changes nothing").isEqualTo("Test");
   }
 
   @Test

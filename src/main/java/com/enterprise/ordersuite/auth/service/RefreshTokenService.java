@@ -4,6 +4,7 @@ import com.enterprise.ordersuite.auth.domain.RefreshToken;
 import com.enterprise.ordersuite.auth.persistence.RefreshTokenRepository;
 import com.enterprise.ordersuite.auth.service.tokens.RefreshTokenGenerator;
 import com.enterprise.ordersuite.auth.service.tokens.TokenHashing;
+import com.enterprise.ordersuite.identity.application.MemberSessions;
 import com.enterprise.ordersuite.identity.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,7 +17,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class RefreshTokenService {
+public class RefreshTokenService implements MemberSessions {
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final RefreshTokenGenerator refreshTokenGenerator;
@@ -57,6 +58,7 @@ public class RefreshTokenService {
     // Lock first, then revoke in a separate statement. Under READ COMMITTED the bulk update
     // alone would miss a successor that a concurrent rotation inserted but had not committed;
     // the lock waits for that commit and the update's fresh snapshot then includes it.
+    @Override
     @Transactional
     public void revokeAllFor(User user) {
         refreshTokenRepository.findUnrevokedByUserIdForUpdate(user.getId());

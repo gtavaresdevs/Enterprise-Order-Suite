@@ -4,6 +4,7 @@ import com.enterprise.ordersuite.auth.domain.PasswordResetToken;
 import com.enterprise.ordersuite.auth.domain.PasswordResetTokenPurpose;
 import com.enterprise.ordersuite.auth.persistence.PasswordResetTokenRepository;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidPasswordResetTokenException;
+import com.enterprise.ordersuite.identity.application.MemberInvitations;
 import com.enterprise.ordersuite.identity.domain.User;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
 import com.enterprise.ordersuite.notifications.service.EmailService;
@@ -28,7 +29,7 @@ import java.util.Optional;
  * historical credential reuse policy validation checks.
  */
 @Service
-public class PasswordResetService {
+public class PasswordResetService implements MemberInvitations {
 
   private static final int TOKEN_BYTES = 32; // Cryptographically strong 256-bit entropy
   private static final int EXPIRY_MINUTES = 15;
@@ -91,6 +92,7 @@ public class PasswordResetService {
    * the email goes out only after that transaction commits, so a rolled-back invite never
    * reaches anyone. The invitee completes it through POST /auth/reset-password.
    */
+  @Override
   @Transactional
   public void sendInvite(User user) {
     Instant now = Instant.now(clock);

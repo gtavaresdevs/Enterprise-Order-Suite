@@ -54,7 +54,7 @@ This page is the rulebook for request and response shapes. Contract docs (Tenanc
 1. `application/json`, UTF-8, for every request and response except uploads (§12). Field names are camelCase.
 2. Responses always include every field of the schema. An empty value is `null` (or `[]` for lists), never a missing key, so generated types stay exact **(Claude)**.
 3. Booleans are adjectives without `is`: `active`, `available`.
-4. Unknown request fields are rejected with 400 `INVALID_INPUT` **(Claude)**. A typo by a client, or by an agent, then fails loudly instead of being ignored. Build 1 sets this for the whole app.
+4. Unknown request fields are rejected with 400 `INVALID_INPUT` **(Claude)**, with `errors: ["<field>: unknown field"]`. A typo by a client, or by an agent, then fails loudly instead of being ignored. Set for the whole app in Build 1 slice 6 (`spring.jackson.deserialization.fail-on-unknown-properties`).
 5. Strings are trimmed by the server. An empty string after trimming counts as absent for optional fields and is `INVALID_INPUT` for required ones. Each draft states max lengths.
 6. Field name suffixes carry the unit: `...Id` (ULID), `...At` (instant), `...Date` (local date), `...Cents` (money), `...Minutes` (duration), `...Url` (absolute URL).
 

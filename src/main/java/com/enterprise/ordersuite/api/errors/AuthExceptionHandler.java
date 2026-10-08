@@ -5,6 +5,7 @@ import com.enterprise.ordersuite.auth.service.exceptions.InvalidCurrentPasswordE
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidPasswordResetTokenException;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidRefreshTokenException;
 import com.enterprise.ordersuite.auth.service.exceptions.PasswordReuseException; // Imported
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -93,8 +94,19 @@ public class AuthExceptionHandler {
     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
   }
 
+  // An unknown field is refused app-wide (API conventions §4.4, spring.jackson
+  // fail-on-unknown-properties) and named in errors.
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ApiErrorResponse> handleNotReadable(HttpMessageNotReadableException ex) {
+    if (ex.getCause() instanceof UnrecognizedPropertyException unknown) {
+      ApiErrorResponse body = new ApiErrorResponse(
+        "INVALID_INPUT",
+        "Unknown field",
+        Instant.now(clock),
+        List.of(unknown.getPropertyName() + ": unknown field")
+      );
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
     return build(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "Malformed JSON");
   }
 

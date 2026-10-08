@@ -44,6 +44,25 @@ public class TestUsers {
     return user;
   }
 
+  // A member of an existing restaurant, so tests can build a team (and a second restaurant
+  // for cross-tenant cases).
+  public User memberOf(String restaurantId, String email, String rawPassword, MembershipRole role) {
+    User user = save(email, rawPassword, false);
+    membershipRepository.save(new Membership(restaurantId, user, role));
+    return user;
+  }
+
+  // Invited but has not set a password yet (invitationPending).
+  public User inviteeOf(String restaurantId, String email, MembershipRole role) {
+    User user = save(email, null, false);
+    membershipRepository.save(new Membership(restaurantId, user, role));
+    return user;
+  }
+
+  public String restaurantOf(User user) {
+    return membershipRepository.findByUserId(user.getId()).orElseThrow().getRestaurantId();
+  }
+
   public User owner(String email, String rawPassword) {
     return member(email, rawPassword, MembershipRole.OWNER);
   }
@@ -57,7 +76,7 @@ public class TestUsers {
     user.setFirstName("Test");
     user.setLastName("User");
     user.setEmail(email.trim().toLowerCase(Locale.ROOT));
-    user.setPassword(passwordEncoder.encode(rawPassword));
+    user.setPassword(rawPassword == null ? null : passwordEncoder.encode(rawPassword));
     user.setPlatformAdmin(platformAdmin);
     user.setActive(true);
     return userRepository.save(user);

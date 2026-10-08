@@ -214,6 +214,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Restaurant' }
           description: The caller's restaurant.
+        '404': { description: 'RESTAURANT_NOT_FOUND (support read of an unknown id)', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
     patch:
       operationId: updateMyRestaurant
       tags: [tenancy-identity]
@@ -360,8 +361,9 @@ paths:
       x-seed: live POST /admin/users/{id}/password-setup
       responses:
         '204': { description: A new invite token is emailed; the old one stops working. }
+        '403': { $ref: '#/components/responses/Error' }
         '404': { description: 'MEMBER_NOT_FOUND', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
-        '409': { description: 'INVITATION_NOT_PENDING', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
+        '409': { description: 'INVITATION_NOT_PENDING (password already set, or member deactivated: D-23)', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
 
   /audit-events:
     get:

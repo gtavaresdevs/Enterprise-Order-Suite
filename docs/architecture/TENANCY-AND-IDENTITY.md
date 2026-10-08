@@ -41,6 +41,9 @@ Leaves to other contracts: storefront settings, branding, ordering settings, del
 | D-18 | Profile keeps name, phone, email (read-only) and avatar; department, office, bio, country and timezone are removed. `/me/profile` folds into `/me`. | Gabriel (proposal Q3 yes); folding: Claude | proposal C1 |
 | D-19 | The access token carries `sid`, the id of the refresh-token family it came from (stable across rotations). `POST /me/password` and `POST /me/sign-out-other-devices` keep that family and revoke the others: the refresh cookie is scoped to `/auth` and never reaches `/me/*`. A token without `sid` keeps no session. | Gabriel (2026-10-07, Build 1 slice 5: chose the `sid` claim over widening the cookie path) | Own account 2, 3 |
 | D-20 | `/auth/login` and `/auth/refresh` return `{ accessToken, expiresAt, role, user }`, where `user` is the app shell's display data: `id`, `firstName`, `lastName`, `email`, `avatarUrl`, `restaurantId`, `restaurantName` (both null for the platform admin). The frontend paints names from the same call that gives it the token, with no placeholder and no `GET /me` first; names stay out of the token, which travels on every request. | Gabriel (2026-10-07, Build 1 slice 5: names in the body rather than back in the token; the shell field set) | Phase 1 put names in the token to stop the dashboard showing a placeholder |
+| D-21 | When a change would remove the last active owner and is also a self-action, `LAST_OWNER` wins: the only owner demoting or deactivating themselves gets 409 `LAST_OWNER`; an owner with an active co-owner doing the same gets 409 `SELF_ACTION_NOT_ALLOWED`. | Gabriel (2026-10-08, Build 1 slice 6) | Membership changes 3, 4; acceptance 4 |
+| D-22 | Team writes (`POST /team/members`, `PATCH /team/members/{memberId}` and the deactivate, reactivate and resend-invite commands) judge the actor by their membership as it is now, not by the token's role: a deactivated actor is 403 `FORBIDDEN`, a demoted one is held to the new role. Reads keep the 15-minute window of D-11. | Gabriel (2026-10-08, Build 1 slice 6) | D-11 |
+| D-23 | Resending an invite to a deactivated member who never set a password is 409 `INVITATION_NOT_PENDING`: reactivate first, since `/auth/reset-password` refuses an inactive user's link. | Gabriel (2026-10-08, Build 1 slice 6) | Invites 3 |
 
 ## Resources
 
@@ -83,7 +86,7 @@ A platform admin never has a membership, and a member never has `platformAdmin =
 | `type` | enum | `MEMBER_INVITED`, `INVITE_RESENT`, `ROLE_CHANGED`, `MEMBER_DEACTIVATED`, `MEMBER_REACTIVATED`, `PASSWORD_CHANGED`, `PASSWORD_RESET`, `SIGNED_OUT_OTHER_DEVICES`, `RESTAURANT_CREATED`, `RESTAURANT_UPDATED`; Build 4 adds `PIX_KEY_CHANGED`, `WHATSAPP_NUMBER_CHANGED` |
 | `actorUserId`, `actorName` | | who did it |
 | `targetUserId`, `targetName` | or null | who it was done to |
-| `details` | object | type-specific, no secrets, no tokens (for `ROLE_CHANGED`: `{ from, to }`) |
+| `details` | object | type-specific, no secrets, no tokens (for `ROLE_CHANGED`: `{ from, to }`; for `MEMBER_INVITED`: `{ role }`; for `RESTAURANT_UPDATED`: `{ name: { from, to } }`) |
 | `occurredAt` | instant | |
 
 ## Operations
@@ -142,9 +145,10 @@ Removed with no replacement: `GET /roles` (three fixed roles, proposal B6), `GET
 1. Role change, deactivation and reactivation follow the matrix in §5.3.
 2. Role change and deactivation revoke every refresh-token family of the target (Q-29 a). Their current access token works until it expires (at most 15 minutes, D-11); the screen says so (proposal Rule 8).
 3. Nobody changes their own role or deactivates themselves: 409 `SELF_ACTION_NOT_ALLOWED`.
-4. Demoting or deactivating the last active owner: 409 `LAST_OWNER` (D-16).
+4. Demoting or deactivating the last active owner: 409 `LAST_OWNER` (D-16), checked first (D-21). The owner count is read under a row lock, so two owners demoting each other at once cannot both succeed.
 5. A deactivated user's login answers 401 `INVALID_CREDENTIALS`, like a wrong password (no account enumeration).
 6. Members are never hard-deleted: their id stays referenced by orders and audit events.
+7. Repeating a deactivation or reactivation, or setting the role a member already has, changes nothing and writes no audit event (API conventions §11.2). The actor is judged by their current membership (D-22).
 
 ### Own account (proposal C)
 1. `PATCH /me` edits `firstName`, `lastName`, `phone`. Email is read-only.
@@ -215,7 +219,7 @@ A manager acting on a manager or owner, or granting either role, gets 403 `FORBI
 | `SLUG_RESERVED` | 400 | the slug is in the reserved list (validation) |
 | `LAST_OWNER` | 409 | demoting or deactivating the last active owner |
 | `SELF_ACTION_NOT_ALLOWED` | 409 | changing one's own role or deactivating oneself |
-| `INVITATION_NOT_PENDING` | 409 | resending an invite to a member who already set a password |
+| `INVITATION_NOT_PENDING` | 409 | resending an invite to a member who already set a password, or who is deactivated (D-23) |
 | `MEMBER_NOT_FOUND` | 404 | unknown member, or a member of another restaurant |
 | `RESTAURANT_NOT_FOUND` | 404 | unknown restaurant id (platform) or slug (public) |
 | `INVALID_AVATAR` | 400 | avatar not an image or unreadable (live) |

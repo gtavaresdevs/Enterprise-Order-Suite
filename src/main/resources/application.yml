@@ -19,6 +19,11 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 6MB
+  # API conventions §4.4: an unknown request field is 400 INVALID_INPUT, never silently
+  # ignored (so a body carrying restaurantId is refused too, §3.3).
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
   jpa:
     hibernate:
       ddl-auto: validate
