@@ -86,7 +86,7 @@ A platform admin never has a membership, and a member never has `platformAdmin =
 | `type` | enum | `MEMBER_INVITED`, `INVITE_RESENT`, `ROLE_CHANGED`, `MEMBER_DEACTIVATED`, `MEMBER_REACTIVATED`, `PASSWORD_CHANGED`, `PASSWORD_RESET`, `SIGNED_OUT_OTHER_DEVICES`, `RESTAURANT_CREATED`, `RESTAURANT_UPDATED`; Build 4 adds `PIX_KEY_CHANGED`, `WHATSAPP_NUMBER_CHANGED` |
 | `actorUserId`, `actorName` | | who did it |
 | `targetUserId`, `targetName` | or null | who it was done to |
-| `details` | object | type-specific, no secrets, no tokens (for `ROLE_CHANGED`: `{ from, to }`; for `MEMBER_INVITED`: `{ role }`; for `RESTAURANT_UPDATED`: `{ name: { from, to } }`) |
+| `details` | object | type-specific, no secrets, no tokens (for `ROLE_CHANGED`: `{ from, to }`; for `MEMBER_INVITED`: `{ role }`; for `RESTAURANT_UPDATED`: each changed field as `{ from, to }`, `name` and, from the platform admin, `timezone`; for `RESTAURANT_CREATED`: `{ restaurantId, name, slug, timezone }`, since the event's own `restaurantId` is null) |
 | `occurredAt` | instant | |
 
 ## Operations
@@ -135,6 +135,8 @@ Removed with no replacement: `GET /roles` (three fixed roles, proposal B6), `GET
 1. The platform admin sends name, slug, timezone and the owner's email, first and last name.
 2. In one transaction: the restaurant row, a user with no password, an `OWNER` membership, a password-setup token, and a `RESTAURANT_CREATED` plus a `MEMBER_INVITED` audit event.
 3. After commit, the password-setup email is sent (today's email). The owner sets a password through `/auth/reset-password` and lands in their restaurant.
+4. Checked in this order: field validation (400 `INVALID_INPUT`), reserved slug (400 `SLUG_RESERVED`), taken slug (409 `SLUG_TAKEN`), taken owner email (409 `EMAIL_TAKEN`, which rolls the restaurant back). A blank `timezone` counts as absent and takes the default.
+5. `GET /platform/restaurants` is ordered by `name`, then `id`; `GET /platform/restaurants/{restaurantId}/members` uses the team order (role, last name, id). A platform `PATCH` that changes something writes `RESTAURANT_UPDATED` into that restaurant's own log, so its owner and managers see it.
 
 ### Invites (proposal B3)
 1. An invite creates the user (no password, `invitationPending = true`) and the membership with the chosen role, then sends the password-setup email after commit.
@@ -198,6 +200,7 @@ A manager acting on a manager or owner, or granting either role, gets 403 `FORBI
 ### 5.5 Public endpoints
 1. `/public/r/{slug}` resolves the slug to a restaurant; an unknown slug is 404 `RESTAURANT_NOT_FOUND`.
 2. `/public/*` never reuses a staff query and never returns staff-only fields (LR-4, ADR-0000). Each `/public/*` endpoint has a leak test.
+3. Build 1 has a single public endpoint and it needs no tenant context: it reads the restaurant by slug through its own query. The slug resolver of §5.1.1, which sets `TenantContext` for public requests, arrives with the first public endpoint that reads restaurant-owned rows (Storefront).
 
 ### 5.6 Required tests (inherited by every contract)
 1. Cross-tenant test per restaurant endpoint: a member of R2 reads, edits or transitions an R1 resource by id and gets 404; lists never contain R1 rows.

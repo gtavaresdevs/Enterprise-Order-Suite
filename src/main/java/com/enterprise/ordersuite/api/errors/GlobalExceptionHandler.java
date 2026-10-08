@@ -8,6 +8,8 @@ import com.enterprise.ordersuite.identity.domain.LastOwnerException;
 import com.enterprise.ordersuite.identity.domain.MemberNotFoundException;
 import com.enterprise.ordersuite.identity.domain.SelfActionNotAllowedException;
 import com.enterprise.ordersuite.restaurants.domain.RestaurantNotFoundException;
+import com.enterprise.ordersuite.restaurants.domain.SlugReservedException;
+import com.enterprise.ordersuite.restaurants.domain.SlugTakenException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -69,6 +71,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RestaurantNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleRestaurantNotFound(RestaurantNotFoundException ex) {
         return build(HttpStatus.NOT_FOUND, "RESTAURANT_NOT_FOUND", ex.getMessage());
+    }
+
+    @ExceptionHandler(SlugTakenException.class)
+    public ResponseEntity<ApiErrorResponse> handleSlugTaken(SlugTakenException ex) {
+        return build(HttpStatus.CONFLICT, "SLUG_TAKEN", ex.getMessage());
+    }
+
+    @ExceptionHandler(SlugReservedException.class)
+    public ResponseEntity<ApiErrorResponse> handleSlugReserved(SlugReservedException ex) {
+        return build(HttpStatus.BAD_REQUEST, "SLUG_RESERVED", ex.getMessage());
     }
 
     @ExceptionHandler(EmailTakenException.class)

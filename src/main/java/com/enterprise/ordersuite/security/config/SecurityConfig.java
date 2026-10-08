@@ -17,6 +17,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
 import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
@@ -176,6 +177,9 @@ public class SecurityConfig {
         .accessDeniedHandler(forbiddenHandler()))
       .authorizeHttpRequests(auth -> auth
         .requestMatchers("/error", "/auth/**", "/actuator/health/**", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html", "/webjars/**", "/logo.png").permitAll()
+        // The anonymous storefront surface (Tenancy & Identity §5.5). Each endpoint under it
+        // has its own query and a leak test (LR-4).
+        .requestMatchers(HttpMethod.GET, "/public/**").permitAll()
         .requestMatchers("/actuator/info", "/actuator/metrics/**").hasRole("PLATFORM_ADMIN")
         .anyRequest().authenticated()
       )

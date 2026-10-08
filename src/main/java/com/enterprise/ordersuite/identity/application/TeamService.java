@@ -56,8 +56,16 @@ public class TeamService {
 
     @Transactional(readOnly = true)
     public PagedResult<MemberResponse> list(MembershipRole role, Boolean active, int page, int size, String sort) {
+        return listIn(TenantContextHolder.requireRestaurantId(), role, active, page, size, sort);
+    }
+
+    // The platform admin's view of a restaurant's team (GET /platform/restaurants/{id}/members):
+    // the restaurant comes from the path (D-6), and the caller has checked that it exists.
+    @Transactional(readOnly = true)
+    public PagedResult<MemberResponse> listIn(
+            String restaurantId, MembershipRole role, Boolean active, int page, int size, String sort) {
         Page<Membership> members = membershipRepository.findMembers(
-                TenantContextHolder.requireRestaurantId(), role, active, PageRequest.of(page, size, order(sort)));
+                restaurantId, role, active, PageRequest.of(page, size, order(sort)));
         return PagedResult.of(members, members.map(this::toResponse).getContent());
     }
 
@@ -66,11 +74,16 @@ public class TeamService {
         return toResponse(requireMember(memberId));
     }
 
-    // Invites 1 and 2: a user with no password and the membership, in the caller's
-    // transaction; the email goes out after commit.
     @Transactional
     public MemberResponse invite(InviteMemberRequest request) {
-        String restaurantId = TenantContextHolder.requireRestaurantId();
+        return inviteTo(TenantContextHolder.requireRestaurantId(), request);
+    }
+
+    // Invites 1 and 2: a user with no password and the membership, in the caller's
+    // transaction; the email goes out after commit. The platform paths (restaurant creation,
+    // POST /platform/restaurants/{id}/members) name the restaurant themselves.
+    @Transactional
+    public MemberResponse inviteTo(String restaurantId, InviteMemberRequest request) {
         String email = request.email().trim().toLowerCase(Locale.ROOT);
         if (userRepository.existsByEmailIgnoreCase(email)) {
             throw new EmailTakenException();
@@ -85,7 +98,7 @@ public class TeamService {
         Membership membership = membershipRepository.save(new Membership(restaurantId, user, request.role()));
 
         memberInvitations.sendInvite(user);
-        record(IdentityAuditEventType.MEMBER_INVITED, user, Map.of("role", request.role().name()));
+        record(IdentityAuditEventType.MEMBER_INVITED, restaurantId, user, Map.of("role", request.role().name()));
         return toResponse(membership);
     }
 
@@ -103,7 +116,8 @@ public class TeamService {
 
             membership.setRole(request.role());
             memberSessions.revokeAllFor(user);
-            record(IdentityAuditEventType.ROLE_CHANGED, user, Map.of("from", from.name(), "to", request.role().name()));
+            record(IdentityAuditEventType.ROLE_CHANGED, membership.getRestaurantId(), user,
+                    Map.of("from", from.name(), "to", request.role().name()));
         }
         if (request.firstName() != null) {
             user.setFirstName(request.firstName().trim());
@@ -129,7 +143,7 @@ public class TeamService {
 
         user.setActive(false);
         memberSessions.revokeAllFor(user);
-        record(IdentityAuditEventType.MEMBER_DEACTIVATED, user, Map.of());
+        record(IdentityAuditEventType.MEMBER_DEACTIVATED, membership.getRestaurantId(), user, Map.of());
         return toResponse(membership);
     }
 
@@ -142,7 +156,7 @@ public class TeamService {
         }
 
         user.setActive(true);
-        record(IdentityAuditEventType.MEMBER_REACTIVATED, user, Map.of());
+        record(IdentityAuditEventType.MEMBER_REACTIVATED, membership.getRestaurantId(), user, Map.of());
         return toResponse(membership);
     }
 
@@ -150,13 +164,14 @@ public class TeamService {
     // link (Gabriel, Build 1 slice 6).
     @Transactional
     public void resendInvite(String memberId) {
-        User user = requireMember(memberId).getUser();
+        Membership membership = requireMember(memberId);
+        User user = membership.getUser();
         if (user.getPassword() != null || !Boolean.TRUE.equals(user.getActive())) {
             throw new InvitationNotPendingException();
         }
 
         memberInvitations.sendInvite(user);
-        record(IdentityAuditEventType.INVITE_RESENT, user, Map.of());
+        record(IdentityAuditEventType.INVITE_RESENT, membership.getRestaurantId(), user, Map.of());
     }
 
     private Membership requireMember(String memberId) {
@@ -184,9 +199,8 @@ public class TeamService {
         }
     }
 
-    private void record(IdentityAuditEventType type, User target, Map<String, Object> details) {
-        identityAuditService.recordEvent(
-                type, TenantContextHolder.requireRestaurantId(), currentUserService.getUserId(), target.getId(), details);
+    private void record(IdentityAuditEventType type, String restaurantId, User target, Map<String, Object> details) {
+        identityAuditService.recordEvent(type, restaurantId, currentUserService.getUserId(), target.getId(), details);
     }
 
     // sort=<field>,<asc|desc> for the draft's x-sort fields; anything else is INVALID_INPUT.

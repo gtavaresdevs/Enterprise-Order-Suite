@@ -391,6 +391,7 @@ paths:
       x-roles: [PLATFORM_ADMIN]
       x-seed: new
       x-sort: [name, createdAt]
+      x-default-order: name, then id
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
@@ -416,7 +417,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Restaurant' }
-          description: Created; the owner's invite email is sent after commit.
+          description: Created with its owner invited (Restaurant creation 1-4); the invite email is sent after commit.
         '400': { description: 'INVALID_INPUT, SLUG_RESERVED', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
         '409': { description: 'SLUG_TAKEN, EMAIL_TAKEN', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
   /platform/restaurants/{restaurantId}:
@@ -464,6 +465,7 @@ paths:
       tags: [tenancy-identity]
       x-roles: [PLATFORM_ADMIN]
       x-seed: new
+      x-default-order: role (OWNER, MANAGER, STAFF), then lastName, then id
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
@@ -473,6 +475,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PagedMembers' }
           description: The restaurant's members.
+        '404': { description: 'RESTAURANT_NOT_FOUND', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
     post:
       operationId: inviteRestaurantMember
       tags: [tenancy-identity]
@@ -489,6 +492,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Member' }
           description: Invited.
+        '404': { description: 'RESTAURANT_NOT_FOUND', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
         '409': { description: 'EMAIL_TAKEN', content: { application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } } } }
 
   /public/r/{slug}:

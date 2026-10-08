@@ -74,7 +74,7 @@ public class RestaurantService {
                 .orElseThrow(RestaurantNotFoundException::new);
     }
 
-    private RestaurantResponse toResponse(Restaurant restaurant) {
+    RestaurantResponse toResponse(Restaurant restaurant) {
         return new RestaurantResponse(
                 restaurant.getId(),
                 restaurant.getName(),
