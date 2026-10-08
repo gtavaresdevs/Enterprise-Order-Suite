@@ -5,6 +5,7 @@ import com.enterprise.ordersuite.auth.service.exceptions.InvalidCurrentPasswordE
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidPasswordResetTokenException;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidRefreshTokenException;
 import com.enterprise.ordersuite.auth.service.exceptions.PasswordReuseException; // Imported
+import com.enterprise.ordersuite.common.errors.InvalidInputException;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -110,8 +111,12 @@ public class AuthExceptionHandler {
     return build(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "Malformed JSON");
   }
 
-  @ExceptionHandler(IllegalArgumentException.class)
-  public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
+  // Only an exception thrown on purpose echoes its message. There is deliberately no
+  // IllegalArgumentException handler: Spring matches handlers against causes too, so one
+  // here answered a data-access error with 400 and the HQL in message (ErrorDisclosureIT).
+  // An IllegalArgumentException is a bug and lands in GlobalExceptionHandler's generic 500.
+  @ExceptionHandler(InvalidInputException.class)
+  public ResponseEntity<ApiErrorResponse> handleInvalidInput(InvalidInputException ex) {
     return build(HttpStatus.BAD_REQUEST, "INVALID_INPUT", ex.getMessage());
   }
 

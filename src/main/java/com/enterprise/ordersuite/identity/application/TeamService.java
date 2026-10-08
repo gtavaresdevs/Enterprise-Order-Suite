@@ -1,5 +1,6 @@
 package com.enterprise.ordersuite.identity.application;
 
+import com.enterprise.ordersuite.common.errors.InvalidInputException;
 import com.enterprise.ordersuite.common.tenancy.TenantContextHolder;
 import com.enterprise.ordersuite.common.util.PagedResult;
 import com.enterprise.ordersuite.identity.api.dto.InviteMemberRequest;
@@ -200,19 +201,19 @@ public class TeamService {
         String path = switch (field) {
             case "lastName" -> "u.lastName";
             case "createdAt" -> "m.createdAt";
-            default -> throw new IllegalArgumentException("sort: unknown field " + field);
+            default -> throw new InvalidInputException("sort: unknown field " + field);
         };
         return JpaSort.unsafe(direction, path).andUnsafe(Sort.Direction.ASC, "u.id");
     }
 
     private static Sort.Direction direction(String[] parts) {
         if (parts.length != 2) {
-            throw new IllegalArgumentException("sort: expected <field>,<asc|desc>");
+            throw new InvalidInputException("sort: expected <field>,<asc|desc>");
         }
         return switch (parts[1].trim().toLowerCase(Locale.ROOT)) {
             case "asc" -> Sort.Direction.ASC;
             case "desc" -> Sort.Direction.DESC;
-            default -> throw new IllegalArgumentException("sort: direction must be asc or desc");
+            default -> throw new InvalidInputException("sort: direction must be asc or desc");
         };
     }
 

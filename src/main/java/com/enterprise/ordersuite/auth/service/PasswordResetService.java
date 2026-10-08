@@ -4,6 +4,7 @@ import com.enterprise.ordersuite.auth.domain.PasswordResetToken;
 import com.enterprise.ordersuite.auth.domain.PasswordResetTokenPurpose;
 import com.enterprise.ordersuite.auth.persistence.PasswordResetTokenRepository;
 import com.enterprise.ordersuite.auth.service.exceptions.InvalidPasswordResetTokenException;
+import com.enterprise.ordersuite.common.errors.InvalidInputException;
 import com.enterprise.ordersuite.identity.application.MemberInvitations;
 import com.enterprise.ordersuite.identity.domain.User;
 import com.enterprise.ordersuite.identity.persistence.UserRepository;
@@ -122,7 +123,7 @@ public class PasswordResetService implements MemberInvitations {
       throw InvalidPasswordResetTokenException.generic();
     }
     if (newPassword == null || newPassword.isBlank()) {
-      throw new IllegalArgumentException("New password string constraints failed validation: must not be blank");
+      throw new InvalidInputException("newPassword: must not be blank");
     }
 
     // Compute the deterministic hash matching the criteria utilized during persistence allocation
